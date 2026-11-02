@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres_demo_only
+      POSTGRES_DB: memz
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - memz_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d memz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  memz_data:
