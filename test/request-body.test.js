@@ -19,7 +19,7 @@ async function login(){
   assert.equal(r.status,200);return {cookie:r.headers.get('set-cookie').split(';')[0],csrf:r.json().csrf};
 }
 function rejected(r,status){
-  assert.equal(r.status,status,r.text);assert.match(r.headers.get('content-type'),/application\/json/);
+  assert.equal(r.status,status);assert.match(r.headers.get('content-type'),/application\/json/);
   const json=r.json();assert.deepEqual(Object.keys(json),['error']);assert.equal(typeof json.error,'string');
   assert.equal(r.headers.get('x-content-type-options'),'nosniff');assert.ok(r.headers.get('content-security-policy'));
   assert.equal(r.headers.get('set-cookie'),null,'拒绝请求不能创建会话');
@@ -75,4 +75,9 @@ test('valid JSON charset, field errors and bodyless logout retain existing behav
   for(const path of ['/api/projects/1/sources','/api/projects/1/candidates'])rejected(await request(path,{auth,body:'{}',headers:{'content-type':'application/json'}}),400);
   const logout=await request('/api/logout',{auth});assert.equal(logout.status,200);assert.deepEqual(logout.json(),{ok:true});
   rejected(await request('/api/me',{auth,method:'GET'}),401);
+});
+test('login requires a string username without array coercion or object conversion',async()=>{
+  for(const username of [['owner'],[],null,true,1,{}, {toString:'owner'}, {toString:null,valueOf:null}]){
+    rejected(await request('/api/login',{body:JSON.stringify({username,password:'demo-owner'}),headers:{'content-type':'application/json'}}),401);
+  }
 });

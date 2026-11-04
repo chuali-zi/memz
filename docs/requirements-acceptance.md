@@ -4,7 +4,7 @@
 
 | 需求 | 可执行验收条件 | 实现位置 | 自动证据与演示材料 |
 | --- | --- | --- | --- |
-| R01 会话身份可信 | 伪造X-User不能登录；错误密码401；退出后旧cookie失效 | server.js 登录、会话中间件 | integration.test.js伪造身份；request-body.test.js退出失效；UI 01/02 |
+| R01 会话身份可信 | 伪造X-User不能登录；错误密码/非字符串用户名401；退出后旧cookie失效 | server.js 登录、会话中间件 | integration.test.js伪造身份；request-body.test.js退出失效；UI 01/02 |
 | R02 项目隔离 | 用户不能读另一项目；来源不能跨项目关联 | memberships、member_role、RLS与复合外键 | integration.test.js跨项目请求/SQL；检索隔离用例；UI 08 |
 | R03 角色分工 | owner/member可提议；viewer不能写；只有owner可决策 | role检查与各表写入策略 | integration.test.js权限与操作前后快照；UI 07 |
 | R04 来源与候选先于事实 | 提议只产生pending候选及propose审计，不自动改变当前事实 | candidates接口、sources接口 | 检索待审排除用例；UI 05 |
@@ -16,7 +16,7 @@
 | R10 不可信文本不自动执行 | 外部指令只作为数据/候选；负责人可驳回，历史不增加 | 前端textContent、候选流程 | integration.test.js文字检索；UI 05/06；不等于完整XSS安全认证 |
 | R11 数据库指针完整性 | 错事实、错版本、正版本空指针均被数据库拒绝 | facts复合FK与CHECK | integration.test.js直接SQL反例；test/migrations.js |
 | R12 保留数据升级 | 原库升级后业务行/序列/权限/策略不变；可重复；失败回滚；应用账号不能迁移 | 001迁移 | test/migrations.js 7组；含升级后完整HTTP集成 |
-| R13 输入错误可理解 | 登录/来源/候选要求JSON对象；非JSON415；空/坏JSON400；超16KiB413；错误JSON不反射请求原文 | requireJsonObject、解析器、统一错误处理 | request-body.test.js 7组，含字节边界、多字节与gzip膨胀、错误安全头 |
+| R13 输入错误可理解 | 登录/来源/候选要求JSON对象；非JSON415；空/坏JSON400；超16KiB413；错误JSON不反射请求原文 | requireJsonObject、解析器、统一错误处理 | request-body.test.js 8组，含字节边界、多字节与gzip膨胀、错误安全头 |
 | R14 演示可复现 | 无需重置现有数据生成八张截图；报告含提交/版本/校验值；没有浏览器脚本错误 | test/ui.js、ui-evidence.js | ui-evidence artifact；docs/demo-evidence.md |
 
 ## 运行条件与取证方法

@@ -6,7 +6,7 @@
 
 | 方法与路径 | 输入 | 成功结果 | 权限与主要失败 |
 | --- | --- | --- | --- |
-| POST /api/login | username, password | name, csrf；设置sid cookie | 公开合成账号；错误凭据401；不匹配的Origin返回403 JSON |
+| POST /api/login | username, password | name, csrf；设置sid cookie | 公开合成账号；用户名/密码须为字符串，错误凭据401；不匹配的Origin返回403 JSON |
 | GET /api/me | cookie | name, csrf | 未登录/过期401 |
 | POST /api/logout | cookie、CSRF；无请求体也可 | ok:true；清除会话/cookie | 未登录401；CSRF错误403 |
 | GET /api/projects | cookie | id/name/role 数组 | 仅当前用户所属项目 |
