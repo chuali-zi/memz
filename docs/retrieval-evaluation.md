@@ -41,3 +41,5 @@ EVALUATION_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/me
 报告 schemaVersion 2 增加 fillerCount、原响应 UTF-8 字节数和返回行数，以及每例分页完整遍历的页数、最大页行数、首/总字节数。分页使用相同黄金结果验证但不计时；原 HTTP 耗时仍仅指聚合接口。默认填充200，可通过 EVALUATION_FILLER_COUNT 设置200–5000。测量结果和快照边界见[游标分页](bounded-retrieval.md)。
 
 报告contextScale另记录来源/候选/历史/审计数组规模，以及省略历史的侧栏与历史第一页合计字节数。固定种子下核对其他字段不变、历史第一页等于原聚合前25条；不进行新旧请求耗时比较。详见[历史分页实测](history-pagination.md)。
+
+报告candidateScale增加来源/审计响应、候选第一页及与历史第一页合计的JSON字节数（不含事实页），并核对旧候选前25条及保留字段。测量与限制见[候选分页](candidate-pagination.md)。

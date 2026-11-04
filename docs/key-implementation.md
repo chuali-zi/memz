@@ -68,3 +68,7 @@ ALTER TABLE facts ADD CONSTRAINT facts_current_revision_state
 ## 历史有界读取
 
 `readHistoryPage`按修订ID倒序并以排他before游标取limit+1行，复用角色校验、RLS及单页只读快照。`readProject`仅在include_history=false时跳过历史读取，默认兼容。页面loadHistory独立维护页起点与请求代次，刷新时旧响应不可覆盖新页；较新修订需刷新第一页。它不提供跨请求共同快照，也未解决来源和候选的全量加载。
+
+## 候选状态筛选与分页
+
+readCandidatesPage参数化查询状态和排他before游标，每页limit+1行判断后续页，复用角色/RLS及单页只读快照。页面renderCandidate仅为owner的pending行显示决定按钮，但服务端decide仍锁定与复核候选状态。决定期间禁用条目按钮，成功或409后刷新并保留筛选。旧筛选响应按请求代次丢弃；状态在翻页期间变化不提供共同快照保证。来源仍全量加载。

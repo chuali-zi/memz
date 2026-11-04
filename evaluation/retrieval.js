@@ -75,6 +75,14 @@ async function main(){
     contextScale.withoutHistoryBytes=reduced.bytes;contextScale.historyFirstPageBytes=firstHistory.bytes;
     contextScale.historyFirstPageRows=firstHistory.body.history.length;
     contextScale.initialCombinedBytes=reduced.bytes+firstHistory.bytes;
+    const candidateContext=await readHistoryMeasurement('data?include_facts=false&include_history=false&include_candidates=false');
+    const firstCandidates=await readHistoryMeasurement('candidates?limit=25');
+    const {candidates:allCandidates,...remainingContext}=reduced.body;
+    assert.deepEqual(candidateContext.body,remainingContext);
+    assert.deepEqual(firstCandidates.body.candidates,allCandidates.slice(0,25));
+    assert.ok(firstCandidates.body.candidates.length<=25);
+    const candidateScale={contextBytes:candidateContext.bytes,firstPageBytes:firstCandidates.bytes,firstPageRows:firstCandidates.body.candidates.length,
+      contextWithHistoryAndCandidateBytes:candidateContext.bytes+firstHistory.bytes+firstCandidates.bytes};
     async function pagedFacts(item){
       const facts=[],seen=new Set();let after=0,pages=0,totalBytes=0,firstPageBytes,maxRows=0,status;
       while(true){
@@ -121,7 +129,7 @@ async function main(){
       environment:{node:process.version,postgres:(await owner.query('SHOW server_version')).rows[0].server_version,platform:process.platform,arch:process.arch,cpu:os.cpus()[0]?.model},
       method:{transport:'HTTP localhost including full project response JSON parsing',concurrency:1,warmupsPerCase:warmups,measuredRequestsPerCase:repeats,
         percentile:'nearest rank',note:'Legacy aggregate timings only. Paged endpoint is traversed once per case for correctness and JSON byte counts; no timing comparison or production/load claims.'},
-      counts,contextScale,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
+      counts,contextScale,candidateScale,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
     fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/retrieval-report.json',JSON.stringify(report,null,2)+'\n');
     console.log(`Retrieval evaluation: ${report.passedCases}/${report.totalCases} cases passed; ${counts.facts} current facts. Report: artifacts/retrieval-report.json`);
     assert.ok(report.passed,'Retrieval evaluation failed; inspect the report');

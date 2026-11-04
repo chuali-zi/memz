@@ -2,4 +2,4 @@
 
 #searchForm button{white-space:nowrap;flex-shrink:0}
 
-button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible,#factsTitle:focus-visible,#historyTitle:focus-visible{outline:3px solid #a66b19;outline-offset:3px}#factsStatus{font-size:14px}.actions{flex-wrap:wrap}
+button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible,#factsTitle:focus-visible,#historyTitle:focus-visible,#candidatesTitle:focus-visible{outline:3px solid #a66b19;outline-offset:3px}#factsStatus{font-size:14px}.actions{flex-wrap:wrap}

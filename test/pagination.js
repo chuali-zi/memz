@@ -120,3 +120,59 @@ test('new revisions between descending history pages do not shift older pages; r
   assert.equal(new Set([...first.history,...second.history].map(r=>r.id)).size,50);
   const latest=(await history()).body;assert.equal(latest.history[0].subject,'历史翻页期间');assert.ok(latest.history[0].id>first.history[0].id);
 });
+
+async function candidates(query='',user='owner',project=1){
+  const r=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/${project}/candidates${query}`,{headers:{cookie:cookies[user]}});
+  return {status:r.status,body:await r.json()};
+}
+test('candidate pages and all status filters reproduce legacy rows; opt-out preserves context',async()=>{
+  const base=`http://127.0.0.1:${server.address().port}/api/projects/1/data`;
+  const read=async q=>{const r=await fetch(base+q,{headers:{cookie:cookies.owner}});assert.equal(r.status,200);return r.json()};
+  const full=await read(''),{facts,history,candidates:expected,...rest}=full;
+  assert.deepEqual(await read('?include_facts=false&include_history=false&include_candidates=false'),rest);
+  assert.deepEqual(await read('?include_candidates=true'),full);
+  assert.equal((await candidates()).body.candidates.length,25);assert.equal((await candidates('?limit=100')).body.candidates.length,100);
+  for(const status of ['all','pending','approved','rejected']){
+    const rows=[];let before=null;
+    do{
+      const response=await candidates(`?status=${status}&limit=9${before===null?'':`&before=${before}`}`);
+      assert.equal(response.status,200);const body=response.body;
+      assert.deepEqual(Object.keys(body).sort(),['candidates','next_before','role']);assert.ok(body.candidates.length<=9);
+      for(const row of body.candidates){if(before!==null)assert.ok(row.id<before);before=row.id;rows.push(row)}
+      if(body.next_before===null)break;
+      assert.equal(body.next_before,before);assert.ok(rows.length<1000);
+    }while(true);
+    assert.deepEqual(rows,expected.filter(r=>status==='all'||r.status===status));
+    assert.equal(new Set(rows.map(r=>r.id)).size,rows.length);
+  }
+});
+test('candidate pagination enforces roles, project isolation and strict filter/cursor inputs',async()=>{
+  const viewer=await candidates('','viewer');assert.equal(viewer.status,200);assert.equal(viewer.body.role,'viewer');
+  assert.deepEqual(viewer.body.candidates,(await candidates()).body.candidates);
+  assert.equal((await candidates('','other')).status,403);
+  assert.equal((await candidates('','other',2)).body.candidates.length,1);
+  assert.equal((await candidates('?status=pending','other',2)).body.candidates.length,0);
+  assert.equal((await candidates('?before=1')).body.next_before,null);
+  assert.deepEqual((await candidates('?before=1')).body.candidates,[]);
+  for(const q of ['?status=unknown','?status=','?status=pending&status=approved','?limit=0','?limit=101','?limit=1.5','?limit=1&limit=2','?before=0','?before=-1','?before=1e2','?before=2147483648','?before=','?before=1&before=2'])assert.equal((await candidates(q)).status,400,q);
+  for(const q of ['?include_candidates=no','?include_candidates=false&include_candidates=true'])assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/api/projects/1/data${q}`,{headers:{cookie:cookies.owner}})).status,400);
+});
+test('concurrent decisions change a later pending page without duplicate decisions; refresh exposes new candidates',async()=>{
+  for(let i=0;i<30;i++)await create(`候选并发${i}`,'待审批值',{decision:null});
+  const first=(await candidates('?status=pending')).body;
+  const oldSecond=(await candidates(`?status=pending&before=${first.next_before}`)).body;
+  const chosen=oldSecond.candidates[0].id;
+  const me=await (await fetch(`http://127.0.0.1:${server.address().port}/api/me`,{headers:{cookie:cookies.owner}})).json();
+  const results=await Promise.all(['approve','reject'].map(async action=>{
+    const response=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/1/candidates/${chosen}/${action}`,{method:'POST',headers:{cookie:cookies.owner,'X-CSRF-Token':me.csrf}});
+    await response.json();return response.status;
+  }));assert.deepEqual(results.sort(),[200,409]);
+  const second=(await candidates(`?status=pending&before=${first.next_before}`)).body;
+  assert.deepEqual(second.candidates,oldSecond.candidates.filter(r=>r.id!==chosen));
+  assert.equal(new Set([...first.candidates,...second.candidates].map(r=>r.id)).size,first.candidates.length+second.candidates.length);
+  const decided=await tx(1,async c=>(await c.query('SELECT status FROM candidates WHERE id=$1',[chosen])).rows[0]);
+  assert.ok(['approved','rejected'].includes(decided.status));
+  await create('候选翻页后新增','新值',{decision:null});
+  assert.deepEqual((await candidates(`?status=pending&before=${first.next_before}`)).body,second);
+  assert.equal((await candidates('?status=pending')).body.candidates[0].subject,'候选翻页后新增');
+});

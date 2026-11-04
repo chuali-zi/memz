@@ -76,6 +76,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#facts').getByText('项目 / 截止日：15号',{exact:true}).waitFor();
     await page.getByRole('button',{name:'提交候选'}).click();
     await page.getByText(/403 无权访问/).waitFor();
+    assert.equal(await page.locator('#candidates button').count(),0,'viewer must not see decision buttons');
     await capture('07-viewer.png','只读者可以浏览，但提交候选被403拒绝');
     await page.getByRole('button',{name:'切换账号'}).click();
     await page.locator('[name=username]').selectOption('other');
@@ -140,7 +141,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       assert.equal(await page.locator('#facts .entry').count(),0);
       assert.equal(await page.locator('#factsNext').isDisabled(),true);
       await page.unroute('**/api/projects/1/facts?**');
-      const contextRequest=page.waitForRequest(r=>r.url().endsWith('/data?include_facts=false&include_history=false'));
+      const contextRequest=page.waitForRequest(r=>r.url().endsWith('/data?include_facts=false&include_history=false&include_candidates=false'));
       await page.getByRole('button',{name:'刷新工作台',exact:true}).click();await contextRequest;
       await page.locator('#facts').getByText('分页演示54 / 状态：合成分页事实',{exact:true}).waitFor();
       await capture('11-search-recovered.png','注入503后刷新恢复真实检索；聚合请求显式排除事实','.card:has(#facts)');
@@ -188,6 +189,76 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await page.getByText('历史第 3 页 · 8 条 · 已到末页',{exact:true}).waitFor();
       await capture('14-mobile-history.png','390px视口中的历史末页与分页状态','.card:has(#history)');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'mobile page must not overflow horizontally');
+      await page.setViewportSize({width:1440,height:1000});
+      await page.getByText('候选第 1 页 · 25 条',{exact:true}).waitFor();
+      await page.locator('#candidatesNext').focus();await page.keyboard.press('Enter');
+      await page.getByText('候选第 2 页 · 25 条',{exact:true}).waitFor();
+      assert.equal(await page.locator('#candidatesTitle').evaluate(e=>e===document.activeElement),true);
+      await page.getByRole('button',{name:'较旧候选',exact:true}).click();
+      await page.getByText('候选第 3 页 · 10 条 · 已到末页',{exact:true}).waitFor();
+      assert.equal(await page.locator('#candidatesNext').isDisabled(),true);
+      await capture('15-candidates-last-page.png','60条真实合成候选分25/25/10，末页保留原待审批记录','.card:has(#candidates)');
+      await page.getByLabel('筛选候选').selectOption('pending');
+      await page.getByText('候选第 1 页 · 1 条 · 已到末页',{exact:true}).waitFor();
+      await page.locator('#proposal [name=subject]').fill('分页审批');
+      await page.locator('#proposal [name=predicate]').fill('状态');
+      await page.locator('#proposal [name=value]').fill('新审核值');
+      await page.locator('#proposal [name=expected_version]').fill('0');
+      await page.getByRole('button',{name:'提交候选',exact:true}).click();
+      await page.locator('#candidates .entry').filter({hasText:'分页审批'}).getByRole('button',{name:'批准',exact:true}).waitFor();
+      assert.equal(await page.locator('#candidateFilter').inputValue(),'pending');
+      await page.locator('#candidates .entry').filter({hasText:'分页审批'}).getByRole('button',{name:'批准',exact:true}).click();
+      await page.getByText('候选第 1 页 · 1 条 · 已到末页',{exact:true}).waitFor();
+      assert.equal(await page.locator('#candidateFilter').inputValue(),'pending');
+      assert.equal(await page.locator('#candidates .entry').filter({hasText:'分页审批'}).count(),0);
+      await page.getByLabel('筛选候选').selectOption('approved');
+      await page.locator('#candidates .entry').filter({hasText:'分页审批'}).getByText('已批准',{exact:true}).waitFor();
+      assert.equal(await page.locator('#candidates button').count(),0);
+      await page.getByLabel('筛选候选').selectOption('pending');
+      await page.locator('#candidates .entry').filter({hasText:'25号'}).getByRole('button',{name:'批准',exact:true}).waitFor();
+      // A separate real request rejects the row while this browser still shows pending.
+      await page.evaluate(async()=>{
+        const {csrf}=await (await fetch('/api/me')).json();
+        const {candidates}=await (await fetch('/api/projects/1/candidates?status=pending')).json();
+        if(candidates.length!==1)throw new Error('Expected one pending fixture');
+        const r=await fetch(`/api/projects/1/candidates/${candidates[0].id}/reject`,{method:'POST',headers:{'X-CSRF-Token':csrf}});
+        if(!r.ok)throw new Error(`Concurrent reject failed: ${r.status}`);await r.json();
+      });
+      await page.locator('#candidates .entry').filter({hasText:'25号'}).getByRole('button',{name:'批准',exact:true}).click();
+      await page.getByText(/409 该候选已处理/).waitFor();
+      await page.getByText('当前筛选没有候选',{exact:true}).waitFor();
+      assert.equal(await page.locator('#candidateFilter').inputValue(),'pending');
+      await page.getByLabel('筛选候选').selectOption('rejected');
+      await page.getByText('候选第 1 页 · 2 条 · 已到末页',{exact:true}).waitFor();
+      assert.equal(await page.locator('#candidates button').count(),0);
+      await capture('16-candidates-concurrent-decision.png','另一请求驳回后旧批准请求409，刷新筛选展示两条真实已驳回状态','.card:has(#candidates)');
+      let releaseCandidates,observeCandidates;
+      const candidateHeld=new Promise(r=>{releaseCandidates=r}),candidateObserved=new Promise(r=>{observeCandidates=r});
+      await page.route('**/api/projects/1/candidates?**',async route=>{
+        if(new URL(route.request().url()).searchParams.get('status')==='approved'){
+          const response=await route.fetch();observeCandidates();await candidateHeld;await route.fulfill({response});
+        }else await route.continue();
+      });
+      await page.getByLabel('筛选候选').selectOption('approved');await candidateObserved;
+      await page.getByLabel('筛选候选').selectOption('pending');
+      await page.getByText('当前筛选没有候选',{exact:true}).waitFor();
+      const oldCandidates=page.waitForResponse(r=>r.url().includes('/candidates?')&&new URL(r.url()).searchParams.get('status')==='approved');
+      releaseCandidates();await (await oldCandidates).finished();
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      assert.equal(await page.locator('#candidates .entry').count(),0);
+      assert.equal(await page.locator('#candidateFilter').inputValue(),'pending');
+      await page.unroute('**/api/projects/1/candidates?**');
+      await page.route('**/api/projects/1/candidates?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'候选测试故障'})}));
+      await page.getByRole('button',{name:'刷新候选',exact:true}).click();
+      await page.getByText(/候选加载失败：503 候选测试故障/).waitFor();
+      assert.equal(await page.locator('#candidatesNext').isDisabled(),true);
+      await page.unroute('**/api/projects/1/candidates?**');
+      await page.getByRole('button',{name:'刷新候选',exact:true}).click();
+      await page.getByText('当前筛选没有候选',{exact:true}).waitFor();
+      await page.setViewportSize({width:390,height:844});
+      await capture('17-mobile-candidates-empty.png','移动视口中待审批筛选为空，故障恢复后无过期审批按钮','.card:has(#candidates)');
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+
     }
     assert.deepEqual(report.pageErrors,[],'浏览器不能出现未捕获脚本错误');
     report.passed=true;
