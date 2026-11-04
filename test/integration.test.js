@@ -20,6 +20,10 @@ for(const sql of [
 assert.equal((await call(other,'/api/projects/1/data')).status,403);assert.equal((await call(other,'/api/projects/1/data',null,{'X-User':'1'})).status,403);assert.equal((await candidate(viewer)).status,403);assert.equal((await candidate(member,{source_id:4})).status,400);assert.equal((await call(other,'/api/projects/1/candidates/1/approve',{})).status,403);
 await assert.rejects(()=>tx(2,c=>c.query("INSERT INTO candidates(project_id,subject,predicate,value,source_id,expected_version,proposed_by) VALUES(1,'跨项目','来源','x',4,0,2)")), e=>e.code==='23503');const rejected=(await candidate(member,{subject:'拒绝',predicate:'记录',expected_version:0})).data;await tx(1,c=>decide(c,1,1,rejected.id,'reject'));assert.equal((await call(owner,'/api/projects/1/data?q=%E6%8B%92%E7%BB%9D')).data.facts.length,0);
 const beforeInvalid=await readProject(1,1,'');
+for(const field of ['title','content'])assert.equal((await call(member,'/api/projects/1/sources',{title:'合成输入',content:'合成原文',[field]:'前\u0000后'})).status,400,`NUL source ${field}`);
+for(const field of ['subject','predicate','value'])assert.equal((await candidate(member,{[field]:'前\u0000后'})).status,400,`NUL candidate ${field}`);
+for(const path of ['facts','sources','data'])for(const q of ['%00','x'.repeat(201)+'%00'])assert.equal((await call(viewer,`/api/projects/1/${path}?q=${q}`)).status,400,`NUL query ${path}`);
+
 for(const value of [null,true,false,[],[1],{},'', ' ', '1e0', '0x1',1.5,-1,2147483648]) {
   assert.equal((await candidate(member,{expected_version:value})).status,400,`invalid version ${JSON.stringify(value)}`);
   assert.equal((await candidate(member,{source_id:value})).status,400,`invalid source ${JSON.stringify(value)}`);

@@ -6,7 +6,7 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
   requireValue(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&!base.search&&!base.hash&&base.pathname==='/','INVALID_BASE_URL');
   requireValue(positive(projectId),'INVALID_PROJECT');requireValue(Number.isInteger(limit)&&limit>=1&&limit<=100,'INVALID_LIMIT');
-  requireValue(typeof query==='string'&&query.length<=200,'INVALID_QUERY');requireValue(typeof username==='string'&&username&&typeof password==='string'&&password,'INVALID_CREDENTIALS');
+  requireValue(typeof query==='string'&&query.length<=200&&!query.includes('\u0000'),'INVALID_QUERY');requireValue(typeof username==='string'&&username&&typeof password==='string'&&password,'INVALID_CREDENTIALS');
   requireValue(Number.isInteger(timeoutMs)&&timeoutMs>=1&&timeoutMs<=60000,'INVALID_TIMEOUT');
   requireValue(Number.isInteger(totalTimeoutMs)&&totalTimeoutMs>=1&&totalTimeoutMs<=60000,'INVALID_TOTAL_TIMEOUT');
   requireValue(Number.isInteger(maxResponseBytes)&&maxResponseBytes>=1&&maxResponseBytes<=1048576,'INVALID_RESPONSE_LIMIT');

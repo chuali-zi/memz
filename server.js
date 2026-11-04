@@ -29,7 +29,8 @@ function integer(x,min,message){
   return n;
 }
 function num(x){return integer(x,1,'编号无效')}
-function str(x,max=500){if(typeof x!=='string'||!x.trim()||x.length>max)throw fail(400,'内容为空或过长');return x.trim()}
+function queryText(x,max){if(x.includes('\u0000'))throw fail(400,'文本不能包含空字符 U+0000');return x.slice(0,max)}
+function str(x,max=500){if(typeof x!=='string'||!x.trim()||x.length>max)throw fail(400,'内容为空或过长');queryText(x,max);return x.trim()}
 async function role(c,p,allowed){const r=(await c.query('SELECT role FROM memberships WHERE project_id=$1 AND user_id=nullif(current_setting(\'app.user_id\',true),\'\')::int',[p])).rows[0];if(!r||!allowed.includes(r.role))throw fail(403,'无权访问此项目或执行此操作');return r.role}
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 app.get('/api/projects',route(async(req,res)=>res.json(await tx(req.user.id,async c=>(await c.query('SELECT p.id,p.name,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=$1 ORDER BY p.id',[req.user.id])).rows))));
@@ -71,7 +72,7 @@ app.get('/api/projects/:p/facts',route(async(req,res)=>{
   if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');
   const after=req.query.after===undefined?0:integer(req.query.after,0,'游标无效');
   if(req.query.q!==undefined&&typeof req.query.q!=='string')throw fail(400,'关键词必须是单个字符串');
-  const q=(req.query.q||'').slice(0,200);
+  const q=queryText(req.query.q||'',200);
   res.json(await readFactsPage(req.user.id,p,q,{limit,after}));
 }));
 async function readHistoryPage(user,p,{limit=25,before=null}={}){
@@ -124,9 +125,9 @@ app.get('/api/projects/:p/sources',route(async(req,res)=>{
   if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');
   const after=req.query.after===undefined?0:integer(req.query.after,0,'游标无效');
   if(req.query.q!==undefined&&typeof req.query.q!=='string')throw fail(400,'来源标题关键词必须是单个字符串');
-  res.json(await readSourcesPage(req.user.id,p,(req.query.q||'').slice(0,150),{limit,after}));
+  res.json(await readSourcesPage(req.user.id,p,queryText(req.query.q||'',150),{limit,after}));
 }));
-app.get('/api/projects/:p/data',route(async(req,res)=>{for(const key of ['include_facts','include_history','include_candidates','include_sources'])if(req.query[key]!==undefined&&!['true','false'].includes(req.query[key]))throw fail(400,`${key} 必须是 true 或 false`);const p=num(req.params.p),q=typeof req.query.q==='string'?req.query.q.slice(0,200):'';res.json(await readProject(req.user.id,p,q,{includeFacts:req.query.include_facts!=='false',includeHistory:req.query.include_history!=='false',includeCandidates:req.query.include_candidates!=='false',includeSources:req.query.include_sources!=='false'}))}));
+app.get('/api/projects/:p/data',route(async(req,res)=>{for(const key of ['include_facts','include_history','include_candidates','include_sources'])if(req.query[key]!==undefined&&!['true','false'].includes(req.query[key]))throw fail(400,`${key} 必须是 true 或 false`);const p=num(req.params.p),q=typeof req.query.q==='string'?queryText(req.query.q,200):'';res.json(await readProject(req.user.id,p,q,{includeFacts:req.query.include_facts!=='false',includeHistory:req.query.include_history!=='false',includeCandidates:req.query.include_candidates!=='false',includeSources:req.query.include_sources!=='false'}))}));
 app.post('/api/projects/:p/sources',requireJsonObject,route(async(req,res)=>{
   const p=num(req.params.p),title=str(req.body.title,150),content=str(req.body.content,4000),key=requestKey(req);
   res.json(await tx(req.user.id,async c=>{

@@ -33,3 +33,8 @@ test('stdio child returns no partial context for unauthorized project',async()=>
 test('stdio child terminates if its parent never ends the request',async()=>{
   const before=requests,result=await invoke('{',{close:false});assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INPUT_TIMEOUT/);assert.equal(requests,before);
 });
+
+test('stdio rejects a NUL query before opening a session',async()=>{
+  const before=requests,result=await invoke(JSON.stringify({query:'前\u0000后'}));
+  assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_QUERY/);assert.equal(requests,before);
+});

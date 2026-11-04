@@ -17,7 +17,7 @@
 | POST /api/projects/:p/candidates/:id/approve | 路径参数；无需请求体 | status:approved,version | owner；候选不存在404；已处理/版本冲突409 |
 | POST /api/projects/:p/candidates/:id/reject | 路径参数；无需请求体 | status:rejected | owner；不存在404；已处理409 |
 
-决策路径除approve/reject外返回400。ID接受正整数或十进制数字字符串；expected_version接受0至2147483647的整数或数字字符串。字符串必填、非空，trim后使用，长度在trim前校验；上限见数据字典。所有已处理API错误返回 `{error:说明}`，包括登录Origin拒绝和已认证未知API路由404。登录、来源、候选要求Content-Type为application/json（允许charset参数）：缺少或不支持的类型415；类型正确但空请求体、数组、标量或坏JSON400；超过16KiB为413；不支持的字符集/编码415。合法空对象仍由字段/凭据校验判定。审批、驳回和退出保持支持无请求体。解析错误使用固定消息，不反射输入原文，且保留安全响应头。解析器先于认证运行，坏JSON可能先被拒绝；其他业务写请求先经过会话与CSRF门禁。断开的传输连接不保证还能收到错误正文。
+决策路径除approve/reject外返回400。ID接受正整数或十进制数字字符串；expected_version接受0至2147483647的整数或数字字符串。字符串必填、非空，trim后使用，长度在trim前校验；上限见数据字典。来源title/content、候选subject/predicate/value与facts/sources/data的查询q不能含U+0000（JSON中的\u0000或查询中的%00），返回400固定说明；在查询截断前检查完整输入，不静默删除该字符。所有已处理API错误返回 `{error:说明}`，包括登录Origin拒绝和已认证未知API路由404。登录、来源、候选要求Content-Type为application/json（允许charset参数）：缺少或不支持的类型415；类型正确但空请求体、数组、标量或坏JSON400；超过16KiB为413；不支持的字符集/编码415。合法空对象仍由字段/凭据校验判定。审批、驳回和退出保持支持无请求体。解析错误使用固定消息，不反射输入原文，且保留安全响应头。解析器先于认证运行，坏JSON可能先被拒绝；其他业务写请求先经过会话与CSRF门禁。断开的传输连接不保证还能收到错误正文。
 
 q是单个字符串时截取前200个 UTF-16 code units，否则当空串。检索不trim q；空串匹配全部当前事实。仅过滤facts的主体、属性和值，其他返回数组不按q过滤。facts按ID升序；候选/历史按ID降序；审计按ID降序最多100条；此处描述兼容聚合/data，页面使用的独立列表分页见后文。
 
