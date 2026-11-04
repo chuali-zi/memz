@@ -467,7 +467,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     report.checks={...report.checks,firstUseStory:{inlineSourceFailure:true,inputPreserved:true,retrySaved:true,keyboardNavigation:true,conflictVisible:true,clientVersion:2,oldVersionPreserved:true,mobileOverflow:false}};
     report.checks.agentHandoff=await require('./agent-handoff')({page,baseURL,capture,dir});
     const compareFixture=await page.evaluate(async()=>{
-      const source=await api('/api/projects/1/sources',{method:'POST',body:JSON.stringify({title:'并发审核依据（合成）',content:'演练分别提交20号和21号，由负责人选择，非真实业务数据。'})});
+      const source=await api('/api/projects/1/sources',{method:'POST',body:JSON.stringify({title:'并发审核依据（合成）',content:'演练分别提交20号、21号和22号，由负责人选择，非真实业务数据。'})});
       const body={subject:'审核刷新演练（合成）',predicate:'截止日',source_id:source.id,expected_version:0};
       const first=await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({...body,value:'20号'})});
       const second=await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({...body,value:'21号'})});return {first:first.id,second:second.id};
@@ -479,6 +479,40 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await capture('28-candidate-version-comparison.png','真实另一请求批准21号v1后，刷新核对显示20号提议基于v0已过期，不自动覆盖','#candidates .entry:has-text("审核刷新演练（合成） / 截止日 → 20号")');
     await review.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#candidateFeedback').getByText(/409 版本冲突/).waitFor();
     const compared=await require('../scripts/context-client').readContext({baseURL,query:'审核刷新演练（合成）'});assert.equal(compared.facts[0].value,'21号');assert.equal(compared.facts[0].version,1);
+    await review.getByRole('button',{name:'核对来源原文',exact:true}).click();await review.getByText(/版本不一致/).waitFor();
+
+    assert.equal(await review.getByRole('button',{name:'用最新版本填写新候选',exact:true}).count(),1,'conflict recovery should offer an explicit form preparation action');
+
+    // The cached preview says v1, but another writer advances to v2 before preparation.
+    await page.evaluate(async id=>{
+      const proof=await api(`/api/projects/1/candidates/${id}/source`);
+      const c=await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({...proof.candidate,value:'22号',expected_version:1})});
+      await api(`/api/projects/1/candidates/${c.id}/approve`,{method:'POST'});
+    },compareFixture.first);
+    const beforePrepare=await page.evaluate(()=>api('/api/projects/1/data'));
+    const originalInput=await page.locator('#proposal').evaluate(f=>Object.fromEntries(new FormData(f)));
+    const retryRoute=`**/api/projects/1/candidates/${compareFixture.first}/source`;
+    await page.route(retryRoute,r=>r.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'重新提议读取故障'})}));
+    await review.getByRole('button',{name:'用最新版本填写新候选',exact:true}).click();
+    await page.locator('#candidateFeedback').getByText(/503 重新提议读取故障/).waitFor();
+    assert.deepEqual(await page.locator('#proposal').evaluate(f=>Object.fromEntries(new FormData(f))),originalInput);
+    await page.unroute(retryRoute);
+    await review.getByRole('button',{name:'用最新版本填写新候选',exact:true}).click();
+    await page.locator('#proposalFeedback').getByText(/已用读取时 v2.*尚未提交/).waitFor();
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),'20号');
+    assert.equal(await page.locator('#proposal [name=expected_version]').inputValue(),'2');
+    assert.deepEqual(await page.evaluate(()=>api('/api/projects/1/data')),beforePrepare,'preparation must not write or remove original evidence');
+    await capture('29-conflict-reproposal.png','390px冲突恢复读取最新v2并保留原值与来源，仅填写表单尚未提交','.card:has(#proposal)');
+    await page.getByRole('button',{name:'提交候选',exact:true}).click();
+    await page.locator('#proposalFeedback').getByText('候选已提交，等待负责人审批',{exact:true}).waitFor();
+    const fresh=page.locator('#candidates .entry').filter({hasText:'审核刷新演练（合成） / 截止日 → 20号'}).filter({hasText:'基于 v2'});
+    await fresh.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#candidateFeedback').getByText(/本次生成 v3/).waitFor();
+    const afterReproposal=await page.evaluate(()=>api('/api/projects/1/data'));
+    assert.deepEqual(afterReproposal.candidates.find(c=>c.id===compareFixture.first),beforePrepare.candidates.find(c=>c.id===compareFixture.first));
+    for(const row of beforePrepare.audit.filter(a=>a.detail.includes(`候选 ${compareFixture.first}`)))assert.ok(afterReproposal.audit.some(a=>JSON.stringify(a)===JSON.stringify(row)),'old audit retained');
+    const recovered=await require('../scripts/context-client').readContext({baseURL,query:'审核刷新演练（合成）'});
+    assert.equal(recovered.facts[0].value,'20号');assert.equal(recovered.facts[0].version,3);
+    report.checks.reproposal={freshVersion:2,approvedVersion:3,preparationReadOnly:true,originalCandidatePreserved:true,auditPreserved:true};
 
     await page.setViewportSize(report.environment.viewport);
     // Invalidate the real server session without navigating, as after expiry/restart.

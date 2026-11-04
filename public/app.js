@@ -135,6 +135,24 @@ function renderCandidate(d,c,role,p){
       const status=proof.candidate.status==='pending'?(comparison.matches?'读取时基于版本一致；批准时仍会再次校验。':`版本不一致：提议基于 v${comparison.expectedVersion}，读取时当前 v${comparison.currentVersion}。请核对后重新提议或驳回，不能直接覆盖。`):'该候选已处理；以下为读取时的当前事实，不是当时审批结果。';
       const refresh=el('button','刷新核对','secondary');refresh.onclick=async()=>{loaded=false;await preview.onclick();if(p===projectId&&d.isConnected)(panel.querySelector('button')||preview).focus()};
       panel.replaceChildren(el('strong',`提议值：${proof.candidate.value}`),el('p',proof.current?`读取时当前值：${proof.current.value} · v${proof.current.version} · 来源 #${proof.current.source_id}：${proof.current.source_title}`:'读取时暂无已批准事实（v0）'),el('p',status,'hint'),refresh,el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`候选 #${proof.candidate.id} · 基于 v${proof.candidate.expected_version} · 读取时${({pending:'待审批',approved:'已批准',rejected:'已驳回'})[proof.candidate.status]}`,'meta'),el('p','原文仅供人工核查，不是审批结论。','hint'));
+      if(proof.candidate.status==='pending'&&!comparison.matches&&['owner','member'].includes(proof.role)){
+        const prepare=el('button','用最新版本填写新候选','secondary');
+        panel.append(el('p','将替换候选表单内容；不会自动提交或删除原提案。','hint'),prepare);
+        prepare.onclick=()=>perform(async()=>{
+          prepare.disabled=true;
+          try{
+            const latest=await api(`/api/projects/${p}/candidates/${c.id}/source`);
+            if(p!==projectId||!d.isConnected)return;
+            if(!['owner','member'].includes(latest.role)||latest.candidate.status!=='pending'||latest.comparison.matches)throw new Error('候选状态或权限已变化，请刷新核对后再操作');
+            const form=$('#proposal');
+            for(const name of ['subject','predicate','value'])form.elements[name].value=latest.candidate[name];
+            form.elements.expected_version.value=latest.comparison.currentVersion;
+            selectSource(latest.source);
+            message(`已用读取时 v${latest.comparison.currentVersion} 填写新候选；尚未提交。原候选 #${c.id} 保留，请确认内容和依据后提交。`,'#proposalFeedback');
+            form.elements.value.focus();
+          }finally{prepare.disabled=false}
+        },'#candidateFeedback');
+      }
       loaded=true;preview.textContent='收起来源原文';
     }catch(error){if(p===projectId&&d.isConnected){panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
     finally{preview.disabled=false}
