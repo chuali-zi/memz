@@ -59,7 +59,7 @@ ALTER TABLE facts ADD CONSTRAINT facts_current_revision_state
 
 检索仅连接facts.current_revision_id到对应修订，将主体、属性和值组合后用参数化position/lower做不区分大小写的子串匹配；`%`和`_`无LIKE通配意义。候选、历史和来源仍在各自数组返回，不被q过滤。界面通过textContent创建文本节点，外部文字不作为HTML插入或系统命令执行。
 
-这不是语义搜索，也没有证明索引加速。评测报告计时覆盖完整HTTP聚合响应与JSON解析，不能当成单条SQL执行时间。当前接口返回未分页来源/候选/历史，数据量增长时响应规模是实际待评估问题。
+这不是语义搜索，也没有证明索引加速。评测报告计时覆盖完整HTTP聚合响应与JSON解析，不能当成单条SQL执行时间。当前页面通过独立分页接口读取事实、历史、候选和来源，并在聚合请求中跳过四类数组；原readProject默认全量行为仅为兼容保留，不能把它当成当前页面的加载方式。分页返回量和实际扫描量不同，来源查询计划及实验索引取舍见[计划证据](query-plans.md)。
 
 ## 6. 创建幂等回执
 
@@ -67,12 +67,19 @@ ALTER TABLE facts ADD CONSTRAINT facts_current_revision_state
 
 ## 历史有界读取
 
-`readHistoryPage`按修订ID倒序并以排他before游标取limit+1行，复用角色校验、RLS及单页只读快照。`readProject`仅在include_history=false时跳过历史读取，默认兼容。页面loadHistory独立维护页起点与请求代次，刷新时旧响应不可覆盖新页；较新修订需刷新第一页。它不提供跨请求共同快照，也未解决来源和候选的全量加载。
+`readHistoryPage`按修订ID倒序并以排他before游标取limit+1行，复用角色校验、RLS及单页只读快照。`readProject`仅在include_history=false时跳过历史读取，默认兼容。页面loadHistory独立维护页起点与请求代次，刷新时旧响应不可覆盖新页；较新修订需刷新第一页。它不提供跨请求共同快照。来源和候选分别由下述独立分页流程读取，不依赖历史接口处理。
 
 ## 候选状态筛选与分页
 
-readCandidatesPage参数化查询状态和排他before游标，每页limit+1行判断后续页，复用角色/RLS及单页只读快照。页面renderCandidate仅为owner的pending行显示决定按钮，但服务端decide仍锁定与复核候选状态。决定期间禁用条目按钮，成功或409后刷新并保留筛选。旧筛选响应按请求代次丢弃；状态在翻页期间变化不提供共同快照保证。来源仍全量加载。
+readCandidatesPage参数化查询状态和排他before游标，每页limit+1行判断后续页，复用角色/RLS及单页只读快照。页面renderCandidate仅为owner的pending行显示决定按钮，但服务端decide仍锁定与复核候选状态。决定期间禁用条目按钮，成功或409后刷新并保留筛选。旧筛选响应按请求代次丢弃；状态在翻页期间变化不提供共同快照保证。来源通过readSourcesPage独立分页，具体选择状态见下一节。
 
 ## 来源分页与选择状态
 
 readSourcesPage按标题参数化匹配及ID升序取limit+1，readProject可选跳过来源SQL。页面sourcePage仅保存当前页，selectedSource只保留当前项目已选ID和标题，sourceOptions合并本页和已选项；项目切换清除选择。候选POST仍校验来源项目，来源与修订的外键未改变。源正文预览与折叠使用textContent，原文不作为HTML执行。
+
+
+## 初次加载与会话恢复
+
+loadProjects在登录后读取项目列表；失败或空列表保留projectId=null并禁用写入。刷新工作台通过load的初始化分支重新读取项目，各分页函数在无项目时不发送请求。项目列表请求带代次，旧失败不能覆盖较新的成功。浏览器用503、空数组和延迟响应注入验证这些行为，恢复后继续真实审批流程。
+
+switchAccount在注销成功或401（会话已不存在）后返回登录页；403、服务错误和网络错误仍显示错误。它不延长会话，也不绕过服务端授权。两项恢复检查都属于UI原始报告及材料包校验的一部分。

@@ -26,7 +26,7 @@ function fixture(fn){
 
     const bytes=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.from('unit fixture only')]);
     for(const file of screenshotNames)write(`evidence/ui/${file}`,bytes);
-    const ui={schemaVersion:1,synthetic:true,passed:true,pageErrors:[],checks:{projectRecovery:{initialFailure:true,emptyState:true,staleFailureIgnored:true,retryLoadedProject:true,invalidProjectRequests:0},sessionRecovery:{invalidatedSession:true,returnedToLogin:true,reloginSucceeded:true},creationKeyRace:{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true}},source:{commit,workingTreeDirty:false,files:Object.fromEntries(uiSources.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},screenshots:screenshotNames.map(file=>({file,sha256:hash(bytes)}))};
+    const ui={schemaVersion:1,synthetic:true,passed:true,pageErrors:[],checks:{projectRecovery:{initialFailure:true,emptyState:true,staleFailureIgnored:true,retryLoadedProject:true,invalidProjectRequests:0},sessionRecovery:{invalidatedSession:true,returnedToLogin:true,reloginSucceeded:true},creationKeyRace:{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true}},source:{commit,workingTreeDirty:false,files:Object.fromEntries(uiSources.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},screenshots:screenshotNames.map(file=>({file,claim:`unit caption ${file}`,sha256:hash(bytes)}))};
     const retrieval={schemaVersion:2,dataset:dataset.dataset,fillerCount:200,synthetic:true,passed:true,totalCases:19,passedCases:19,source:{gitCommit:commit,workingTreeDirty:false,...Object.fromEntries(Object.entries(evaluationSources).map(([key,file])=>[key,hash(fs.readFileSync(path.join(root,file)))]))},cases:cases.map((c,i)=>({...c,user:c.user||'owner',project:c.project||1,expectedStatus:c.status||200,actualStatus:c.status||200,expected:structuredClone(expected[i]),actual:structuredClone(expected[i]),passed:true,paged:{status:c.status||200,factsCount:expected[i].length}})),contextScale:{},candidateScale:{},sourceScale:{}};
     const save=()=>{json('evidence/ui/report.json',ui);json('evidence/retrieval-report.json',retrieval);json('evidence/system/report.json',system)};save();
     const options={root,commit,systemReportPath:path.join(root,'evidence/system/report.json'),uiReportPath:path.join(root,'evidence/ui/report.json'),retrievalReportPath:path.join(root,'evidence/retrieval-report.json')};
@@ -84,6 +84,8 @@ test('complete package build excludes ignored files, verifies offline, and rejec
   const previous=process.env.UI_REPORT_PATH;delete process.env.UI_REPORT_PATH;
   try{
     const output=buildPackage(root),manifest=verifyPackage(output);
+    const index=fs.readFileSync(path.join(output,'index.md'),'utf8');
+    assert.match(index,/阅读顺序/);for(const file of screenshotNames)assert.ok(index.includes(`unit caption ${file}`));
     assert.equal(manifest.commit,commit);assert.equal(fs.existsSync(path.join(output,'.env')),false);
     const check=execFileSync(process.execPath,['scripts/package-evidence.js','verify','.'],{cwd:output,encoding:'utf8'});assert.match(check,/Package verified/);
     write('server.js','uncommitted fixture change');assert.throws(()=>buildPackage(root),/Commit changes/);
@@ -113,4 +115,9 @@ test('database evidence rejects stale commits, changed raw output and skipped te
   const skipped='TAP version 13\nok 1 - fixture # SKIP\n# tests 1\n# pass 0\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n';
   write('evidence/system/core.tap',skipped);save();assert.throws(()=>verifyEvidence(options));
   system.suites[0].stdoutSha256=hash(skipped);system.suites[0].summary=parseTap(skipped);save();assert.throws(()=>verifyEvidence(options));
+}));
+
+test('a screenshot without its recorded meaning is rejected',()=>fixture(({ui,save,options})=>{
+  delete ui.screenshots[0].claim;save();assert.throws(()=>verifyEvidence(options),/Missing screenshot caption/);
+  ui.screenshots[0].claim='   ';save();assert.throws(()=>verifyEvidence(options),/Missing screenshot caption/);
 }));
