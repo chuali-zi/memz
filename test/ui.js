@@ -466,6 +466,20 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.unroute(oldProofRoute);
     report.checks={...report.checks,firstUseStory:{inlineSourceFailure:true,inputPreserved:true,retrySaved:true,keyboardNavigation:true,conflictVisible:true,clientVersion:2,oldVersionPreserved:true,mobileOverflow:false}};
     report.checks.agentHandoff=await require('./agent-handoff')({page,baseURL,capture,dir});
+    const compareFixture=await page.evaluate(async()=>{
+      const source=await api('/api/projects/1/sources',{method:'POST',body:JSON.stringify({title:'并发审核依据（合成）',content:'演练分别提交20号和21号，由负责人选择，非真实业务数据。'})});
+      const body={subject:'审核刷新演练（合成）',predicate:'截止日',source_id:source.id,expected_version:0};
+      const first=await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({...body,value:'20号'})});
+      const second=await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({...body,value:'21号'})});return {first:first.id,second:second.id};
+    });
+    await page.locator('#refreshCandidates').click();const review=page.locator('#candidates .entry').filter({hasText:'审核刷新演练（合成） / 截止日 → 20号'});
+    await review.getByRole('button',{name:'核对来源原文',exact:true}).click();await review.getByText('读取时暂无已批准事实（v0）',{exact:true}).waitFor();
+    await page.evaluate(id=>api(`/api/projects/1/candidates/${id}/approve`,{method:'POST'}),compareFixture.second);
+    await review.getByRole('button',{name:'刷新核对',exact:true}).click();await review.getByText(/版本不一致：提议基于 v0，读取时当前 v1/).waitFor();await review.getByText(/读取时当前值：21号 · v1/).waitFor();assert.equal(await review.getByRole('button',{name:'刷新核对',exact:true}).evaluate(e=>e===document.activeElement),true);
+    await capture('28-candidate-version-comparison.png','真实另一请求批准21号v1后，刷新核对显示20号提议基于v0已过期，不自动覆盖','#candidates .entry:has-text("审核刷新演练（合成） / 截止日 → 20号")');
+    await review.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#candidateFeedback').getByText(/409 版本冲突/).waitFor();
+    const compared=await require('../scripts/context-client').readContext({baseURL,query:'审核刷新演练（合成）'});assert.equal(compared.facts[0].value,'21号');assert.equal(compared.facts[0].version,1);
+
     await page.setViewportSize(report.environment.viewport);
     // Invalidate the real server session without navigating, as after expiry/restart.
     await page.evaluate(async()=>{

@@ -34,7 +34,7 @@ function fixture(fn){
     return fn({root,write,json,ui,retrieval,system,save,options});
   }finally{fs.rmSync(root,{recursive:true,force:true})}
 }
-test('consistent fixture evidence passes with complete required coverage',()=>fixture(({options})=>assert.equal(verifyEvidence(options).ui.screenshots.length,27)));
+test('consistent fixture evidence passes with complete required coverage',()=>fixture(({options})=>assert.equal(verifyEvidence(options).ui.screenshots.length,28)));
 test('another commit or uncommitted run is rejected',()=>fixture(({ui,retrieval,save,options})=>{
   ui.source.commit='b'.repeat(40);save();assert.throws(()=>verifyEvidence(options),/another commit/);
   ui.source.commit=options.commit;retrieval.source.workingTreeDirty=true;save();assert.throws(()=>verifyEvidence(options),/uncommitted/);

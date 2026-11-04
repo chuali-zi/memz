@@ -156,7 +156,11 @@ app.get('/api/projects/:p/candidates/:id/source',route(async(req,res)=>{
       FROM candidates c JOIN sources s ON s.id=c.source_id AND s.project_id=c.project_id
       WHERE c.project_id=$1 AND c.id=$2`,[p,id])).rows[0];
     if(!row)throw fail(404,'候选不存在');
-    const {title,content,...candidate}=row;return {role:access,candidate,source:{id:row.source_id,title,content}};
+    const current=(await c.query(`SELECT f.id AS fact_id,f.version,r.value,r.source_id,s.title AS source_title
+      FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id
+      WHERE f.project_id=$1 AND f.subject=$2 AND f.predicate=$3`,[p,row.subject,row.predicate])).rows[0]||null;
+    const {title,content,...candidate}=row;return {role:access,candidate,source:{id:row.source_id,title,content},current,
+      comparison:{expectedVersion:row.expected_version,currentVersion:current?.version||0,matches:row.expected_version===(current?.version||0)}};
   },{snapshot:true}));
 }));
 app.post('/api/projects/:p/candidates',requireJsonObject,route(async(req,res)=>{
