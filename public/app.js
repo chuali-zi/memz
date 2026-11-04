@@ -14,6 +14,12 @@ async function createRecord(path,body){
   }
 }
 function message(s){$('#notice').textContent=s}function rows(id,items,render){const root=$(id);root.replaceChildren();if(!items.length)root.append(el('p','暂无记录','hint'));for(const item of items){const d=el('div',undefined,'entry');render(d,item);root.append(d)}}
+async function switchAccount(){
+  try{await api('/api/logout',{method:'POST'})}
+  catch(error){if(error.status!==401)throw error}
+  // An expired session is already logged out; let the user authenticate again.
+  location.reload();
+}
 async function loadProjects(){const projects=await api('/api/projects');const select=$('#project');select.replaceChildren();projects.forEach(p=>{const o=el('option',`${p.name} · ${p.role}`);o.value=p.id;select.append(o)});projectId=Number(select.value);await load()}
 let contextGeneration=0,factGeneration=0,factState={query:'',cursors:[0],index:0,next:null};
 function factControls(busy=false){
@@ -174,7 +180,7 @@ async function load(){
 function renderContext(){rows('#audit',data.audit,(d,a)=>d.append(el('strong',a.action),el('div',`${a.detail} · 用户 ${a.actor_id} · ${new Date(a.created_at).toLocaleString()}`,'meta')))}
 async function perform(fn){try{await fn()}catch(e){message(e.message)}}
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
-$('#loginForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const f=new FormData(e.target);const x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=x.csrf;message('');$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));const b=el('button','切换账号');b.onclick=()=>perform(async()=>{await api('/api/logout',{method:'POST'});location.reload()});$('#identity').append(b);await loadProjects()})};
+$('#loginForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const f=new FormData(e.target);const x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=x.csrf;message('');$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));const b=el('button','切换账号');b.onclick=()=>perform(switchAccount);$('#identity').append(b);await loadProjects()})};
 $('#project').onchange=e=>{projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
 $('#factsPrevious').onclick=()=>perform(()=>loadFacts({index:factState.index-1,focus:true}));
 $('#factsNext').onclick=()=>perform(()=>loadFacts({index:factState.index+1,focus:true}));

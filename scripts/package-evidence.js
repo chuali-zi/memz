@@ -36,6 +36,7 @@ function verifyEvidence({root,uiReportPath,retrievalReportPath,systemReportPath,
   assert.equal(ui.synthetic,true);assert.equal(retrieval.synthetic,true);
   assert.equal(ui.passed,true,'UI run did not pass');assert.deepEqual(ui.pageErrors,[]);
   assert.deepEqual(ui.checks?.creationKeyRace,{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true},'Missing or inconsistent browser creation race evidence');
+  assert.deepEqual(ui.checks?.sessionRecovery,{invalidatedSession:true,returnedToLogin:true,reloginSucceeded:true},'Missing session recovery evidence');
   assert.equal(ui.source.commit,commit,'UI report is from another commit');assert.equal(ui.source.workingTreeDirty,false,'UI report used uncommitted code');
   assert.deepEqual(Object.keys(ui.source.files).sort(),[...uiSources].sort(),'UI source hash coverage changed');
   for(const file of uiSources)assert.equal(ui.source.files[file],hash(fs.readFileSync(checkedFile(root,file))),`UI source changed: ${file}`);

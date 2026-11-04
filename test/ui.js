@@ -362,6 +362,20 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       report.checks={...report.checks,creationKeyRace:{requests:4,distinctKeys:new Set(keys).size,createdSources:persisted.sources.length,auditRows:persisted.audit.length,lostResponseReplayed:true}};
       await page.unroute('**/api/projects/1/sources');
     }
+    // Invalidate the real server session without navigating, as after expiry/restart.
+    await page.evaluate(async()=>{
+      const me=await (await fetch('/api/me')).json();
+      const response=await fetch('/api/logout',{method:'POST',headers:{'X-CSRF-Token':me.csrf}});
+      if(!response.ok)throw new Error('Session invalidation failed');
+    });
+    await page.getByRole('button',{name:'刷新工作台',exact:true}).click();
+    await page.getByText(/工作台加载失败：401/).waitFor();
+    await page.getByRole('button',{name:'切换账号'}).click();
+    await page.getByRole('button',{name:'进入项目'}).waitFor({state:'visible'});
+    assert.equal(await page.locator('#workspace').isVisible(),false);
+    await page.getByRole('button',{name:'进入项目'}).click();
+    await page.locator('#facts .entry').first().waitFor();
+    report.checks={...report.checks,sessionRecovery:{invalidatedSession:true,returnedToLogin:true,reloginSucceeded:true}};
     assert.deepEqual(report.pageErrors,[],'浏览器不能出现未捕获脚本错误');
     report.passed=true;
   }catch(e){
