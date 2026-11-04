@@ -52,7 +52,7 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 测试覆盖有历史数据升级、新安装、重复和并发执行、异常数据整体回滚、迁移权限与锁超时、升级后应用角色继续写入及完整 HTTP 集成流程。`test/fixtures/schema-5317607.sql` 为提交 `5317607` 的原始 schema 快照。
 
-界面测试同样会修改数据；先重置、启动服务，再在另一个终端运行 `npm run test:ui`。需要 Chromium，默认 `/usr/bin/chromium`，也可用 `CHROMIUM_PATH` 指定。截图与日志输出到被 Git 忽略的 `artifacts/`。测试结果不代表生产安全认证。
+推荐使用独立临时库的 `npm run test:ui:evidence`，无需重置已有数据或先启动服务；显式设置 `UI_TEST_DATABASE_URL`，浏览器设置与截图说明见[演示证据复现](docs/demo-evidence.md)。原 `npm run test:ui` 会修改3000端口服务使用的演示库，需初始种子状态；默认系统Chromium `/usr/bin/chromium`，可用 `CHROMIUM_PATH` 指定。截图与报告输出到被Git忽略的 `artifacts/ui/`，CI归档为 `ui-evidence`。测试结果不代表生产安全认证。
 
 ## 合成检索评测
 
@@ -72,6 +72,6 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 ## 设计与限制
 
-详见 [数据模型与取舍](docs/design.md)。数据库用事务局部身份设置和 RLS 限制项目范围；应用连接为非 owner、非超级用户、无 BYPASSRLS。会话是服务端随机不透明 cookie，浏览器身份不来自请求中的 user_id 或角色；状态更改要求 CSRF token。来源内容以文本呈现，搜索是参数化的中文子串关键词匹配，**不是语义搜索**。
+详见 [数据模型与取舍](docs/design.md)、[数据字典](docs/data-dictionary.md)与[接口及时序](docs/api-sequences.md)。数据库用事务局部身份设置和 RLS 限制项目范围；应用连接为非 owner、非超级用户、无 BYPASSRLS。会话是服务端随机不透明 cookie，浏览器身份不来自请求中的 user_id 或角色；状态更改要求 CSRF token。来源内容以文本呈现，搜索是参数化的中文子串关键词匹配，**不是语义搜索**。
 
 这是单机演示：固定公开账号、内存 session（重启失效，未做集群/速率限制）、HTTP 本机运行、没有真实智能体/文档导入/真实语料或语义检索评测。该 RLS 设计信任应用服务设置事务身份；已获得应用数据库凭据的人可以自己设置身份，不能抵御此类攻击。生产部署还需真实身份认证、密钥管理、会话存储、TLS、权限复核与安全审计。数据库账号密码只供本地演示。

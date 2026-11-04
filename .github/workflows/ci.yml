@@ -34,3 +34,14 @@ jobs:
           name: retrieval-evaluation
           path: artifacts/retrieval-report.json
           if-no-files-found: ignore
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get install -y fonts-noto-cjk
+      - run: npm run test:ui:evidence
+        env:
+          UI_TEST_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-evidence
+          path: artifacts/ui/
+          if-no-files-found: ignore
