@@ -6,7 +6,7 @@
 
 首次接入者可按[开发者完整上手指南](docs/developer-quickstart.md)从空库走到来源、审批和客户端上下文；包含第二终端配置、预算续读以及实际遇到的安装问题。以下命令使用POSIX shell语法。
 
-需要 Docker Compose、Node.js 20+ 和 npm，端口 5432、3000 可用。仅本机监听；不需外部账号或 API key。
+需要 Docker Compose、Node.js 20+ 和 npm，端口 5432、3000 可用。默认仅绑定127.0.0.1；HTTP Host只接受localhost、127.0.0.1或[::1]及合法端口，不接受自定义域名。不需外部账号或 API key。主机名校验不是身份认证，公开账号仍仅供演示，详见[运行边界](docs/demo-boundary.md)。
 
 ```sh
 npm ci

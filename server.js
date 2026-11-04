@@ -7,6 +7,12 @@ const accounts={owner:{id:1,password:'demo-owner',name:'负责人'},member:{id:2
 const sessions=new Map();
 app.disable('x-powered-by');
 app.use((req,res,next)=>{res.set('X-Content-Type-Options','nosniff');res.set('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"); next()});
+// The public-account demo accepts only literal loopback host names, independent of Origin.
+app.use((req,res,next)=>{
+  const match=typeof req.headers.host==='string'&&/^(localhost|127\.0\.0\.1|\[::1\])(?::([0-9]{1,5}))?$/i.exec(req.headers.host);
+  if(!match||(match[2]!==undefined&&(Number(match[2])<1||Number(match[2])>65535)))return res.status(403).json({error:'仅支持本机演示地址'});
+  next();
+});
 app.use(express.json({limit:'16kb',verify:(req,res,buffer)=>{req.jsonBodyBytes=buffer.length}})); app.use(cookieParser());
 app.post('/api/login',requireJsonObject,(req,res)=>{if(req.get('origin') && req.get('origin')!==`${req.protocol}://${req.get('host')}`) return res.status(403).json({error:'请求来源无效'}); const a=typeof req.body.username==='string'&&Object.hasOwn(accounts,req.body.username) ? accounts[req.body.username] : null;if(!a||typeof req.body?.password!=='string'||a.password!==req.body.password)return res.status(401).json({error:'账号或密码错误'});const token=crypto.randomBytes(32).toString('hex'),csrf=crypto.randomBytes(24).toString('hex');sessions.set(token,{...a,csrf,expires:Date.now()+8*3600000});res.cookie('sid',token,{httpOnly:true,sameSite:'strict',secure:process.env.COOKIE_SECURE==='true',maxAge:8*3600000});res.json({name:a.name,csrf})});
 app.use('/api',(req,res,next)=>{req.user=sessions.get(req.cookies.sid);if(req.user && req.user.expires<Date.now()){sessions.delete(req.cookies.sid);req.user=null}if(!req.user)return res.status(401).json({error:'请先登录'});if(!['GET','HEAD'].includes(req.method)&&req.get('x-csrf-token')!==req.user.csrf)return res.status(403).json({error:'请求校验失败'});next()});

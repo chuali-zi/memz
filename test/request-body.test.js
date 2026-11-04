@@ -81,3 +81,35 @@ test('login requires a string username without array coercion or object conversi
     rejected(await request('/api/login',{body:JSON.stringify({username,password:'demo-owner'}),headers:{'content-type':'application/json'}}),401);
   }
 });
+
+async function hostRequest(host,path,{body,headers={},method='POST'}={}){
+  return new Promise((resolve,reject)=>{
+    const req=require('node:http').request({hostname:'127.0.0.1',port:server.address().port,path,method,headers:{host,'content-type':'application/json',...headers}},res=>{
+      let text='';res.setEncoding('utf8');res.on('data',part=>text+=part);res.on('end',()=>resolve({status:res.statusCode,headers:{get:name=>res.headers[name]??null},text,json:()=>JSON.parse(text)}));
+    });req.on('error',reject);req.end(body);
+  });
+}
+test('local demo rejects a foreign Host even when login Origin matches that Host',async()=>{
+  const host='synthetic-demo.invalid';
+  rejected(await hostRequest(host,'/api/login',{body:credentials,headers:{origin:`http://${host}`}}),403);
+});
+
+test('foreign Host cannot read assets or bypass checks with forwarded headers or a session',async()=>{
+  const auth=await login();
+  for(const host of ['localhost.synthetic.invalid','127.0.0.1.synthetic.invalid','localhost@synthetic.invalid','0.0.0.0','127.1','localhost:65536','localhost:0']){
+    for(const path of ['/','/api/me']){
+      const response=await hostRequest(host,path,{method:'GET',headers:{cookie:auth.cookie,'x-forwarded-host':'localhost','x-forwarded-proto':'http'}});rejected(response,403);assert.equal(response.json().error,'仅支持本机演示地址');assert.ok(!response.text.includes(host));
+    }
+  }
+  rejected(await hostRequest('synthetic.invalid','/api/login',{body:'not json',headers:{origin:'http://synthetic.invalid'}}),403);
+});
+test('literal loopback Hosts retain public demo login, CSRF and logout behavior',async()=>{
+  for(const host of ['127.0.0.1','localhost',`localhost:${server.address().port}`,`[::1]:${server.address().port}`]){
+    const loginResponse=await hostRequest(host,'/api/login',{body:credentials,headers:{origin:`http://${host}`}});assert.equal(loginResponse.status,200);
+    const cookie=loginResponse.headers.get('set-cookie')[0].split(';')[0],csrf=loginResponse.json().csrf;
+    assert.equal((await hostRequest(host,'/api/me',{method:'GET',headers:{cookie}})).status,200);
+    rejected(await hostRequest(host,'/api/projects/1/sources',{body:'{}',headers:{cookie,'x-csrf-token':'wrong'}}),403);
+    assert.equal((await hostRequest(host,'/api/logout',{body:'{}',headers:{cookie,'x-csrf-token':csrf}})).status,200);
+    rejected(await hostRequest(host,'/api/login',{body:credentials,headers:{origin:'http://synthetic.invalid'}}),403);
+  }
+});
