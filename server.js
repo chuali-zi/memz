@@ -29,7 +29,7 @@ function integer(x,min,message){
   return n;
 }
 function num(x){return integer(x,1,'编号无效')}
-function queryText(x,max){if(x.includes('\u0000'))throw fail(400,'文本不能包含空字符 U+0000');return x.slice(0,max)}
+function queryText(x,max){if(x.includes('\u0000'))throw fail(400,'文本不能包含空字符 U+0000');if(!x.isWellFormed())throw fail(400,'文本包含未配对的 Unicode 代理字符');let result=x.slice(0,max);if(/[\uD800-\uDBFF]$/.test(result))result=result.slice(0,-1);return result}
 function str(x,max=500){if(typeof x!=='string'||!x.trim()||x.length>max)throw fail(400,'内容为空或过长');queryText(x,max);return x.trim()}
 async function role(c,p,allowed){const r=(await c.query('SELECT role FROM memberships WHERE project_id=$1 AND user_id=nullif(current_setting(\'app.user_id\',true),\'\')::int',[p])).rows[0];if(!r||!allowed.includes(r.role))throw fail(403,'无权访问此项目或执行此操作');return r.role}
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);

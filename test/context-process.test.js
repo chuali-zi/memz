@@ -38,3 +38,9 @@ test('stdio rejects a NUL query before opening a session',async()=>{
   const before=requests,result=await invoke(JSON.stringify({query:'前\u0000后'}));
   assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_QUERY/);assert.equal(requests,before);
 });
+
+test('stdio rejects escaped unpaired Unicode surrogates without a session',async()=>{
+  for(const query of ['前\ud800后','前\udc00后']){
+    const before=requests,result=await invoke(JSON.stringify({query}));assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_QUERY/);assert.equal(requests,before);
+  }
+});

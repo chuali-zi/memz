@@ -109,6 +109,7 @@ test('application role cannot migrate; lock timeout leaves the legacy database u
 test('full HTTP integration suite works against an upgraded legacy database',async()=>{
   await fixture('test/fixtures/schema-5317607.sql',async(c,url)=>{
     await migrate(c);
+    await migrate(c,fs.readFileSync('db/migrations/002-create-idempotency.sql','utf8'));
     const appUrl=new URL(url);appUrl.username='memz_app';appUrl.password='memz_demo_only';
     const execFile=require('node:util').promisify(require('node:child_process').execFile);
     const childEnv={...process.env,DATABASE_URL:appUrl.href};

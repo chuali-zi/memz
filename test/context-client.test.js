@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {readContext}=require('../scripts/context-client');
 test('context client rejects unsafe or silently truncated configuration before login',async()=>{
   let calls=0;const fetchImpl=async()=>{calls++;throw new Error('unexpected request')};
-  for(const options of [{baseURL:'http://user:password@localhost:3000'},{baseURL:'http://localhost:3000/path'},{projectId:0},{limit:101},{query:'x'.repeat(201)},{query:'前\u0000后'},{timeoutMs:0}])await assert.rejects(()=>readContext({...options,fetchImpl}),e=>e.code.startsWith('INVALID_'));
+  for(const options of [{baseURL:'http://user:password@localhost:3000'},{baseURL:'http://localhost:3000/path'},{projectId:0},{limit:101},{query:'x'.repeat(201)},{query:'前\u0000后'},{query:'前\ud800后'},{query:'前\udc00后'},{timeoutMs:0}])await assert.rejects(()=>readContext({...options,fetchImpl}),e=>e.code.startsWith('INVALID_'));
   assert.equal(calls,0);
 });
 test('context client reports transport timeout without exposing supplied credentials',async()=>{
