@@ -43,3 +43,5 @@ EVALUATION_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/me
 报告contextScale另记录来源/候选/历史/审计数组规模，以及省略历史的侧栏与历史第一页合计字节数。固定种子下核对其他字段不变、历史第一页等于原聚合前25条；不进行新旧请求耗时比较。详见[历史分页实测](history-pagination.md)。
 
 报告candidateScale增加来源/审计响应、候选第一页及与历史第一页合计的JSON字节数（不含事实页），并核对旧候选前25条及保留字段。测量与限制见[候选分页](candidate-pagination.md)。
+
+sourceScale是原19例检索与counts记录之后追加的独立来源增长场景，默认200条、每条4000字符；EVALUATION_SOURCE_COUNT允许25–1000。该场景完整遍历来源并与旧聚合逐条比较，记录原来源/审计响应、审计响应和来源首25条字节数，不计时、不改变之前检索黄金结果。详见[来源规模证据](source-pagination.md)。

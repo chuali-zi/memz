@@ -17,12 +17,13 @@
 | R11 数据库指针完整性 | 错事实、错版本、正版本空指针均被数据库拒绝 | facts复合FK与CHECK | integration.test.js直接SQL反例；test/migrations.js |
 | R12 保留数据升级 | 原库升级后业务行/序列/权限/策略不变；可重复；失败回滚；应用账号不能迁移 | 001/002迁移 | test/migrations.js 9组；含升级后完整HTTP集成 |
 | R13 输入错误可理解 | 登录/来源/候选要求JSON对象；非JSON415；空/坏JSON400；超16KiB413；错误JSON不反射请求原文 | requireJsonObject、解析器、统一错误处理 | request-body.test.js 8组，含字节边界、多字节与gzip膨胀、错误安全头 |
-| R14 演示可复现 | 无需重置现有数据生成十七张截图（独立库流程）；报告含提交/版本/校验值；没有浏览器脚本错误 | test/ui.js、ui-evidence.js | ui-evidence artifact；docs/demo-evidence.md |
+| R14 演示可复现 | 无需重置现有数据生成二十张截图（独立库流程）；报告含提交/版本/校验值；没有浏览器脚本错误 | test/ui.js、ui-evidence.js | ui-evidence artifact；docs/demo-evidence.md |
 | R15 创建请求可安全重试 | 同范围同键同内容只创建一次业务/审计；异内容409；失败回滚后可重试 | idempotency.js、回执表与RLS | test/idempotency.js五组，在新库/升级库各运行一次；pg_locks等待观察 |
-| R16 有界事实读取 | 每页最多100条；游标遍历无重复；保持当前版本及成员隔离 | GET /facts | test/pagination.js十一组；19例双接口检索验证 |
+| R16 有界事实读取 | 每页最多100条；游标遍历无重复；保持当前版本及成员隔离 | GET /facts | test/pagination.js十四组；19例双接口检索验证 |
 | R17 页面分页可靠性 | 页码/空结果/错误可理解；忽略旧响应；键盘翻页；并发变更后可刷新核对 | loadFacts、请求代次与游标栈 | UI真实临时库56条事实；截图09–12及错误/延迟注入 |
 | R18 历史有界读取 | 页面25条；完整遍历与旧历史一致；新增修订不推移较旧页；独立失败恢复 | GET /history、include_history、loadHistory | test/pagination.js；UI截图13–14；contextScale响应测量 |
 | R19 候选有界读取与筛选 | 四种筛选完整遍历；审批保持筛选；并发决定仅一次成功且旧页面刷新 | GET /candidates、include_candidates、loadCandidates | 数据库及UI回归；截图15–17；candidateScale实测 |
+| R20 来源有界读取与依据保持 | 标题检索及分页；跨页保留来源ID；候选/事实/修订引用一致；新来源明确选中 | GET /sources、include_sources、loadSources、selectedSource | 数据库与UI回归；截图18–20；sourceScale增长测量 |
 
 ## 运行条件与取证方法
 
@@ -35,4 +36,4 @@
 
 ## 目前不覆盖的需求
 
-没有真实账号体系、组织级密钥管理、持久化会话、真实智能体/文档导入、语义检索、并发负载容量结论、正式可用性研究或生产安全审计。页面当前事实、历史和候选已分页，原聚合默认响应和来源仍无分页；来源/候选支持可选幂等键，无键或不同键重复提议仍可能创建多个候选。管理员/应用数据库凭据泄漏不在RLS身份假设的保护范围内。原通知模板、最终材料格式和提交渠道仍需复核。
+没有真实账号体系、组织级密钥管理、持久化会话、真实智能体/文档导入、语义检索、并发负载容量结论、正式可用性研究或生产安全审计。页面四类列表已分页，原聚合默认响应仍全量返回；来源/候选支持可选幂等键，无键或不同键重复提议仍可能创建多个候选。管理员/应用数据库凭据泄漏不在RLS身份假设的保护范围内。原通知模板、最终材料格式和提交渠道仍需复核。

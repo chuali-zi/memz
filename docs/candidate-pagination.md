@@ -6,7 +6,7 @@
 
 `GET /api/projects/:p/candidates?status=pending&limit=25&before=123` 返回 `{role,candidates,next_before}`。候选对象保持旧聚合接口同样的字段及来源标题。`status`缺省all，仅接受all/pending/approved/rejected；`limit`缺省25，整数1–100；before可省略，或为整数1–2147483647，排除该编号及更大编号。多取一行确定后续游标，无下一页时null。空、重复、越界或未知参数值400，未登录401，非项目成员403。只读者可读取但不显示审批按钮，服务端仍独立检查审批权限。
 
-旧 `/data` 默认不变；`include_candidates=false`跳过候选SQL并省略candidates字段，true与缺省相同，其他值或重复参数400。页面初次并行读取来源/审计、事实第一页、历史第一页、候选第一页，来源/审计请求同时设置include_facts、include_history、include_candidates为false。无数据库迁移或旧数据修改。
+旧 `/data` 默认不变；`include_candidates=false`跳过候选SQL并省略candidates字段，true与缺省相同，其他值或重复参数400。页面现并行读取审计、事实/历史/候选/来源第一页，审计请求将四个include_*设为false。无数据库迁移或旧数据修改。
 
 ## 并发、失败与可访问性
 
@@ -22,10 +22,10 @@
 
 `EVALUATION_FILLER_COUNT=2000 npm run eval:retrieval`（需测试管理员EVALUATION_DATABASE_URL）复现；报告candidateScale保存上述数字，并核对省略候选后其余字段不变、候选第一页等于旧列表前25条。原始本次报告为工作区artifacts/candidates-scale-2000.json；默认200档由CI归档。报告记录代码校验值和环境，正式材料应使用同次报告。
 
-来源列表及选择器仍完整加载，审计限定100条，原聚合默认响应仍可很大。分页限制行数不保证固定字节数或SQL扫描工作量；没有新增索引，没有宣称所有响应都已严格有界。
+来源现已[分页并保留已选依据](source-pagination.md)，审计限定100条，原聚合默认响应仍可很大。分页限制行数不保证固定字节数或SQL扫描工作量；没有新增索引，没有宣称所有响应都已严格有界。
 
 ## 验收证据
 
-分页数据库子套件现11组：候选新增完整遍历及四种状态与旧结果逐条比较、参数和权限隔离、并发批准/驳回仅一次成功、后页状态变化及新增候选刷新可见；外层迁移/回归仍九组。原审批、版本冲突、幂等与保留数据测试继续执行。
+分页数据库子套件现14组：候选新增完整遍历及四种状态与旧结果逐条比较、参数和权限隔离、并发批准/驳回仅一次成功、后页状态变化及新增候选刷新可见；外层迁移/回归仍九组。原审批、版本冲突、幂等与保留数据测试继续执行。
 
-真实浏览器验证60条候选分25/25/10、键盘翻页、筛选重置、待审批状态下新提议与批准、外部真实请求先驳回后的409与刷新、延迟旧筛选保护、503恢复和移动空状态。故障503为显式注入，延迟的是实际HTTP响应。15-candidates-last-page.png、16-candidates-concurrent-decision.png、17-mobile-candidates-empty.png为新增证据，独立流程共17张截图。图16显示刷新后的已驳回状态，409提示由自动断言验证，不声称截取区域含该提示。
+真实浏览器验证60条候选分25/25/10、键盘翻页、筛选重置、待审批状态下新提议与批准、外部真实请求先驳回后的409与刷新、延迟旧筛选保护、503恢复和移动空状态。故障503为显式注入，延迟的是实际HTTP响应。15-candidates-last-page.png、16-candidates-concurrent-decision.png、17-mobile-candidates-empty.png为新增证据，独立流程共20张截图。图16显示刷新后的已驳回状态，409提示由自动断言验证，不声称截取区域含该提示。

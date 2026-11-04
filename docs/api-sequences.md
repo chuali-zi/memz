@@ -101,6 +101,8 @@ sequenceDiagram
 
 `GET /api/projects/:p/facts` 是可选的游标分页读取：校验参数 → 只读事务身份与角色 → 当前修订查询 limit+1 → 提交 → 返回 role/facts/next_after。单页一致、多页不是同一快照；详见[接口契约及测量](bounded-retrieval.md)。原聚合读取时序保持不变。
 
-页面现使用 `/data?include_facts=false&include_history=false&include_candidates=false` 加载来源/审计，并行使用 `/facts`、`/history` 和 `/candidates` 加载各自第一页。事实搜索与翻页只读 `/facts`，历史翻页/刷新只读 `/history`，候选筛选/翻页只读 `/candidates`；刷新工作台重新读取四者并重置页码。旧 `/data` 缺省响应不变。各请求有独立一致快照，但不是共同快照；界面有明确提示。历史参数与倒序游标说明见[历史分页](history-pagination.md)。
+页面现使用 `/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false` 加载审计，并行使用 `/facts`、`/history`、`/candidates` 和 `/sources` 加载各自第一页。事实搜索与翻页只读 `/facts`，历史翻页/刷新只读 `/history`，候选筛选/翻页只读 `/candidates`；刷新工作台重新读取五者并重置页码。旧 `/data` 缺省响应不变。各请求有独立一致快照，但不是共同快照；界面有明确提示。历史参数与倒序游标说明见[历史分页](history-pagination.md)。
 
 候选审批成功或409后刷新工作台，保留筛选并重置页码。决定事务仍独立复核权限、pending状态及版本，不信任旧列表状态。契约与并发限制见[候选分页](candidate-pagination.md)。
+
+来源按标题检索和升序游标翻页，依据选择独立保留。新来源保存后明确提示选中新ID；项目切换清空原选择，候选提交仍由服务端复核来源项目。见[来源分页](source-pagination.md)。

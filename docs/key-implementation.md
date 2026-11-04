@@ -72,3 +72,7 @@ ALTER TABLE facts ADD CONSTRAINT facts_current_revision_state
 ## 候选状态筛选与分页
 
 readCandidatesPage参数化查询状态和排他before游标，每页limit+1行判断后续页，复用角色/RLS及单页只读快照。页面renderCandidate仅为owner的pending行显示决定按钮，但服务端decide仍锁定与复核候选状态。决定期间禁用条目按钮，成功或409后刷新并保留筛选。旧筛选响应按请求代次丢弃；状态在翻页期间变化不提供共同快照保证。来源仍全量加载。
+
+## 来源分页与选择状态
+
+readSourcesPage按标题参数化匹配及ID升序取limit+1，readProject可选跳过来源SQL。页面sourcePage仅保存当前页，selectedSource只保留当前项目已选ID和标题，sourceOptions合并本页和已选项；项目切换清除选择。候选POST仍校验来源项目，来源与修订的外键未改变。源正文预览与折叠使用textContent，原文不作为HTML执行。

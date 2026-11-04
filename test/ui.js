@@ -5,7 +5,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {execFileSync}=require('node:child_process');
 
-async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env.CHROMIUM_PATH||'/usr/bin/chromium',databaseVersion=null,preparePagination=null}={}){
+async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env.CHROMIUM_PATH||'/usr/bin/chromium',databaseVersion=null,preparePagination=null,prepareSources=null}={}){
   const dir=path.join('artifacts','ui',`run-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`);
   fs.mkdirSync(dir,{recursive:true});
   const report={schemaVersion:1,synthetic:true,startedAt:new Date().toISOString(),passed:false,
@@ -141,7 +141,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       assert.equal(await page.locator('#facts .entry').count(),0);
       assert.equal(await page.locator('#factsNext').isDisabled(),true);
       await page.unroute('**/api/projects/1/facts?**');
-      const contextRequest=page.waitForRequest(r=>r.url().endsWith('/data?include_facts=false&include_history=false&include_candidates=false'));
+      const contextRequest=page.waitForRequest(r=>r.url().endsWith('/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false'));
       await page.getByRole('button',{name:'刷新工作台',exact:true}).click();await contextRequest;
       await page.locator('#facts').getByText('分页演示54 / 状态：合成分页事实',{exact:true}).waitFor();
       await capture('11-search-recovered.png','注入503后刷新恢复真实检索；聚合请求显式排除事实','.card:has(#facts)');
@@ -259,6 +259,77 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await capture('17-mobile-candidates-empty.png','移动视口中待审批筛选为空，故障恢复后无过期审批按钮','.card:has(#candidates)');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
 
+    }
+    if(prepareSources){
+      await prepareSources();await page.setViewportSize({width:1440,height:1000});
+      const originalSelection=await page.locator('#sourceSelect').inputValue();
+      await page.getByRole('button',{name:'刷新来源',exact:true}).click();
+      await page.getByText('来源第 1 页 · 25 条',{exact:true}).waitFor();
+      assert.equal(await page.locator('#sourceSelect').inputValue(),originalSelection);
+      await page.locator('#sourcesNext').focus();await page.keyboard.press('Enter');
+      await page.getByText('来源第 2 页 · 25 条',{exact:true}).waitFor();
+      assert.equal(await page.locator('#sourcesTitle').evaluate(e=>e===document.activeElement),true);
+      assert.equal(await page.locator('#sourceSelect').inputValue(),originalSelection);
+      assert.equal(await page.locator('#sourceSelect option').count(),26,'page plus pinned choice');
+      await page.getByRole('button',{name:'下一页来源',exact:true}).click();
+      await page.getByText('来源第 3 页 · 8 条 · 已到末页',{exact:true}).waitFor();
+      const sourceEntry=page.locator('#sources .entry').filter({hasText:'来源演示54'});
+      await sourceEntry.locator('summary').click();
+      assert.equal(await sourceEntry.locator('details .meta').textContent(),'X'.repeat(4000));
+      await sourceEntry.locator('summary').click();
+      await capture('18-sources-last-page.png','58条来源分25/25/8；长正文可展开，翻页仍保留原依据','.card:has(#sources)');
+      await sourceEntry.getByRole('button',{name:'选作依据',exact:true}).click();
+      const selectedId=await page.locator('#sourceSelect').inputValue();
+      await page.getByRole('textbox',{name:'检索来源标题'}).fill('不存在的来源标题');
+      await page.getByRole('button',{name:'查找来源',exact:true}).click();
+      await page.getByText('没有匹配的来源标题',{exact:true}).waitFor();
+      assert.equal(await page.locator('#sourceSelect').inputValue(),selectedId);
+      assert.equal(await page.locator('#sourceSelect option').count(),1);
+      await page.locator('#proposal [name=subject]').fill('来源引用测试');
+      await page.locator('#proposal [name=predicate]').fill('依据');
+      await page.locator('#proposal [name=value]').fill('跨页引用');
+      await page.locator('#proposal [name=expected_version]').fill('0');
+      const proposalRequest=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/candidates'));
+      await page.getByRole('button',{name:'提交候选',exact:true}).click();
+      assert.equal((await proposalRequest).postDataJSON().source_id,selectedId);
+      await page.locator('#candidates .entry').filter({hasText:'来源引用测试'}).getByRole('button',{name:'批准',exact:true}).click();
+      await page.getByText('当前筛选没有候选',{exact:true}).waitFor();
+      const provenance=await page.evaluate(async()=>{
+        const {facts}=await (await fetch('/api/projects/1/facts?q=来源引用测试')).json();
+        const {candidates}=await (await fetch('/api/projects/1/candidates?status=approved')).json();
+        return {fact:facts[0],candidate:candidates.find(c=>c.subject==='来源引用测试')};
+      });
+      assert.equal(provenance.fact.source,'来源演示54');assert.equal(provenance.candidate.source_id,Number(selectedId));
+      assert.equal(await page.locator('#sourceSelect').inputValue(),selectedId);
+      await capture('19-source-choice-preserved.png','来源检索为空后仍使用已选ID提议并批准，候选与事实溯源经真实接口验证','.card:has(#proposal)');
+      let releaseSources,observeSources;
+      const sourceHeld=new Promise(r=>{releaseSources=r}),sourceObserved=new Promise(r=>{observeSources=r});
+      await page.route('**/api/projects/1/sources?**',async route=>{
+        if(new URL(route.request().url()).searchParams.get('q')==='来源演示00'){
+          const response=await route.fetch();observeSources();await sourceHeld;await route.fulfill({response});
+        }else await route.continue();
+      });
+      await page.getByRole('textbox',{name:'检索来源标题'}).fill('来源演示00');await page.getByRole('button',{name:'查找来源',exact:true}).click();await sourceObserved;
+      await page.getByRole('textbox',{name:'检索来源标题'}).fill('来源演示54');await page.getByRole('button',{name:'查找来源',exact:true}).click();
+      await page.getByText('来源第 1 页 · 1 条 · 已到末页',{exact:true}).waitFor();
+      const oldSources=page.waitForResponse(r=>r.url().includes('/sources?')&&new URL(r.url()).searchParams.get('q')==='来源演示00');releaseSources();await (await oldSources).finished();
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      assert.ok((await page.locator('#sources').textContent()).includes('来源演示54'));assert.equal(await page.locator('#sourceSelect').inputValue(),selectedId);
+      await page.unroute('**/api/projects/1/sources?**');
+      await page.route('**/api/projects/1/sources?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'来源测试故障'})}));
+      await page.getByRole('button',{name:'刷新来源',exact:true}).click();await page.getByText(/来源加载失败：503 来源测试故障/).waitFor();
+      assert.equal(await page.locator('#sourceSelect').inputValue(),selectedId);assert.equal(await page.locator('#sourcesNext').isDisabled(),true);
+      await page.unroute('**/api/projects/1/sources?**');
+      await page.getByRole('button',{name:'刷新来源',exact:true}).click();await page.getByText('来源第 1 页 · 1 条 · 已到末页',{exact:true}).waitFor();
+      await page.locator('details').filter({has:page.locator('#sourceForm')}).locator('summary').click();
+      await page.locator('#sourceForm [name=title]').fill('浏览器新来源');await page.locator('#sourceForm [name=content]').fill('真实创建的合成来源正文');
+      await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.getByText(/来源 #\d+ 已保存并选为依据/).waitFor();
+      assert.notEqual(await page.locator('#sourceSelect').inputValue(),selectedId);
+      await page.getByRole('textbox',{name:'检索来源标题'}).fill('浏览器新来源');await page.getByRole('button',{name:'查找来源',exact:true}).click();
+      await page.locator('#sources').getByText('真实创建的合成来源正文',{exact:true}).waitFor();
+      await page.setViewportSize({width:390,height:844});
+      await capture('20-mobile-sources.png','移动端新建来源标题检索，正文与分页控件可见','.card:has(#sources)');
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
     }
     assert.deepEqual(report.pageErrors,[],'浏览器不能出现未捕获脚本错误');
     report.passed=true;

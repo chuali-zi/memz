@@ -17,6 +17,9 @@ async function main(){
     server=await new Promise(resolve=>{const s=service.app.listen(0,'127.0.0.1',()=>resolve(s))});
     await runUI({baseURL:`http://127.0.0.1:${server.address().port}`,executablePath:process.env.CHROMIUM_PATH||null,
       databaseVersion:(await owner.query('SHOW server_version')).rows[0].server_version,
+      prepareSources:async()=>{
+        await service.tx(1,c=>c.query("INSERT INTO sources(project_id,title,content) SELECT 1,'来源演示'||lpad(n::text,2,'0'),repeat('X',4000) FROM generate_series(0,54) n"));
+      },
       preparePagination:async()=>{
         for(let i=0;i<55;i++)await service.tx(1,async c=>{
           const id=(await c.query("INSERT INTO candidates(project_id,subject,predicate,value,source_id,expected_version,proposed_by) VALUES(1,$1,'状态','合成分页事实',2,0,1) RETURNING id",[`分页演示${String(i).padStart(2,'0')}`])).rows[0].id;

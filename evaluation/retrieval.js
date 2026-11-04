@@ -123,13 +123,32 @@ async function main(){
         latencyMs:{samples:samples.length,rawSamples:samples,median:percentile(samples,0.5),p95:percentile(samples,0.95),min:Math.min(...samples),max:Math.max(...samples)},...(error?{error}:{})});
     }
     const counts={};for(const table of ['facts','revisions','candidates','sources'])counts[table]=Number((await owner.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
+    const sourceCount=process.env.EVALUATION_SOURCE_COUNT===undefined?200:Number(process.env.EVALUATION_SOURCE_COUNT);
+    assert.ok(Number.isInteger(sourceCount)&&sourceCount>=25&&sourceCount<=1000,'EVALUATION_SOURCE_COUNT must be an integer from 25 to 1000');
+    // Separate source-growth scenario after the fixed retrieval dataset was measured.
+    await tx(1,c=>c.query("INSERT INTO sources(project_id,title,content) SELECT 1,'规模来源'||lpad(n::text,4,'0'),repeat('测',4000) FROM generate_series(1,$1::int) n",[sourceCount]));
+    const sourcesFull=await readHistoryMeasurement('data?include_facts=false&include_history=false&include_candidates=false');
+    const sourcesOmitted=await readHistoryMeasurement('data?include_facts=false&include_history=false&include_candidates=false&include_sources=false');
+    const {sources:expectedSources,...sourceRest}=sourcesFull.body;assert.deepEqual(sourcesOmitted.body,sourceRest);
+    const sourceRows=[];let sourceAfter=0,sourcePages=0,sourceFirstBytes;
+    do{
+      const page=await readHistoryMeasurement(`sources?limit=25&after=${sourceAfter}`);sourcePages++;
+      if(sourcePages===1)sourceFirstBytes=page.bytes;
+      assert.ok(page.body.sources.length<=25);
+      for(const row of page.body.sources){assert.ok(row.id>sourceAfter);sourceAfter=row.id;sourceRows.push(row)}
+      if(page.body.next_after===null)break;
+      assert.equal(page.body.next_after,sourceAfter);assert.ok(sourcePages<100);
+    }while(true);
+    assert.deepEqual(sourceRows,expectedSources);
+    const sourceScale={scenario:'additional synthetic sources after retrieval cases',addedSources:sourceCount,charactersPerAddedBody:4000,projectSources:sourceRows.length,pages:sourcePages,
+      aggregateBytes:sourcesFull.bytes,withoutSourcesBytes:sourcesOmitted.bytes,firstPageBytes:sourceFirstBytes,initialCombinedBytes:sourcesOmitted.bytes+sourceFirstBytes};
     const report={schemaVersion:2,dataset:fixture.dataset,fillerCount,synthetic:true,generatedAt:new Date().toISOString(),
       source:{gitCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),
         datasetSha256:checksum(fixtureBytes),serverSha256:checksum(fs.readFileSync('server.js')),idempotencySha256:checksum(fs.readFileSync('idempotency.js')),runnerSha256:checksum(fs.readFileSync(__filename))},
       environment:{node:process.version,postgres:(await owner.query('SHOW server_version')).rows[0].server_version,platform:process.platform,arch:process.arch,cpu:os.cpus()[0]?.model},
       method:{transport:'HTTP localhost including full project response JSON parsing',concurrency:1,warmupsPerCase:warmups,measuredRequestsPerCase:repeats,
         percentile:'nearest rank',note:'Legacy aggregate timings only. Paged endpoint is traversed once per case for correctness and JSON byte counts; no timing comparison or production/load claims.'},
-      counts,contextScale,candidateScale,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
+      counts,contextScale,candidateScale,sourceScale,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
     fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/retrieval-report.json',JSON.stringify(report,null,2)+'\n');
     console.log(`Retrieval evaluation: ${report.passedCases}/${report.totalCases} cases passed; ${counts.facts} current facts. Report: artifacts/retrieval-report.json`);
     assert.ok(report.passed,'Retrieval evaluation failed; inspect the report');

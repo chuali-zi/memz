@@ -109,26 +109,73 @@ async function loadCandidates({reset=false,index=candidateState.index,focus=fals
     $('#candidates').setAttribute('aria-busy','false');$('#candidatesPrevious').disabled=true;$('#candidatesNext').disabled=true;
   }
 }
+let sourceGeneration=0,sourceState={query:'',cursors:[0],index:0,next:null},sourcePage=[],selectedSource=null;
+function writeControls(){
+  for(const b of document.querySelectorAll('#sourceForm button,#stale,#injection'))b.disabled=!data;
+  $('#proposal button').disabled=!data||!selectedSource||selectedSource.project!==projectId;
+}
+function sourceOptions(){
+  const select=$('#sourceSelect');select.replaceChildren();
+  const options=[...sourcePage];
+  if(selectedSource&&!options.some(s=>s.id===selectedSource.id))options.unshift(selectedSource);
+  for(const source of options){const option=el('option',`#${source.id} ${source.title}`);option.value=source.id;select.append(option)}
+  if(selectedSource)select.value=selectedSource.id;
+  $('#sourceSelection').textContent=selectedSource?`已选 #${selectedSource.id} ${selectedSource.title}；翻页与检索会保留此依据。`:'请先在来源列表选择依据。';
+  writeControls();
+}
+function selectSource(source){selectedSource={id:source.id,title:source.title,project:projectId};sourceOptions()}
+function sourceControls(busy=false){
+  $('#sources').setAttribute('aria-busy',String(busy));
+  $('#sourcesPrevious').disabled=busy||sourceState.index===0;
+  $('#sourcesNext').disabled=busy||sourceState.next===null;
+}
+async function loadSources({reset=false,index=sourceState.index,focus=false}={}){
+  if(reset){sourceState={query:$('#sourceSearchForm').q.value,cursors:[0],index:0,next:null};index=0}
+  const generation=++sourceGeneration,p=projectId,query=sourceState.query,after=sourceState.cursors[index];
+  sourcePage=[];sourceOptions();sourceControls(true);$('#sources').replaceChildren();$('#sourcesStatus').textContent='正在加载来源…';
+  try{
+    const page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(query)}&limit=25&after=${after}`);
+    if(generation!==sourceGeneration||p!==projectId)return;
+    sourceState.index=index;sourceState.next=page.next_after;
+    sourceState.cursors=sourceState.cursors.slice(0,index+1);
+    if(page.next_after!==null)sourceState.cursors.push(page.next_after);
+    sourcePage=page.sources;
+    if(!selectedSource&&sourcePage.length)selectedSource={id:sourcePage[0].id,title:sourcePage[0].title,project:p};
+    sourceOptions();
+    rows('#sources',sourcePage,(d,source)=>{
+      d.append(el('strong',`#${source.id} ${source.title}`));
+      if(source.content.length<=160)d.append(el('div',source.content,'meta'));
+      else{d.append(el('div',source.content.slice(0,120)+'…','meta'));const details=el('details');details.append(el('summary',`查看完整正文（${source.content.length} 字符）`),el('div',source.content,'meta'));d.append(details)}
+      const button=el('button','选作依据','secondary');button.onclick=()=>{selectSource(source);message(`已选择来源 #${source.id}`);$('#sourceSelect').focus()};d.append(button);
+    });
+    $('#sourcesStatus').textContent=sourcePage.length?`来源第 ${index+1} 页 · ${sourcePage.length} 条${page.next_after===null?' · 已到末页':''}`:'没有匹配的来源标题';
+    sourceControls();if(focus)$('#sourcesTitle').focus();
+  }catch(e){
+    if(generation!==sourceGeneration||p!==projectId)return;
+    $('#sourcesStatus').textContent=`来源加载失败：${e.message}。请刷新来源重试。`;
+    $('#sources').setAttribute('aria-busy','false');$('#sourcesPrevious').disabled=true;$('#sourcesNext').disabled=true;
+  }
+}
 async function load(){
   const generation=++contextGeneration,p=projectId;
   data=null;
-  for(const id of ['#sources','#candidates','#history','#audit','#sourceSelect'])$(id).replaceChildren();
+  for(const id of ['#sources','#candidates','#history','#audit'])$(id).replaceChildren();
   for(const b of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))b.disabled=true;
-  const facts=loadFacts({reset:true}),history=loadHistory({reset:true}),candidates=loadCandidates({reset:true});
+  const facts=loadFacts({reset:true}),history=loadHistory({reset:true}),candidates=loadCandidates({reset:true}),sources=loadSources({reset:true});
   try{
-    const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false`);
+    const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false`);
     if(generation!==contextGeneration||p!==projectId)return;
     data=result;
-    for(const b of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))b.disabled=false;
+    writeControls();
     renderContext();
   }catch(e){if(generation===contextGeneration&&p===projectId)message(`工作台加载失败：${e.message}。请刷新重试。`)}
-  await Promise.all([facts,history,candidates]);
+  await Promise.all([facts,history,candidates,sources]);
 }
-function renderContext(){rows('#sources',data.sources,(d,s)=>{d.append(el('strong',`#${s.id} ${s.title}`),el('div',s.content,'meta'))});const sel=$('#sourceSelect');sel.replaceChildren();data.sources.forEach(s=>{const o=el('option',`#${s.id} ${s.title}`);o.value=s.id;sel.append(o)});rows('#audit',data.audit,(d,a)=>d.append(el('strong',a.action),el('div',`${a.detail} · 用户 ${a.actor_id} · ${new Date(a.created_at).toLocaleString()}`,'meta')))}
+function renderContext(){rows('#audit',data.audit,(d,a)=>d.append(el('strong',a.action),el('div',`${a.detail} · 用户 ${a.actor_id} · ${new Date(a.created_at).toLocaleString()}`,'meta')))}
 async function perform(fn){try{await fn()}catch(e){message(e.message)}}
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
 $('#loginForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const f=new FormData(e.target);const x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=x.csrf;message('');$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));const b=el('button','切换账号');b.onclick=()=>perform(async()=>{await api('/api/logout',{method:'POST'});location.reload()});$('#identity').append(b);await loadProjects()})};
-$('#project').onchange=e=>{projectId=Number(e.target.value);perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
+$('#project').onchange=e=>{projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
 $('#factsPrevious').onclick=()=>perform(()=>loadFacts({index:factState.index-1,focus:true}));
 $('#factsNext').onclick=()=>perform(()=>loadFacts({index:factState.index+1,focus:true}));
 $('#refreshWorkspace').onclick=()=>perform(load);
@@ -139,7 +186,17 @@ $('#candidateFilter').onchange=()=>perform(()=>loadCandidates({reset:true}));
 $('#candidatesPrevious').onclick=()=>perform(()=>loadCandidates({index:candidateState.index-1,focus:true}));
 $('#candidatesNext').onclick=()=>perform(()=>loadCandidates({index:candidateState.index+1,focus:true}));
 $('#refreshCandidates').onclick=()=>perform(()=>loadCandidates({reset:true}));
+$('#sourceSelect').onchange=e=>{const source=sourcePage.find(s=>s.id===Number(e.target.value))||selectedSource;if(source)selectSource(source)};
+$('#sourceSearchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadSources({reset:true}))};
+$('#sourcesPrevious').onclick=()=>perform(()=>loadSources({index:sourceState.index-1,focus:true}));
+$('#sourcesNext').onclick=()=>perform(()=>loadSources({index:sourceState.index+1,focus:true}));
+$('#refreshSources').onclick=()=>perform(()=>loadSources({reset:true}));
 $('#proposal').onsubmit=e=>{e.preventDefault();perform(async()=>{await createRecord(`/api/projects/${projectId}/candidates`,Object.fromEntries(new FormData(e.target)));message('候选已提交，等待负责人审批');await load()})};
-$('#sourceForm').onsubmit=e=>{e.preventDefault();perform(async()=>{await createRecord(`/api/projects/${projectId}/sources`,Object.fromEntries(new FormData(e.target)));e.target.reset();message('来源已保存');await load()})};
-async function simulated(value,source){await createRecord(`/api/projects/${projectId}/candidates`,{subject:'项目',predicate:'截止日',value,source_id:source,expected_version:1});message('模拟客户端已提交候选，尚未改变当前事实');await load()}
-$('#stale').onclick=()=>perform(()=>simulated('25号',data.sources.find(s=>s.title.includes('会议纪要'))?.id));$('#injection').onclick=()=>perform(()=>simulated('30号',data.sources.find(s=>s.title.includes('外部文档'))?.id));
+$('#sourceForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const p=projectId,source=await createRecord(`/api/projects/${p}/sources`,Object.fromEntries(new FormData(e.target)));if(p!==projectId)return;selectSource(source);e.target.reset();message(`来源 #${source.id} 已保存并选为依据`);await load()})};
+async function simulated(value,fragment){
+  const p=projectId,page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(fragment)}&limit=1`);
+  if(!page.sources.length)throw new Error('当前项目缺少此模拟场景的来源');
+  await createRecord(`/api/projects/${p}/candidates`,{subject:'项目',predicate:'截止日',value,source_id:page.sources[0].id,expected_version:1});
+  if(p===projectId){message('模拟客户端已提交候选，尚未改变当前事实');await load()}
+}
+$('#stale').onclick=()=>perform(()=>simulated('25号','会议纪要'));$('#injection').onclick=()=>perform(()=>simulated('30号','外部文档'));

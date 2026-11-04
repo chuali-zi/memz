@@ -176,3 +176,46 @@ test('concurrent decisions change a later pending page without duplicate decisio
   assert.deepEqual((await candidates(`?status=pending&before=${first.next_before}`)).body,second);
   assert.equal((await candidates('?status=pending')).body.candidates[0].subject,'候选翻页后新增');
 });
+
+async function sources(query='',user='owner',project=1){
+  const r=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/${project}/sources${query}`,{headers:{cookie:cookies[user]}});
+  return {status:r.status,body:await r.json()};
+}
+test('large source lists traverse exactly once, search titles literally, and preserve aggregate compatibility',async()=>{
+  await tx(1,c=>c.query("INSERT INTO sources(project_id,title,content) SELECT 1,'Source规模'||lpad(n::text,3,'0')||CASE WHEN n=1 THEN '%_' ELSE '' END,repeat('测',4000) FROM generate_series(1,70) n"));
+  const base=`http://127.0.0.1:${server.address().port}/api/projects/1/data`;
+  const read=async q=>{const r=await fetch(base+q,{headers:{cookie:cookies.owner}});assert.equal(r.status,200);return r.json()};
+  const full=await read(''),{sources:expected,...rest}=full;assert.deepEqual(await read('?include_sources=false'),rest);assert.deepEqual(await read('?include_sources=true'),full);
+  const onlyAudit=await read('?include_facts=false&include_history=false&include_candidates=false&include_sources=false');assert.deepEqual(onlyAudit,{role:full.role,audit:full.audit});
+  assert.equal((await sources()).body.sources.length,25);
+  const rows=[];let after=0;
+  do{const page=(await sources(`?limit=11&after=${after}`)).body;assert.ok(page.sources.length<=11);
+    for(const row of page.sources){assert.ok(row.id>after);after=row.id;rows.push(row)}
+    if(page.next_after===null)break;assert.equal(page.next_after,after);assert.ok(rows.length<1000);
+  }while(true);
+  assert.deepEqual(rows,expected);assert.equal(new Set(rows.map(s=>s.id)).size,rows.length);
+  assert.equal((await sources('?q=source规模&limit=100')).body.sources.length,70);
+  assert.equal((await sources('?q=%25')).body.sources.length,1);assert.equal((await sources('?q=_')).body.sources.length,1);
+  assert.deepEqual((await sources('?q=测测')).body.sources,[],'content is not searched');
+});
+test('source paging validates inputs and permissions without granting source edits',async()=>{
+  assert.deepEqual((await sources('','viewer')).body.sources,(await sources()).body.sources);
+  assert.equal((await sources('','other')).status,403);assert.equal((await sources('','other',2)).body.sources.length,1);
+  for(const q of ['?q=a&q=b','?limit=0','?limit=101','?limit=1e2','?limit=2&limit=3','?after=-1','?after=2147483648','?after=1.2','?after=','?after=1&after=2'])assert.equal((await sources(q)).status,400,q);
+  assert.equal((await sources('?after=2147483647')).body.next_after,null);
+  assert.deepEqual((await sources('?after=2147483647')).body.sources,[]);
+  for(const q of ['?include_sources=no','?include_sources=false&include_sources=true'])assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/api/projects/1/data${q}`,{headers:{cookie:cookies.owner}})).status,400);
+  await assert.rejects(tx(1,c=>c.query("UPDATE sources SET title='changed' WHERE id=1")),e=>e.code==='42501');
+});
+test('concurrent source inserts do not invalidate paging or source references outside the current page',async()=>{
+  const first=(await sources()).body;
+  const source=await tx(1,async c=>(await c.query("INSERT INTO sources(project_id,title,content) VALUES(1,'并发新增依据','可追溯正文') RETURNING id")).rows[0]);
+  const later=[];let after=first.next_after;
+  do{const page=(await sources(`?after=${after}`)).body;later.push(...page.sources);if(page.next_after===null)break;after=page.next_after;assert.ok(later.length<1000)}while(true);
+  assert.ok(later.some(s=>s.id===source.id));assert.equal(new Set([...first.sources,...later].map(s=>s.id)).size,first.sources.length+later.length);
+  await create('跨页溯源','引用新来源',{source:source.id});
+  const fact=(await get('?q=跨页溯源')).body.facts[0];assert.equal(fact.source,'并发新增依据');
+  const candidate=(await candidates()).body.candidates.find(c=>c.subject==='跨页溯源');assert.equal(candidate.source_id,source.id);assert.equal(candidate.source,'并发新增依据');
+  const revision=await tx(1,async c=>(await c.query('SELECT r.source_id,s.content FROM revisions r JOIN sources s ON s.id=r.source_id WHERE r.candidate_id=$1',[candidate.id])).rows[0]);
+  assert.deepEqual(revision,{source_id:source.id,content:'可追溯正文'});
+});

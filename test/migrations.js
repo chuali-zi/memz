@@ -151,6 +151,6 @@ test('bounded fact retrieval preserves pagination, isolation and search semantic
     const childEnv={...process.env,DATABASE_URL:appUrl.href};delete childEnv.NODE_TEST_CONTEXT;
     const execFile=require('node:util').promisify(require('node:child_process').execFile);
     const {stdout}=await execFile(process.execPath,['--test','--test-reporter=tap','test/pagination.js'],{env:childEnv,timeout:30000});
-    assert.match(stdout,/^# pass 11$/m);assert.match(stdout,/^# fail 0$/m);
+    assert.match(stdout,/^# pass 14$/m);assert.match(stdout,/^# fail 0$/m);
   });
 });
