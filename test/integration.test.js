@@ -55,4 +55,37 @@ assert.equal((await call(owner,proofPath+'?version=99')).status,404);
 for(const suffix of ['?version=0','?version=-1','?version=1&version=2','?version=1.5'])assert.equal((await call(owner,proofPath+suffix)).status,400);
 assert.equal((await fetch(`http://127.0.0.1:${server.address().port}${proofPath}`)).status,401);
 
+// An actual HTTP client reads a pinned version while another actor advances it.
+const {readContext}=require('../scripts/context-client');
+const baseURL=`http://127.0.0.1:${server.address().port}`;
+let advanced=false,clientCookie;
+const concurrentFetch=async(url,options)=>{
+  const response=await fetch(url,options);
+  if(new URL(url).pathname==='/api/login')clientCookie=response.headers.get('set-cookie').split(';')[0];
+  if(!advanced&&new URL(url).pathname==='/api/projects/1/facts'){
+    const next=(await candidate(member,{subject:'精确溯源',source_id:sourceA.id,expected_version:2,value:'第三版'})).data;
+    assert.equal((await call(owner,`/api/projects/1/candidates/${next.id}/approve`,{})).status,200);advanced=true;
+  }
+  return response;
+};
+const context=await readContext({baseURL,query:'精确溯源',fetchImpl:concurrentFetch});
+assert.ok(advanced);assert.equal(context.facts.length,1);assert.equal(context.facts[0].version,2);
+assert.equal(context.facts[0].value,'第二版');assert.equal(context.facts[0].source.id,sourceB.id);assert.equal(context.sourceTextIsUntrusted,true);
+assert.equal((await call(owner,proofPath)).data.revision.version,3);
+assert.equal((await fetch(baseURL+'/api/projects',{headers:{cookie:clientCookie}})).status,401,'client session is logged out');
+assert.equal((await readContext({baseURL,query:'不存在的上下文'})).facts.length,0);
+const bounded=await readContext({baseURL,limit:1});assert.equal(bounded.facts.length,1);assert.equal(bounded.truncated,true);assert.equal(bounded.nextAfter,bounded.facts[0].id);
+await assert.rejects(()=>readContext({baseURL,username:'other',password:'demo-other'}),e=>e.status===403);
+let failedCookie;
+await assert.rejects(()=>readContext({baseURL,query:'精确溯源',fetchImpl:async(url,options)=>{
+  if(new URL(url).pathname.endsWith('/provenance'))return new Response(JSON.stringify({error:'synthetic proof outage'}),{status:503});
+  const response=await fetch(url,options);if(new URL(url).pathname==='/api/login')failedCookie=response.headers.get('set-cookie').split(';')[0];return response;
+}}),e=>e.status===503);
+assert.equal((await fetch(baseURL+'/api/projects',{headers:{cookie:failedCookie}})).status,401,'failed read also logs out');
+await assert.rejects(()=>readContext({baseURL,query:'精确溯源',fetchImpl:async(url,options)=>{
+  const response=await fetch(url,options);
+  if(new URL(url).pathname.endsWith('/provenance')){const proof=await response.json();proof.revision.version=99;return new Response(JSON.stringify(proof),{status:200})}
+  return response;
+}}),e=>e.code==='PROVENANCE_MISMATCH');
+
 });

@@ -97,3 +97,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 来源分页的PostgreSQL执行计划、固定规模及正确性实验见[查询计划证据](docs/query-plans.md)，使用 `npm run eval:plans` 和显式PLAN_DATABASE_URL；CI单独归档query-plan-evidence。
 
 当前事实可按版本查看确切原文、修订与候选ID，接口与合成接入步骤见[上下文接入及溯源](docs/context-client.md)。
+
+可执行只读客户端：服务启动后运行 `MEMZ_QUERY=项目 npm run --silent demo:context`，输出固定版本与精确依据的JSON；无模型或SDK依赖，配置、截断及失败处理见上述接入说明。

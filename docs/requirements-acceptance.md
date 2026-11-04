@@ -27,6 +27,7 @@
 | R21 材料与代码同提交 | 拒绝脏/过期/失败报告、缺图、校验值变化及实际检索值矛盾；离线校验文件集合；明确合成与CI边界 | scripts/package-evidence.js | evidence.test.js反例与完整包回归；competition-evidence artifact |
 | R22 初次加载可恢复 | 项目列表503后刷新可恢复；空项目有明确提示；无项目时不发送null/0项目请求；晚到失败不覆盖新结果 | loadProjects代次保护、load的初始化分支、各列表空项目守卫 | UI真实登录与明确503/空列表/延迟响应注入，report.checks.projectRecovery |
 | R23 按版本精确溯源 | 同名来源可区分；指定版本返回旧原文；按需读取与失败重试；成员隔离 | GET /facts/:id/provenance、renderFact | HTTP集成同名来源/版本推进/权限/参数回归；UI 02/03与checks.provenance |
+| R24 接入方完整读取 | 一页有界事实与固定版本依据一致；失败不输出部分上下文；标明截断；注销会话 | scripts/context-client.js | 真实HTTP并发审批/权限/失败回归及context-client.test.js |
 
 ## 运行条件与取证方法
 
