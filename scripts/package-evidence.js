@@ -15,12 +15,26 @@ function checkedFile(root,relative){
   return resolved;
 }
 function readJSON(file){return JSON.parse(fs.readFileSync(file,'utf8'))}
+function expectedResults(dataset,fillerCount){
+  assert.ok(Number.isInteger(fillerCount)&&fillerCount>=200&&fillerCount<=5000,'Invalid retrieval filler count');
+  const tuple=f=>[f.subject,f.predicate,f.value];
+  const known=new Map([['seed',tuple(dataset.seed)],...dataset.facts.map(f=>[f.key,tuple(f)])]);
+  for(let i=0;i<fillerCount;i++)known.set(`filler-${i}`,[`评测条目${String(i).padStart(4,'0')}`,'描述',`合成记忆 ${i}`]);
+  const projectOne=[...known.values()];known.set('isolated',tuple(dataset.isolated));
+  return dataset.cases.map(item=>item.expected==='all-project-1'?projectOne:(item.expected||[]).map(key=>{assert.ok(known.has(key),`Unknown expected fact: ${key}`);return known.get(key)}));
+}
+function canonicalTuples(rows){
+  assert.ok(Array.isArray(rows),'Missing retrieval tuples');
+  for(const tuple of rows)assert.ok(Array.isArray(tuple)&&tuple.length===3&&tuple.every(value=>typeof value==='string'),'Invalid retrieval tuple');
+  return rows.map(row=>JSON.stringify(row)).sort();
+}
 function verifyEvidence({root,uiReportPath,retrievalReportPath,commit}){
   assert.match(commit,/^[a-f0-9]{40}$/,'Expected a full Git commit');
   const ui=readJSON(uiReportPath),retrieval=readJSON(retrievalReportPath);
   assert.equal(ui.schemaVersion,1);assert.equal(retrieval.schemaVersion,2);
   assert.equal(ui.synthetic,true);assert.equal(retrieval.synthetic,true);
   assert.equal(ui.passed,true,'UI run did not pass');assert.deepEqual(ui.pageErrors,[]);
+  assert.deepEqual(ui.checks?.creationKeyRace,{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true},'Missing or inconsistent browser creation race evidence');
   assert.equal(ui.source.commit,commit,'UI report is from another commit');assert.equal(ui.source.workingTreeDirty,false,'UI report used uncommitted code');
   assert.deepEqual(Object.keys(ui.source.files).sort(),[...uiSources].sort(),'UI source hash coverage changed');
   for(const file of uiSources)assert.equal(ui.source.files[file],hash(fs.readFileSync(checkedFile(root,file))),`UI source changed: ${file}`);
@@ -35,8 +49,15 @@ function verifyEvidence({root,uiReportPath,retrievalReportPath,commit}){
   assert.equal(retrieval.passed,true,'Retrieval run did not pass');
   assert.equal(retrieval.totalCases,19);assert.equal(retrieval.passedCases,19);assert.equal(retrieval.cases.length,19);
   const dataset=readJSON(checkedFile(root,'evaluation/retrieval-cases.json'));
+  assert.equal(retrieval.dataset,dataset.dataset,'Retrieval dataset changed');
   assert.deepEqual(retrieval.cases.map(c=>[c.name,c.query,c.user,c.project,c.expectedStatus]),dataset.cases.map(c=>[c.name,c.query,c.user||'owner',c.project||1,c.status||200]),'Retrieval case identities changed');
-  for(const item of retrieval.cases){assert.equal(item.passed,true);assert.equal(item.actualStatus,item.expectedStatus);assert.equal(item.paged.status,item.expectedStatus)}
+  const expected=expectedResults(dataset,retrieval.fillerCount);
+  for(const [index,item] of retrieval.cases.entries()){
+    assert.equal(item.passed,true);assert.equal(item.actualStatus,item.expectedStatus);assert.equal(item.paged.status,item.expectedStatus);
+    assert.deepEqual(canonicalTuples(item.expected),canonicalTuples(expected[index]),`Reported expectation differs from golden data: ${item.name}`);
+    assert.deepEqual(canonicalTuples(item.actual),canonicalTuples(expected[index]),`Actual result differs from golden data: ${item.name}`);
+    assert.equal(item.paged.factsCount,expected[index].length,`Paged result count differs: ${item.name}`);
+  }
   assert.ok(retrieval.sourceScale&&retrieval.candidateScale&&retrieval.contextScale,'Missing scale evidence');
   return {ui,retrieval};
 }
@@ -88,4 +109,4 @@ if(require.main===module){
     else{assert.equal(process.argv.length,2,'Usage: package-evidence.js [verify directory]');console.log(`Submission package: ${buildPackage()}`)}
   }catch(error){console.error(`Evidence rejected: ${error.message}`);process.exitCode=1}
 }
-module.exports={hash,uiSources,screenshotNames,evaluationSources,verifyEvidence,verifyPackage,buildPackage};
+module.exports={hash,uiSources,screenshotNames,evaluationSources,expectedResults,verifyEvidence,verifyPackage,buildPackage};

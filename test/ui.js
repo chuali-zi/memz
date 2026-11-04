@@ -331,6 +331,37 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await capture('20-mobile-sources.png','移动端新建来源标题检索，正文与分页控件可见','.card:has(#sources)');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
     }
+    if(prepareSources){
+      const raceTitle='客户端幂等竞态（合成）',keys=[];let releaseOld,releaseLost,oldSeen,lostSeen,committedLostId;
+      const oldHeld=new Promise(r=>{releaseOld=r}),lostHeld=new Promise(r=>{releaseLost=r});
+      const oldObserved=new Promise(r=>{oldSeen=r}),lostObserved=new Promise(r=>{lostSeen=r});
+      await page.route('**/api/projects/1/sources',async route=>{
+        if(route.request().method()!=='POST'||route.request().postDataJSON().title!==raceTitle){await route.continue();return}
+        const number=keys.length;keys.push(route.request().headers()['idempotency-key']);
+        const response=await route.fetch();assert.equal(response.status(),200);
+        if(number===1){oldSeen();await oldHeld}
+        if(number===2){committedLostId=(await response.json()).id;lostSeen();await lostHeld;await route.abort('failed');return}
+        await route.fulfill({response});
+      });
+      await page.evaluate(title=>{
+        window.creationRace={body:{title,content:'真实请求竞态合成正文'},outcomes:[]};
+        for(const i of [0,1])createRecord('/api/projects/1/sources',window.creationRace.body).then(value=>{window.creationRace.outcomes[i]={ok:true,id:value.id}},()=>{window.creationRace.outcomes[i]={ok:false}});
+      },raceTitle);
+      await page.waitForFunction(()=>window.creationRace.outcomes[0]?.ok);await oldObserved;
+      await page.evaluate(()=>{createRecord('/api/projects/1/sources',window.creationRace.body).then(value=>{window.creationRace.outcomes[2]={ok:true,id:value.id}},()=>{window.creationRace.outcomes[2]={ok:false}})});
+      await lostObserved;releaseOld();await page.waitForFunction(()=>window.creationRace.outcomes[1]?.ok);
+      releaseLost();await page.waitForFunction(()=>window.creationRace.outcomes[2]?.ok===false);
+      const retried=await page.evaluate(()=>createRecord('/api/projects/1/sources',window.creationRace.body));
+      assert.equal(keys.length,4);assert.equal(keys[0],keys[1]);assert.notEqual(keys[0],keys[2]);assert.equal(keys[2],keys[3]);assert.equal(retried.id,committedLostId);
+      const persisted=await page.evaluate(async title=>{
+        const {sources}=await (await fetch(`/api/projects/1/sources?q=${encodeURIComponent(title)}`)).json();
+        const {audit}=await (await fetch('/api/projects/1/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false')).json();
+        return {sources,audit:audit.filter(a=>a.action==='source'&&sources.some(s=>a.detail===`新增来源 ${s.id}`))};
+      },raceTitle);
+      assert.equal(persisted.sources.length,2);assert.equal(persisted.audit.length,2);
+      report.checks={...report.checks,creationKeyRace:{requests:4,distinctKeys:new Set(keys).size,createdSources:persisted.sources.length,auditRows:persisted.audit.length,lostResponseReplayed:true}};
+      await page.unroute('**/api/projects/1/sources');
+    }
     assert.deepEqual(report.pageErrors,[],'浏览器不能出现未捕获脚本错误');
     report.passed=true;
   }catch(e){

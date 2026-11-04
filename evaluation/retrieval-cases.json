@@ -2,6 +2,8 @@
   "dataset": "memz-synthetic-retrieval-v1",
   "description": "Synthetic fixtures only; exact case-insensitive substring matching, not semantic retrieval.",
   "fillerCount": 200,
+  "seed": {"subject":"项目","predicate":"截止日","value":"20号"},
+  "isolated": {"subject":"独立评测","predicate":"内部","value":"隔离秘密词"},
   "facts": [
     {"key":"deadline","subject":"评测项目","predicate":"截止日","value":"15号","previous":"旧截止日20号"},
     {"key":"case","subject":"评测API","predicate":"状态","value":"Ready"},

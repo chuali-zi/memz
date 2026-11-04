@@ -45,3 +45,5 @@ EVALUATION_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/me
 报告candidateScale增加来源/审计响应、候选第一页及与历史第一页合计的JSON字节数（不含事实页），并核对旧候选前25条及保留字段。测量与限制见[候选分页](candidate-pagination.md)。
 
 sourceScale是原19例检索与counts记录之后追加的独立来源增长场景，默认200条、每条4000字符；EVALUATION_SOURCE_COUNT允许25–1000。该场景完整遍历来源并与旧聚合逐条比较，记录原来源/审计响应、审计响应和来源首25条字节数，不计时、不改变之前检索黄金结果。详见[来源规模证据](source-pagination.md)。
+
+数据集现显式声明初始seed与隔离项目事实；取证打包器按该版本化数据和fillerCount独立核对报告actual/expected元组与分页结果数量，不仅检查passed标记。关键词用例及预期值未改变。

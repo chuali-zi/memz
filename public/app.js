@@ -7,9 +7,9 @@ async function createRecord(path,body){
   if(!key){key=crypto.randomUUID();pendingCreations.set(intent,key)}
   try{
     const result=await api(path,{method:'POST',headers:{'Idempotency-Key':key},body:encoded});
-    pendingCreations.delete(intent);return result;
+    if(pendingCreations.get(intent)===key)pendingCreations.delete(intent);return result;
   }catch(error){
-    if(error.status>=400&&error.status<500)pendingCreations.delete(intent);
+    if(error.status>=400&&error.status<500&&pendingCreations.get(intent)===key)pendingCreations.delete(intent);
     throw error;
   }
 }

@@ -4,21 +4,21 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {execFileSync}=require('node:child_process');
-const {hash,uiSources,screenshotNames,evaluationSources,verifyEvidence,verifyPackage,buildPackage}=require('../scripts/package-evidence');
+const {hash,uiSources,screenshotNames,evaluationSources,expectedResults,verifyEvidence,verifyPackage,buildPackage}=require('../scripts/package-evidence');
 
 // Deliberate unit fixtures, not browser or competition evidence.
 function fixture(fn){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'memz-evidence-unit-'));
   const write=(name,value)=>{fs.mkdirSync(path.dirname(path.join(root,name)),{recursive:true});fs.writeFileSync(path.join(root,name),value)};
   const json=(name,value)=>write(name,JSON.stringify(value));
-  const commit='a'.repeat(40),cases=Array.from({length:19},(_,i)=>({name:`fixture-${i}`,query:`q${i}`}));
+  const commit='a'.repeat(40),dataset=JSON.parse(fs.readFileSync(path.join(__dirname,'../evaluation/retrieval-cases.json'),'utf8')),cases=dataset.cases,expected=expectedResults(dataset,200);
   try{
     for(const file of new Set([...uiSources,...Object.values(evaluationSources)]))write(file,`unit fixture ${file}`);
-    json('evaluation/retrieval-cases.json',{cases});
+    json('evaluation/retrieval-cases.json',dataset);
     const bytes=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.from('unit fixture only')]);
     for(const file of screenshotNames)write(`evidence/ui/${file}`,bytes);
-    const ui={schemaVersion:1,synthetic:true,passed:true,pageErrors:[],source:{commit,workingTreeDirty:false,files:Object.fromEntries(uiSources.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},screenshots:screenshotNames.map(file=>({file,sha256:hash(bytes)}))};
-    const retrieval={schemaVersion:2,synthetic:true,passed:true,totalCases:19,passedCases:19,source:{gitCommit:commit,workingTreeDirty:false,...Object.fromEntries(Object.entries(evaluationSources).map(([key,file])=>[key,hash(fs.readFileSync(path.join(root,file)))]))},cases:cases.map(c=>({...c,user:'owner',project:1,expectedStatus:200,actualStatus:200,passed:true,paged:{status:200}})),contextScale:{},candidateScale:{},sourceScale:{}};
+    const ui={schemaVersion:1,synthetic:true,passed:true,pageErrors:[],checks:{creationKeyRace:{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true}},source:{commit,workingTreeDirty:false,files:Object.fromEntries(uiSources.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},screenshots:screenshotNames.map(file=>({file,sha256:hash(bytes)}))};
+    const retrieval={schemaVersion:2,dataset:dataset.dataset,fillerCount:200,synthetic:true,passed:true,totalCases:19,passedCases:19,source:{gitCommit:commit,workingTreeDirty:false,...Object.fromEntries(Object.entries(evaluationSources).map(([key,file])=>[key,hash(fs.readFileSync(path.join(root,file)))]))},cases:cases.map((c,i)=>({...c,user:c.user||'owner',project:c.project||1,expectedStatus:c.status||200,actualStatus:c.status||200,expected:structuredClone(expected[i]),actual:structuredClone(expected[i]),passed:true,paged:{status:c.status||200,factsCount:expected[i].length}})),contextScale:{},candidateScale:{},sourceScale:{}};
     const save=()=>{json('evidence/ui/report.json',ui);json('evidence/retrieval-report.json',retrieval)};save();
     const options={root,commit,uiReportPath:path.join(root,'evidence/ui/report.json'),retrievalReportPath:path.join(root,'evidence/retrieval-report.json')};
     return fn({root,write,json,ui,retrieval,save,options});
@@ -79,4 +79,13 @@ test('complete package build excludes ignored files, verifies offline, and rejec
     assert.throws(()=>buildPackage(root),/another commit/);
     assert.equal(fs.readdirSync(path.join(root,'artifacts/submission')).length,1,'failed build must not publish another package');
   }finally{if(previous===undefined)delete process.env.UI_REPORT_PATH;else process.env.UI_REPORT_PATH=previous}
+}));
+
+test('true pass flags cannot hide inconsistent actual or rewritten expected values',()=>fixture(({retrieval,save,options})=>{
+  retrieval.cases[0].actual=[['评测项目','截止日','错误值']];save();assert.throws(()=>verifyEvidence(options),/Actual result differs/);
+  retrieval.cases[0].expected=structuredClone(retrieval.cases[0].actual);save();assert.throws(()=>verifyEvidence(options),/Reported expectation differs/);
+}));
+test('paged counts and browser race evidence must agree with asserted outcomes',()=>fixture(({ui,retrieval,save,options})=>{
+  retrieval.cases[0].paged.factsCount=99;save();assert.throws(()=>verifyEvidence(options),/Paged result count differs/);
+  retrieval.cases[0].paged.factsCount=1;ui.checks.creationKeyRace.createdSources=3;save();assert.throws(()=>verifyEvidence(options),/browser creation race evidence/);
 }));

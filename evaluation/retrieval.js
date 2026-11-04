@@ -30,7 +30,7 @@ async function main(){
     process.env.DATABASE_URL=url.href;
     const service=require('../server');pool=service.pool;
     const {tx,decide}=service;
-    const known={seed:{subject:'项目',predicate:'截止日',value:'20号'}};
+    const known={seed:fixture.seed};
     async function propose(f,{user=1,project=1,version=0,decision='approve',source=2}={}){
       return tx(user,async c=>{
         const r=await c.query(`INSERT INTO candidates(project_id,subject,predicate,value,source_id,expected_version,proposed_by)
@@ -50,7 +50,7 @@ async function main(){
     await propose({subject:'评测驳回',predicate:'状态',value:'驳回专用词'},{decision:'reject'});
     await tx(1,c=>c.query("INSERT INTO sources(project_id,title,content) VALUES(1,'合成来源','来源正文专用词')"));
     const allProject1=Object.values(known);
-    known.isolated={subject:'独立评测',predicate:'内部',value:'隔离秘密词'};
+    known.isolated=fixture.isolated;
     await propose(known.isolated,{user:4,project:2,source:4});
     server=await new Promise(resolve=>{const s=service.app.listen(0,'127.0.0.1',()=>resolve(s))});
     const base=`http://127.0.0.1:${server.address().port}`;
