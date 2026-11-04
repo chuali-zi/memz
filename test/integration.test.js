@@ -123,6 +123,13 @@ await require('./context-budget')({baseURL,call,owner,member});
 const {stdout:storyOutput}=await require('node:util').promisify(require('node:child_process').execFile)(process.execPath,['scripts/demo-story.js'],{env:{...process.env,MEMZ_DEMO_BASE_URL:baseURL},timeout:30000});
 const story=JSON.parse(storyOutput);assert.equal(story.synthetic,true);assert.equal(story.steps.length,7);assert.equal(story.context.facts[0].value,'15号');assert.equal(story.context.facts[0].version,2);assert.equal(story.provenanceV1.value,'20号');assert.ok(!storyOutput.includes('sid='));assert.ok(!storyOutput.includes('demo-owner'));
 const narrative=require('../scripts/demo-story').markdown(story);assert.ok(narrative.includes('独立客户端实际得到的上下文'));assert.ok(narrative.includes(story.subject));
+assert.equal(story.comparison.baseline,'synthetic-last-received-proposal');
+assert.deepEqual(story.comparison.messages.map(m=>m.value),['20号','15号','25号','30号']);
+assert.deepEqual(story.comparison.rows.map(r=>r.latestReceived.value),['20号','20号','15号','25号','30号']);
+assert.deepEqual(story.comparison.rows.map(r=>r.current&&[r.current.value,r.current.version]),[null,['20号',1],['15号',2],['15号',2],['15号',2]]);
+assert.equal(story.comparison.rows[1].current.sourceId,story.provenanceV1.source.id);
+assert.equal(story.comparison.rows[4].current.sourceId,story.context.facts[0].source.id);
+assert.ok(narrative.includes('不是外部聊天产品或模型实测'));
 console.log('Synthetic reviewer rehearsal result:',JSON.stringify(story));
 
 });
