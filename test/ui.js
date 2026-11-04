@@ -322,7 +322,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await page.unroute('**/api/projects/1/sources?**');
       await page.getByRole('button',{name:'刷新来源',exact:true}).click();await page.getByText('来源第 1 页 · 1 条 · 已到末页',{exact:true}).waitFor();
       await page.locator('details').filter({has:page.locator('#sourceForm')}).locator('summary').click();
-      await page.locator('#sourceForm [name=title]').fill('浏览器新来源');await page.locator('#sourceForm [name=content]').fill('真实创建的合成来源正文');
+      await page.locator('#sourceForm [name=title]').fill('浏览器新来源'+'X'.repeat(140));await page.locator('#sourceForm [name=content]').fill('真实创建的合成来源正文');
       await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.getByText(/来源 #\d+ 已保存并选为依据/).waitFor();
       assert.notEqual(await page.locator('#sourceSelect').inputValue(),selectedId);
       await page.getByRole('textbox',{name:'检索来源标题'}).fill('浏览器新来源');await page.getByRole('button',{name:'查找来源',exact:true}).click();

@@ -7,3 +7,5 @@ button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,input:focus-v
 .entry{overflow-wrap:anywhere}
 
 .grid{align-items:start}
+
+#sourceSelection{overflow-wrap:anywhere}
