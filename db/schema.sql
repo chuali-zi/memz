@@ -43,3 +43,26 @@ INSERT INTO facts(project_id,subject,predicate,version) VALUES (1,'项目','截�
 INSERT INTO revisions(project_id,fact_id,version,value,source_id,candidate_id,approved_by) VALUES (1,1,1,'20号',1,1,1);
 UPDATE facts SET version=1,current_revision_id=1 WHERE id=1;
 INSERT INTO audit(project_id,actor_id,action,detail) VALUES (1,1,'seed','初始化合成事实 v1');
+
+-- Creation retry receipts (also installed on existing databases by migration 002).
+CREATE TABLE IF NOT EXISTS public.idempotency_requests (
+  project_id int NOT NULL REFERENCES public.projects(id),
+  actor_id int NOT NULL,
+  operation text NOT NULL CHECK(operation IN ('sources','candidates')),
+  request_key text NOT NULL CHECK(request_key ~ '^[A-Za-z0-9._:-]{1,128}$'),
+  request_hash text NOT NULL CHECK(request_hash ~ '^[a-f0-9]{64}$'),
+  response jsonb NOT NULL CHECK(jsonb_typeof(response)='object'),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(project_id,actor_id,operation,request_key),
+  FOREIGN KEY(project_id,actor_id) REFERENCES public.memberships(project_id,user_id)
+);
+ALTER TABLE public.idempotency_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS idempotency_read ON public.idempotency_requests;
+CREATE POLICY idempotency_read ON public.idempotency_requests FOR SELECT TO memz_app
+  USING (actor_id=nullif(current_setting('app.user_id',true),'')::int
+    AND public.member_role(project_id) IN ('owner','member'));
+DROP POLICY IF EXISTS idempotency_insert ON public.idempotency_requests;
+CREATE POLICY idempotency_insert ON public.idempotency_requests FOR INSERT TO memz_app
+  WITH CHECK (actor_id=nullif(current_setting('app.user_id',true),'')::int
+    AND public.member_role(project_id) IN ('owner','member'));
+GRANT SELECT,INSERT ON public.idempotency_requests TO memz_app;

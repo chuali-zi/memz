@@ -77,7 +77,7 @@ async function main(){
     const counts={};for(const table of ['facts','revisions','candidates','sources'])counts[table]=Number((await owner.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
     const report={schemaVersion:1,dataset:fixture.dataset,synthetic:true,generatedAt:new Date().toISOString(),
       source:{gitCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),
-        datasetSha256:checksum(fixtureBytes),serverSha256:checksum(fs.readFileSync('server.js')),runnerSha256:checksum(fs.readFileSync(__filename))},
+        datasetSha256:checksum(fixtureBytes),serverSha256:checksum(fs.readFileSync('server.js')),idempotencySha256:checksum(fs.readFileSync('idempotency.js')),runnerSha256:checksum(fs.readFileSync(__filename))},
       environment:{node:process.version,postgres:(await owner.query('SHOW server_version')).rows[0].server_version,platform:process.platform,arch:process.arch,cpu:os.cpus()[0]?.model},
       method:{transport:'HTTP localhost including full project response JSON parsing',concurrency:1,warmupsPerCase:warmups,measuredRequestsPerCase:repeats,
         percentile:'nearest rank',note:'Small synthetic corpus, warmed serial requests; no production/load/semantic-retrieval claims or timing pass threshold.'},

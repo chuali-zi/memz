@@ -12,7 +12,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
       workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),files:{}},
     environment:{node:process.version,postgres:databaseVersion,viewport:{width:1440,height:1000},locale:'zh-CN',timezone:'UTC'},screenshots:[],pageErrors:[]};
-  for(const file of ['server.js','db/schema.sql','public/app.js','public/index.html','public/style.css','test/ui.js','test/ui-evidence.js']){
+  for(const file of ['server.js','db/schema.sql','public/app.js','public/index.html','public/style.css','test/ui.js','test/ui-evidence.js','idempotency.js']){
     report.source.files[file]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   }
   let browser,page;
@@ -37,7 +37,9 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#facts').getByText('项目 / 截止日：20号',{exact:true}).waitFor();
     await capture('02-workspace.png','负责人看到初始当前事实 20号 v1 与来源');
     await page.locator('#sourceSelect').selectOption({label:'#2 负责人更正（合成）'});
+    const creationRequest=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/api/projects/1/candidates'));
     await page.getByRole('button',{name:'提交候选'}).click();
+    assert.match((await creationRequest).headers()['idempotency-key'],/^[A-Za-z0-9._:-]{1,128}$/);
     await page.getByText('候选已提交，等待负责人审批').waitFor();
     await page.locator('#candidates .entry').filter({hasText:'15号'}).first().getByRole('button',{name:'批准'}).click();
     await page.getByText('批准成功').waitFor();

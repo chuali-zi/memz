@@ -16,7 +16,7 @@ async function snapshot(c){
   return {rows,sequences,policies,grants};
 }
 async function constraints(c){return (await c.query("SELECT conname,pg_get_constraintdef(oid) AS definition,convalidated FROM pg_constraint WHERE connamespace='public'::regnamespace ORDER BY conname")).rows}
-async function migrate(c){try{await c.query(migration)}catch(e){await c.query('ROLLBACK');throw e}}
+async function migrate(c,sql=migration){try{await c.query(sql)}catch(e){await c.query('ROLLBACK');throw e}}
 async function fixture(file,fn){
   const admin=new Client({connectionString:adminUrl});await admin.connect();
   const name=`memz_migration_${crypto.randomBytes(8).toString('hex')}`;
@@ -118,5 +118,30 @@ test('full HTTP integration suite works against an upgraded legacy database',asy
     });
     assert.match(stdout,/^# pass 1$/m);
     assert.match(stdout,/^# fail 0$/m);
+  });
+});
+
+test('idempotent creates work on fresh and upgraded databases; migration 002 preserves existing rows and receipts',async()=>{
+  const addition=fs.readFileSync('db/migrations/002-create-idempotency.sql','utf8');
+  for(const file of ['test/fixtures/schema-5317607.sql','db/schema.sql'])await fixture(file,async(c,url)=>{
+    await migrate(c);
+    const before=await snapshot(c);
+    const concurrent=new Client({connectionString:url});await concurrent.connect();
+    try{await Promise.all([migrate(c,addition),migrate(concurrent,addition)])}finally{await concurrent.end()}
+    await migrate(c,addition);
+    const after=await snapshot(c);
+    assert.deepEqual(after.rows,before.rows);assert.deepEqual(after.sequences,before.sequences);
+    const oldPolicies=rows=>rows.filter(r=>r.tablename!=='idempotency_requests');
+    const oldGrants=rows=>rows.filter(r=>r.table_name!=='idempotency_requests');
+    assert.deepEqual(oldPolicies(after.policies),oldPolicies(before.policies));assert.deepEqual(oldGrants(after.grants),oldGrants(before.grants));
+    const appUrl=new URL(url);appUrl.username='memz_app';appUrl.password='memz_demo_only';
+    const childEnv={...process.env,DATABASE_URL:appUrl.href};delete childEnv.NODE_TEST_CONTEXT;
+    const execFile=require('node:util').promisify(require('node:child_process').execFile);
+    const {stdout}=await execFile(process.execPath,['--test','--test-reporter=tap','test/idempotency.js'],{env:childEnv,timeout:30000});
+    assert.match(stdout,/^# pass 5$/m);assert.match(stdout,/^# fail 0$/m);
+    const populated=await snapshot(c),receipts=(await c.query('SELECT * FROM idempotency_requests ORDER BY project_id,actor_id,operation,request_key')).rows;
+    await migrate(c,addition);
+    assert.deepEqual(await snapshot(c),populated);
+    assert.deepEqual((await c.query('SELECT * FROM idempotency_requests ORDER BY project_id,actor_id,operation,request_key')).rows,receipts);
   });
 });

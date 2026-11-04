@@ -106,3 +106,9 @@ UNIQUE(project_id,id) 供 revisions 引用。数据库 RLS 要求提出者与事
 主键/唯一约束自动生成 B-tree 索引，复合外键使跨项目关联在写入时失败。外键本身不自动创建引用侧索引；当前未为所有查询额外建索引，也没有全文/向量索引。`position(lower(q) in lower(subject || ' ' || predicate || ' ' || value))` 是子串检索，不能据已有 B-tree 宣称查询已加速。下一步应结合受控规模和执行计划决定索引或分页。
 
 将来源、候选和历史分开，避免覆盖历史值；facts 保留当前指针与版本以简化当前读取，这是一项需维护一致性的冗余。审批事务、唯一键、复合外键和回归测试共同维护它。增量迁移不修改业务数据，锁等待或已有坏数据会使事务整体回滚，详见 README。
+
+## idempotency_requests：创建回执
+
+由迁移002添加；新schema直接包含。字段project_id(int)、actor_id(int)、operation(text，sources/candidates)、request_key(text，1–128个限定ASCII字符)组成主键；project_id引用projects，(project_id,actor_id)引用memberships。request_hash为64位小写十六进制SHA-256字符串；response为必填JSONB对象；created_at为必填timestamptz，默认now()。
+
+应用只授予SELECT/INSERT，RLS要求actor与事务身份一致且是项目owner/member；不授予UPDATE/DELETE。主键提供范围唯一性，配合事务锁和业务事务实现重试，详见idempotent-creation.md。它保存原创建响应，不是候选实时状态；目前无TTL和自动清理。

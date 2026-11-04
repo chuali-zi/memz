@@ -25,12 +25,13 @@ docker compose up -d --wait
 
 ## 保留数据升级
 
-`001-current-revision-integrity.sql` 支持原始 schema 和当前新安装版本，可重复执行。它只更新约束，不修改事实、来源、候选、历史、审计或序列。先暂停应用写入，备份并确认备份可用，再以 schema owner 执行：
+`001-current-revision-integrity.sql` 加强当前修订约束，`002-create-idempotency.sql` 增加创建回执表；二者支持原始schema与当前新安装版本，可重复执行，不修改已有事实、来源、候选、历史、审计或序列。每个脚本是独立事务，按编号顺序执行。先暂停应用写入，备份并确认备份可用，再以 schema owner 执行：
 
 ```sh
 mkdir -p backups
 docker compose exec -T db pg_dump -U postgres -d memz -Fc > backups/before-001.dump
 docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/001-current-revision-integrity.sql
+docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/002-create-idempotency.sql
 ```
 
 迁移在单事务内锁定 facts/revisions 并验证既有数据。锁等待超过 5 秒或单条语句超过 60 秒即失败；安排维护窗口，确认没有活跃长事务后重试。若现有指针指向错误事实、版本不匹配或正版本缺少指针，迁移会报错并整体回滚，业务数据保留；不要用删除数据来绕过校验，应先核对来源与历史。迁移成功后再启动应用。此脚本不提供自动降级，不是通用迁移框架。
@@ -53,6 +54,10 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 测试覆盖有历史数据升级、新安装、重复和并发执行、异常数据整体回滚、迁移权限与锁超时、升级后应用角色继续写入及完整 HTTP 集成流程。`test/fixtures/schema-5317607.sql` 为提交 `5317607` 的原始 schema 快照。
 
 推荐使用独立临时库的 `npm run test:ui:evidence`，无需重置已有数据或先启动服务；显式设置 `UI_TEST_DATABASE_URL`，浏览器设置与截图说明见[演示证据复现](docs/demo-evidence.md)。原 `npm run test:ui` 会修改3000端口服务使用的演示库，需初始种子状态；默认系统Chromium `/usr/bin/chromium`，可用 `CHROMIUM_PATH` 指定。截图与报告输出到被Git忽略的 `artifacts/ui/`，CI归档为 `ui-evidence`。测试结果不代表生产安全认证。
+
+## 创建重试
+
+来源与候选创建支持可选 `Idempotency-Key`，页面在同内容请求结果不确定时复用键；旧客户端不传键保持原行为。部署新版页面前先执行迁移002。范围、409冲突、原响应重放及限制见[幂等创建说明](docs/idempotent-creation.md)。
 
 ## 合成检索评测
 

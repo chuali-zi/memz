@@ -60,3 +60,7 @@ ALTER TABLE facts ADD CONSTRAINT facts_current_revision_state
 检索仅连接facts.current_revision_id到对应修订，将主体、属性和值组合后用参数化position/lower做不区分大小写的子串匹配；`%`和`_`无LIKE通配意义。候选、历史和来源仍在各自数组返回，不被q过滤。界面通过textContent创建文本节点，外部文字不作为HTML插入或系统命令执行。
 
 这不是语义搜索，也没有证明索引加速。评测报告计时覆盖完整HTTP聚合响应与JSON解析，不能当成单条SQL执行时间。当前接口返回未分页来源/候选/历史，数据量增长时响应规模是实际待评估问题。
+
+## 6. 创建幂等回执
+
+新增idempotency.js的createOnce：在当前写事务中按项目/用户/操作/键获取锁，检查输入摘要，返回原回执或执行业务及审计后保存回执。新回执与业务一起提交或回滚。服务端先检查当前写权限，不通过缓存绕过授权；不传键仍执行原路径。完整合同与并发测试见[idempotent-creation.md](idempotent-creation.md)。
