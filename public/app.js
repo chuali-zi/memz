@@ -124,8 +124,11 @@ function renderCandidate(d,c,role,p){
     b.onclick=()=>perform(async()=>{
       for(const button of actions.querySelectorAll('button'))button.disabled=true;
       try{
-        await api(`/api/projects/${p}/candidates/${c.id}/${action}`,{method:'POST'});
-        if(p===projectId){message(`${label}成功`);await load()}
+        const result=await api(`/api/projects/${p}/candidates/${c.id}/${action}`,{method:'POST'});
+        if(p===projectId){
+          await load();
+          if(p===projectId){message(action==='approve'?`批准成功：本次生成 v${result.version}，当前事实已更新；旧版本保留在历史中。`:'驳回成功：候选保留为已驳回，本次操作未修改当前事实。','#candidateFeedback');$('#candidateFeedback').focus()}
+        }
       }catch(e){
         if(e.status===409&&p===projectId)await load();
         throw e;
