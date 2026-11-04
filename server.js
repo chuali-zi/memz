@@ -3,6 +3,9 @@ const {Pool}=require('pg');
 const {requestKey,createOnce}=require('./idempotency');
 const app=express();
 const pool=new Pool({connectionString:process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz',max:10});
+// pg removes failed idle clients before emitting this event; later requests reconnect.
+// Do not log the error/client object: it can contain connection credentials.
+pool.on('error',()=>console.error('Database idle connection lost; future requests will reconnect.'));
 const accounts={owner:{id:1,password:'demo-owner',name:'负责人'},member:{id:2,password:'demo-member',name:'成员'},viewer:{id:3,password:'demo-viewer',name:'只读者'},other:{id:4,password:'demo-other',name:'另一项目用户'}};
 const sessions=new Map();
 app.disable('x-powered-by');
