@@ -49,3 +49,10 @@ jobs:
           name: ui-evidence
           path: artifacts/ui/
           if-no-files-found: ignore
+      - name: Verify and package competition evidence
+        run: npm run evidence:package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: competition-evidence
+          path: artifacts/submission/
+          if-no-files-found: error

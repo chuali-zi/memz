@@ -24,6 +24,7 @@
 | R18 历史有界读取 | 页面25条；完整遍历与旧历史一致；新增修订不推移较旧页；独立失败恢复 | GET /history、include_history、loadHistory | test/pagination.js；UI截图13–14；contextScale响应测量 |
 | R19 候选有界读取与筛选 | 四种筛选完整遍历；审批保持筛选；并发决定仅一次成功且旧页面刷新 | GET /candidates、include_candidates、loadCandidates | 数据库及UI回归；截图15–17；candidateScale实测 |
 | R20 来源有界读取与依据保持 | 标题检索及分页；跨页保留来源ID；候选/事实/修订引用一致；新来源明确选中 | GET /sources、include_sources、loadSources、selectedSource | 数据库与UI回归；截图18–20；sourceScale增长测量 |
+| R21 材料与代码同提交 | 拒绝脏/过期/失败报告、缺图与校验值变化；离线校验文件集合；明确合成与CI边界 | scripts/package-evidence.js | evidence.test.js八组；competition-evidence artifact |
 
 ## 运行条件与取证方法
 
@@ -37,3 +38,5 @@
 ## 目前不覆盖的需求
 
 没有真实账号体系、组织级密钥管理、持久化会话、真实智能体/文档导入、语义检索、并发负载容量结论、正式可用性研究或生产安全审计。页面四类列表已分页，原聚合默认响应仍全量返回；来源/候选支持可选幂等键，无键或不同键重复提议仍可能创建多个候选。管理员/应用数据库凭据泄漏不在RLS身份假设的保护范围内。原通知模板、最终材料格式和提交渠道仍需复核。
+
+材料汇总入口：[六项初赛草稿](submission-report.md)、[演示步骤](demo-script.md)、[同提交打包与真实性边界](evidence-package.md)。
