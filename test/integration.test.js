@@ -131,5 +131,6 @@ assert.equal(story.comparison.rows[1].current.sourceId,story.provenanceV1.source
 assert.equal(story.comparison.rows[4].current.sourceId,story.context.facts[0].source.id);
 assert.ok(narrative.includes('不是外部聊天产品或模型实测'));
 console.log('Synthetic reviewer rehearsal result:',JSON.stringify(story));
+await require('./proposal-process')({baseURL,call,owner,member,viewer});
 
 });
