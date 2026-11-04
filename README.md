@@ -117,3 +117,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 本机智能体可使用 [MCP stdio 兼容适配](docs/mcp-local.md)：固定项目、默认只读，显式开启后可提交待审；支持 2025-11-25 握手，不提供审批工具。
 
 宿主配置可用 `node scripts/mcp-config.js --host claude-desktop` 或 `--host vscode` 生成，只输出待审阅 JSON，不修改用户设置。
+
+无需真实智能体账号即可演示只读 MCP：启动本机服务后运行 `node scripts/mcp-read-example.js "项目"`，通过官方 SDK 返回已批准版本及来源原文，详见 [MCP 说明](docs/mcp-local.md)。

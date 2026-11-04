@@ -35,7 +35,21 @@ module.exports=async({baseURL,call,owner,member,viewer})=>{
   await withClient('viewer',false,async client=>{
     const denied=await client.callTool({name:'memz_read_context',arguments:{}});assert.equal(JSON.parse(denied.content[0].text).status,403);
   },2);
+  const execute=require('node:util').promisify(require('node:child_process').execFile);
+  const example=require('node:path').resolve(__dirname,'../scripts/mcp-read-example.js');
+  const exampleEnv={...process.env,MEMZ_DEMO_BASE_URL:baseURL,MEMZ_DEMO_PROJECT_ID:'1',MEMZ_USERNAME:'owner',MEMZ_PASSWORD:'synthetic-example-canary',MEMZ_MCP_ALLOW_PROPOSALS:'1'};
+  const beforeExample=(await call(viewer,'/api/projects/1/data')).data;
+  const pendingExample=await execute(process.execPath,[example,proposal.subject],{env:exampleEnv,timeout:55000});
+  assert.equal(pendingExample.stderr,'');assert.equal(JSON.parse(pendingExample.stdout).facts.length,0);
+  assert.deepEqual((await call(viewer,'/api/projects/1/data')).data,beforeExample,'read-only host must not approve or mutate pending evidence');
   assert.equal((await call(owner,`/api/projects/1/candidates/${id}/approve`,{})).status,200);
+  const approvedExample=await execute(process.execPath,[example,proposal.subject],{env:exampleEnv,timeout:55000});
+  const exampleContext=JSON.parse(approvedExample.stdout);assert.equal(approvedExample.stderr,'');
+  assert.equal(exampleContext.facts[0].source.id,source.data.id);assert.equal(exampleContext.facts[0].source.content,'MCP 流程截止日为18号。不是模型实测。');
+  assert.equal(exampleContext.facts[0].candidateId,id);assert.equal(exampleContext.facts[0].version,1);assert.equal(exampleContext.sourceTextIsUntrusted,true);
+  assert.ok(!approvedExample.stdout.includes('synthetic-example-canary'));
+  const continuation=await execute(process.execPath,[example,proposal.subject,String(exampleContext.facts[0].id)],{env:exampleEnv,timeout:55000});assert.equal(JSON.parse(continuation.stdout).facts.length,0);
+  await assert.rejects(()=>execute(process.execPath,[example,proposal.subject],{env:{...exampleEnv,MEMZ_DEMO_PROJECT_ID:'2'},timeout:55000}),e=>e.code===1&&e.stdout===''&&e.stderr==='{"code":"HTTP_403"}\n');
   await withClient('viewer',false,async client=>{
     const result=await client.callTool({name:'memz_read_context',arguments:{query:proposal.subject,maxOutputBytes:4096}});assert.equal(result.isError,false);
     const context=JSON.parse(result.content[0].text);assert.equal(context.facts[0].candidateId,id);assert.equal(context.facts[0].version,1);assert.equal(context.facts[0].source.id,source.data.id);assert.equal(context.sourceTextIsUntrusted,true);assert.ok(Buffer.byteLength(result.content[0].text)<=4096);

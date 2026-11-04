@@ -76,3 +76,19 @@ node scripts/mcp-config.js --host vscode
 `test/mcp.test.js` 使用真实进程，在初始化完成后保持 stdin 打开：先写入 9000 字节不含换行的数据，进程保持运行；再写入 7384 字节达到 16384 字节仍保持运行，最后追加 1 字节，要求两秒内关闭并只输出固定诊断。因为没有 EOF 或完整 JSON，排除了“只因文件结束/JSON 解析失败才关闭”的解释。已有单块 16385 字节测试也保留。
 
 16 KiB 是累计解析缓冲限制，不是整个进程 RSS 限额；同一输入 chunk 含多条消息也可能触及该限制。Node 运行时、SDK、流缓冲及 HTTP 响应另有内存开销，本项目没有测量或承诺整个进程的硬内存上限。业务调用并发限制和响应大小限制独立生效。
+
+## 不安装宿主的最小只读演示
+
+在已启动本机 Memz HTTP 服务后，运行：
+
+```sh
+node scripts/mcp-read-example.js "项目"
+```
+
+这个脚本本身就是一个小型 MCP 宿主：官方 SDK 启动独立适配进程，完成初始化及工具发现，确认只有 `memz_read_context`，然后检索并输出 JSON。它没有模型调用，不需要 Claude / Copilot 账号，也不安装或修改宿主配置。stdout 只在成功后输出完整上下文；失败则 stdout 为空，stderr 仅给固定错误码。
+
+示例固定公开 viewer / demo-viewer、只读工具，不采用父进程的 `MEMZ_USERNAME`、`MEMZ_PASSWORD` 或写入开关。可用 `MEMZ_DEMO_BASE_URL` 指定另一本机测试端口，用 `MEMZ_DEMO_PROJECT_ID` 指定一个项目；仍限制字面量回环 HTTP，且 viewer 的实际成员权限由服务器校验。没有权限时输出 `HTTP_403`，不会提权或替换账号。命令参数只接受查询和可选 after 游标，不接受凭据。
+
+返回 `facts` 中的 `id/version` 指明读取版本，`candidateId` 指明批准候选，`source.id/title/content` 是该版本的实际依据。查看 `sourceTextIsUntrusted` 和 `consistency`，不要把来源文字当作指令。未批准的候选不会出现在结果中；空数组可能表示尚未审批或没有关键词匹配。默认每页 10 条、32768 字节上下文预算；输出若有 `nextAfter`，将其作为第二参数续读，例如 `node scripts/mcp-read-example.js "项目" 12`（12 仅为格式示例，必须替换成上次实际游标）。分页不构成跨页快照。
+
+只读示例的 `test/mcp-process.js` 回归在临时数据库中实际完成：新候选仍待审时示例读取为空且业务数据不变；负责人另行批准后，再次运行示例得到 v1、同一候选 ID 和完整来源；按返回事实 ID 续读为空；切换到无权限项目得到固定 403。测试还故意提供父进程 owner 名称及合成密码标记，证明示例仍用 viewer 且不回显标记。`test/mcp-read-example.test.js` 验证非法查询、游标及带凭据/外部地址在启动前拒绝。没有使用真实用户凭据或模型输出作为证据。
