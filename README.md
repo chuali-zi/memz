@@ -82,3 +82,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 详见 [数据模型与取舍](docs/design.md)、[数据字典](docs/data-dictionary.md)与[接口及时序](docs/api-sequences.md)。数据库用事务局部身份设置和 RLS 限制项目范围；应用连接为非 owner、非超级用户、无 BYPASSRLS。会话是服务端随机不透明 cookie，浏览器身份不来自请求中的 user_id 或角色；状态更改要求 CSRF token。来源内容以文本呈现，搜索是参数化的中文子串关键词匹配，**不是语义搜索**。
 
 这是单机演示：固定公开账号、内存 session（重启失效，未做集群/速率限制）、HTTP 本机运行、没有真实智能体/文档导入/真实语料或语义检索评测。该 RLS 设计信任应用服务设置事务身份；已获得应用数据库凭据的人可以自己设置身份，不能抵御此类攻击。生产部署还需真实身份认证、密钥管理、会话存储、TLS、权限复核与安全审计。数据库账号密码只供本地演示。
+
+仅取当前事实可使用兼容新增的[游标分页接口](docs/bounded-retrieval.md)，默认 50、最多 100 条；原聚合接口与页面仍保留完整快照。

@@ -145,3 +145,12 @@ test('idempotent creates work on fresh and upgraded databases; migration 002 pre
     assert.deepEqual((await c.query('SELECT * FROM idempotency_requests ORDER BY project_id,actor_id,operation,request_key')).rows,receipts);
   });
 });
+test('bounded fact retrieval preserves pagination, isolation and search semantics',async()=>{
+  await fixture('db/schema.sql',async(c,url)=>{
+    const appUrl=new URL(url);appUrl.username='memz_app';appUrl.password='memz_demo_only';
+    const childEnv={...process.env,DATABASE_URL:appUrl.href};delete childEnv.NODE_TEST_CONTEXT;
+    const execFile=require('node:util').promisify(require('node:child_process').execFile);
+    const {stdout}=await execFile(process.execPath,['--test','--test-reporter=tap','test/pagination.js'],{env:childEnv,timeout:30000});
+    assert.match(stdout,/^# pass 5$/m);assert.match(stdout,/^# fail 0$/m);
+  });
+});

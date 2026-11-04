@@ -34,6 +34,26 @@ async function role(c,p,allowed){const r=(await c.query('SELECT role FROM member
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 app.get('/api/projects',route(async(req,res)=>res.json(await tx(req.user.id,async c=>(await c.query('SELECT p.id,p.name,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=$1 ORDER BY p.id',[req.user.id])).rows))));
 async function readProject(user,p,q){return tx(user,async c=>{const r=await role(c,p,['owner','member','viewer']);const facts=(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id WHERE f.project_id=$1 AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0 ORDER BY f.id`,[p,q])).rows;const sources=(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 ORDER BY id',[p])).rows;const candidates=(await c.query('SELECT c.*,s.title source FROM candidates c JOIN sources s ON s.id=c.source_id WHERE c.project_id=$1 ORDER BY c.id DESC',[p])).rows;const history=(await c.query('SELECT f.subject,f.predicate,r.version,r.value,s.title source,r.created_at FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id WHERE r.project_id=$1 ORDER BY r.id DESC',[p])).rows;const audit=(await c.query('SELECT * FROM audit WHERE project_id=$1 ORDER BY id DESC LIMIT 100',[p])).rows;return {role:r,facts,sources,candidates,history,audit}},{snapshot:true})}
+async function readFactsPage(user,p,q,{limit=50,after=0}={}){
+  return tx(user,async c=>{
+    const r=await role(c,p,['owner','member','viewer']);
+    const rows=(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source
+      FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id
+      WHERE f.project_id=$1 AND f.id>$3
+        AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0
+      ORDER BY f.id LIMIT $4`,[p,q,after,limit+1])).rows;
+    const more=rows.length>limit,facts=rows.slice(0,limit);
+    return {role:r,facts,next_after:more?facts[facts.length-1].id:null};
+  },{snapshot:true});
+}
+app.get('/api/projects/:p/facts',route(async(req,res)=>{
+  const p=num(req.params.p),limit=req.query.limit===undefined?50:integer(req.query.limit,1,'分页大小无效');
+  if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');
+  const after=req.query.after===undefined?0:integer(req.query.after,0,'游标无效');
+  if(req.query.q!==undefined&&typeof req.query.q!=='string')throw fail(400,'关键词必须是单个字符串');
+  const q=(req.query.q||'').slice(0,200);
+  res.json(await readFactsPage(req.user.id,p,q,{limit,after}));
+}));
 app.get('/api/projects/:p/data',route(async(req,res)=>{const p=num(req.params.p),q=typeof req.query.q==='string'?req.query.q.slice(0,200):'';res.json(await readProject(req.user.id,p,q))}));
 app.post('/api/projects/:p/sources',requireJsonObject,route(async(req,res)=>{
   const p=num(req.params.p),title=str(req.body.title,150),content=str(req.body.content,4000),key=requestKey(req);
@@ -79,4 +99,4 @@ app.use((err,req,res,next)=>{
   res.status(status).json({error:message});
 });
 if(require.main===module)app.listen(process.env.PORT||3000,'127.0.0.1',()=>console.log('Memz http://127.0.0.1:3000'));
-module.exports={app,pool,tx,decide,readProject};
+module.exports={app,pool,tx,decide,readProject,readFactsPage};

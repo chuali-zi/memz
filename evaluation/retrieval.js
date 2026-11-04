@@ -9,6 +9,8 @@ const fixtureBytes=fs.readFileSync('evaluation/retrieval-cases.json');
 const fixture=JSON.parse(fixtureBytes);
 const checksum=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const repeats=10,warmups=2;
+const fillerCount=process.env.EVALUATION_FILLER_COUNT===undefined?fixture.fillerCount:Number(process.env.EVALUATION_FILLER_COUNT);
+if(!Number.isInteger(fillerCount)||fillerCount<200||fillerCount>5000)throw new Error('EVALUATION_FILLER_COUNT must be an integer from 200 to 5000.');
 const tuple=f=>[f.subject,f.predicate,f.value];
 const ordered=rows=>rows.map(tuple).map(JSON.stringify).sort();
 const percentile=(values,p)=>[...values].sort((a,b)=>a-b)[Math.ceil(values.length*p)-1];
@@ -40,7 +42,7 @@ async function main(){
       if(f.previous)await propose({...f,value:f.previous});
       await propose(f,{version:f.previous?1:0});known[f.key]=f;
     }
-    for(let i=0;i<fixture.fillerCount;i++){
+    for(let i=0;i<fillerCount;i++){
       const f={subject:`评测条目${String(i).padStart(4,'0')}`,predicate:'描述',value:`合成记忆 ${i}`};
       await propose(f);known[`filler-${i}`]=f;
     }
@@ -57,30 +59,52 @@ async function main(){
       const r=await fetch(`${base}/api/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:user,password:`demo-${user}`})});
       assert.equal(r.status,200);cookies[user]=r.headers.get('set-cookie').split(';')[0];await r.json();
     }
+    async function pagedFacts(item){
+      const facts=[],seen=new Set();let after=0,pages=0,totalBytes=0,firstPageBytes,maxRows=0,status;
+      while(true){
+        const response=await fetch(`${base}/api/projects/${item.project||1}/facts?q=${encodeURIComponent(item.query)}&limit=50&after=${after}`,{headers:{cookie:cookies[item.user||'owner']}});
+        const raw=await response.text(),body=JSON.parse(raw),bytes=Buffer.byteLength(raw);status=response.status;
+        pages++;totalBytes+=bytes;if(pages===1)firstPageBytes=bytes;
+        assert.equal(status,item.status||200);
+        if(status!==200)break;
+        assert.deepEqual(Object.keys(body).sort(),['facts','next_after','role']);
+        assert.ok(body.facts.length<=50);maxRows=Math.max(maxRows,body.facts.length);
+        for(const fact of body.facts){assert.ok(fact.id>after);assert.ok(!seen.has(fact.id));seen.add(fact.id);after=fact.id;facts.push(fact)}
+        if(body.next_after===null)break;
+        assert.ok(body.facts.length>0);assert.equal(body.next_after,after);assert.ok(pages<200);
+      }
+      return {facts,summary:{status,pages,firstPageBytes,totalBytes,maxRows,factsCount:facts.length}};
+    }
     const results=[];
     for(const item of fixture.cases){
       const expected=item.expected==='all-project-1'?allProject1:(item.expected||[]).map(key=>{assert.ok(known[key],`Unknown expected key ${key}`);return known[key]});
-      const samples=[];let actualStatus,actualRows,passed=true,error;
+      const samples=[],byteSamples=[];let actualStatus,actualRows,returnedRows,passed=true,error;
       for(let i=0;i<warmups+repeats;i++){
         const start=performance.now();
         const r=await fetch(`${base}/api/projects/${item.project||1}/data?q=${encodeURIComponent(item.query)}`,{headers:{cookie:cookies[item.user||'owner']}});
-        const body=await r.json();const elapsed=performance.now()-start;
-        if(i>=warmups)samples.push(elapsed);
+        const raw=await r.text(),body=JSON.parse(raw);const elapsed=performance.now()-start;
+        if(i>=warmups){samples.push(elapsed);byteSamples.push(Buffer.byteLength(raw))}
+        returnedRows=Object.fromEntries(['facts','sources','candidates','history','audit'].map(key=>[key,Array.isArray(body[key])?body[key].length:0]));
         actualStatus=r.status;actualRows=Array.isArray(body.facts)?body.facts:[];
         try{assert.equal(r.status,item.status||200);if(r.status===200)assert.deepEqual(ordered(actualRows),ordered(expected))}
         catch(e){passed=false;error=e.message}
       }
+      let paged;
+      try{
+        const result=await pagedFacts(item);paged=result.summary;
+        if(result.summary.status===200)assert.deepEqual(ordered(result.facts),ordered(expected));
+      }catch(e){passed=false;error=e.message;paged={...paged,error:e.message}}
       results.push({name:item.name,query:item.query,user:item.user||'owner',project:item.project||1,passed,
-        expectedStatus:item.status||200,actualStatus,expected:expected.map(tuple),actual:actualRows.map(tuple),
+        expectedStatus:item.status||200,actualStatus,paged,returnedRows,responseBytes:{min:Math.min(...byteSamples),max:Math.max(...byteSamples)},expected:expected.map(tuple),actual:actualRows.map(tuple),
         latencyMs:{samples:samples.length,rawSamples:samples,median:percentile(samples,0.5),p95:percentile(samples,0.95),min:Math.min(...samples),max:Math.max(...samples)},...(error?{error}:{})});
     }
     const counts={};for(const table of ['facts','revisions','candidates','sources'])counts[table]=Number((await owner.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
-    const report={schemaVersion:1,dataset:fixture.dataset,synthetic:true,generatedAt:new Date().toISOString(),
+    const report={schemaVersion:2,dataset:fixture.dataset,fillerCount,synthetic:true,generatedAt:new Date().toISOString(),
       source:{gitCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),
         datasetSha256:checksum(fixtureBytes),serverSha256:checksum(fs.readFileSync('server.js')),idempotencySha256:checksum(fs.readFileSync('idempotency.js')),runnerSha256:checksum(fs.readFileSync(__filename))},
       environment:{node:process.version,postgres:(await owner.query('SHOW server_version')).rows[0].server_version,platform:process.platform,arch:process.arch,cpu:os.cpus()[0]?.model},
       method:{transport:'HTTP localhost including full project response JSON parsing',concurrency:1,warmupsPerCase:warmups,measuredRequestsPerCase:repeats,
-        percentile:'nearest rank',note:'Small synthetic corpus, warmed serial requests; no production/load/semantic-retrieval claims or timing pass threshold.'},
+        percentile:'nearest rank',note:'Legacy aggregate timings only. Paged endpoint is traversed once per case for correctness and JSON byte counts; no timing comparison or production/load claims.'},
       counts,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
     fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/retrieval-report.json',JSON.stringify(report,null,2)+'\n');
     console.log(`Retrieval evaluation: ${report.passedCases}/${report.totalCases} cases passed; ${counts.facts} current facts. Report: artifacts/retrieval-report.json`);
