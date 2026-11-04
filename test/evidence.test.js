@@ -26,14 +26,15 @@ function fixture(fn){
 
     const bytes=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.from('unit fixture only')]);
     for(const file of screenshotNames)write(`evidence/ui/${file}`,bytes);
-    const ui={schemaVersion:1,synthetic:true,passed:true,pageErrors:[],checks:{firstUseStory:{inlineSourceFailure:true,inputPreserved:true,retrySaved:true,keyboardNavigation:true,conflictVisible:true,clientVersion:2,oldVersionPreserved:true,mobileOverflow:false},provenance:{versionPinned:true,sourceRead:true,retryRecovered:true},projectRecovery:{initialFailure:true,emptyState:true,staleFailureIgnored:true,retryLoadedProject:true,invalidProjectRequests:0},sessionRecovery:{invalidatedSession:true,returnedToLogin:true,reloginSucceeded:true},creationKeyRace:{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true}},source:{commit,workingTreeDirty:false,files:Object.fromEntries(uiSources.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},screenshots:screenshotNames.map(file=>({file,claim:`unit caption ${file}`,sha256:hash(bytes)}))};
+    const agentHandoff={synthetic:true,workerInterruptedAfterCommit:true,restartedWithSavedIntent:true,pendingContextEmpty:true,approvalThroughBrowser:true,singleProposalAudit:true,viewerWrite403:true,otherRead403:true,sourceId:1,candidateId:1,intents:{source:{content:'synthetic'},proposal:{subject:'fixture',sourceId:1}},context:{facts:[{subject:'fixture',value:'18号',version:1,source:{id:1,content:'synthetic'},candidateId:1}]}};
+    const ui={schemaVersion:1,synthetic:true,passed:true,pageErrors:[],checks:{agentHandoff,firstUseStory:{inlineSourceFailure:true,inputPreserved:true,retrySaved:true,keyboardNavigation:true,conflictVisible:true,clientVersion:2,oldVersionPreserved:true,mobileOverflow:false},provenance:{versionPinned:true,sourceRead:true,retryRecovered:true},projectRecovery:{initialFailure:true,emptyState:true,staleFailureIgnored:true,retryLoadedProject:true,invalidProjectRequests:0},sessionRecovery:{invalidatedSession:true,returnedToLogin:true,reloginSucceeded:true},creationKeyRace:{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true}},source:{commit,workingTreeDirty:false,files:Object.fromEntries(uiSources.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},screenshots:screenshotNames.map(file=>({file,claim:`unit caption ${file}`,sha256:hash(bytes)}))};
     const retrieval={schemaVersion:2,dataset:dataset.dataset,fillerCount:200,synthetic:true,passed:true,totalCases:19,passedCases:19,source:{gitCommit:commit,workingTreeDirty:false,...Object.fromEntries(Object.entries(evaluationSources).map(([key,file])=>[key,hash(fs.readFileSync(path.join(root,file)))]))},cases:cases.map((c,i)=>({...c,user:c.user||'owner',project:c.project||1,expectedStatus:c.status||200,actualStatus:c.status||200,expected:structuredClone(expected[i]),actual:structuredClone(expected[i]),passed:true,paged:{status:c.status||200,factsCount:expected[i].length}})),contextScale:{},candidateScale:{},sourceScale:{}};
     const save=()=>{json('evidence/ui/report.json',ui);json('evidence/retrieval-report.json',retrieval);json('evidence/system/report.json',system)};save();
     const options={root,commit,systemReportPath:path.join(root,'evidence/system/report.json'),uiReportPath:path.join(root,'evidence/ui/report.json'),retrievalReportPath:path.join(root,'evidence/retrieval-report.json')};
     return fn({root,write,json,ui,retrieval,system,save,options});
   }finally{fs.rmSync(root,{recursive:true,force:true})}
 }
-test('consistent fixture evidence passes with complete required coverage',()=>fixture(({options})=>assert.equal(verifyEvidence(options).ui.screenshots.length,24)));
+test('consistent fixture evidence passes with complete required coverage',()=>fixture(({options})=>assert.equal(verifyEvidence(options).ui.screenshots.length,26)));
 test('another commit or uncommitted run is rejected',()=>fixture(({ui,retrieval,save,options})=>{
   ui.source.commit='b'.repeat(40);save();assert.throws(()=>verifyEvidence(options),/another commit/);
   ui.source.commit=options.commit;retrieval.source.workingTreeDirty=true;save();assert.throws(()=>verifyEvidence(options),/uncommitted/);
@@ -120,4 +121,9 @@ test('database evidence rejects stale commits, changed raw output and skipped te
 test('a screenshot without its recorded meaning is rejected',()=>fixture(({ui,save,options})=>{
   delete ui.screenshots[0].claim;save();assert.throws(()=>verifyEvidence(options),/Missing screenshot caption/);
   ui.screenshots[0].claim='   ';save();assert.throws(()=>verifyEvidence(options),/Missing screenshot caption/);
+}));
+
+test('missing or mismatched external worker evidence is rejected',()=>fixture(({ui,save,options})=>{
+  ui.checks.agentHandoff.context.facts[0].source.id=99;save();assert.throws(()=>verifyEvidence(options));
+  delete ui.checks.agentHandoff;save();assert.throws(()=>verifyEvidence(options),/Missing agent handoff/);
 }));

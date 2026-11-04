@@ -12,7 +12,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
       workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),files:{}},
     environment:{node:process.version,postgres:databaseVersion,viewport:{width:1440,height:1000},locale:'zh-CN',timezone:'UTC'},screenshots:[],pageErrors:[]};
-  for(const file of ['server.js','db/schema.sql','public/app.js','public/index.html','public/style.css','test/ui.js','test/ui-evidence.js','idempotency.js','scripts/context-client.js']){
+  for(const file of ['server.js','db/schema.sql','public/app.js','public/index.html','public/style.css','test/ui.js','test/ui-evidence.js','idempotency.js','scripts/context-client.js','scripts/source-client.js','scripts/proposal-client.js','scripts/write-client.js','test/agent-handoff.js']){
     report.source.files[file]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   }
   let browser,page;
@@ -454,6 +454,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     assert.equal((await require('../scripts/context-client').readContext({baseURL,query:storySubject})).facts[0].version,2);
     await page.unroute(oldProofRoute);
     report.checks={...report.checks,firstUseStory:{inlineSourceFailure:true,inputPreserved:true,retrySaved:true,keyboardNavigation:true,conflictVisible:true,clientVersion:2,oldVersionPreserved:true,mobileOverflow:false}};
+    report.checks.agentHandoff=await require('./agent-handoff')({page,baseURL,capture,dir});
     await page.setViewportSize(report.environment.viewport);
     // Invalidate the real server session without navigating, as after expiry/restart.
     await page.evaluate(async()=>{

@@ -17,7 +17,7 @@
 | R11 数据库指针完整性 | 错事实、错版本、正版本空指针均被数据库拒绝 | facts复合FK与CHECK | integration.test.js直接SQL反例；test/migrations.js |
 | R12 保留数据升级 | 原库升级后业务行/序列/权限/策略不变；可重复；失败回滚；应用账号不能迁移 | 001/002迁移 | test/migrations.js 9组；含升级后完整HTTP集成 |
 | R13 输入错误可理解 | 登录/来源/候选要求JSON对象；非JSON415；空/坏JSON400；超16KiB413；错误JSON不反射请求原文 | requireJsonObject、解析器、统一错误处理 | request-body.test.js 8组，含字节边界、多字节与gzip膨胀、错误安全头 |
-| R14 演示可复现 | 无需重置现有数据生成二十四张截图（独立库流程）；报告含提交/版本/校验值；没有浏览器脚本错误 | test/ui.js、ui-evidence.js | ui-evidence artifact；docs/demo-evidence.md |
+| R14 演示可复现 | 无需重置现有数据生成二十六张截图（独立库流程）；报告含提交/版本/校验值；没有浏览器脚本错误 | test/ui.js、ui-evidence.js | ui-evidence artifact；docs/demo-evidence.md |
 | R15 创建请求可安全重试 | 同范围同键同内容只创建一次业务/审计；异内容409；失败回滚后可重试 | idempotency.js、回执表与RLS | test/idempotency.js五组，在新库/升级库各运行一次；pg_locks等待观察；客户端三组竞态及真实浏览器丢失响应回归 |
 | R16 有界事实读取 | 每页最多100条；游标遍历无重复；保持当前版本及成员隔离 | GET /facts | test/pagination.js十四组；19例双接口检索验证 |
 | R17 页面分页可靠性 | 页码/空结果/错误可理解；忽略旧响应；键盘翻页；并发变更后可刷新核对 | loadFacts、请求代次与游标栈 | UI真实临时库56条事实；截图09–12及错误/延迟注入 |
