@@ -17,7 +17,7 @@
 ```sh
 npm ci
 docker compose up -d --wait
-npm start
+node scripts/check-setup.js && npm start
 ```
 
 访问 http://127.0.0.1:3000 。首次启动时 `db/schema.sql` 由 PostgreSQL 的初始化入口以迁移 owner 执行，创建应用角色、表、RLS 和种子。可用账号：`owner` / `demo-owner`、`member` / `demo-member`、`viewer` / `demo-viewer`、`other` / `demo-other`。这些凭据是公开的，仅供演示。
@@ -28,6 +28,8 @@ npm start
 docker compose down -v
 docker compose up -d --wait
 ```
+
+启动前的 [只读诊断](docs/setup-check.md) 能提示误用管理员连接、基本表/迁移前提缺失和 RLS 配置问题；不自动修复，不代替完整演示或恢复验证。
 
 已有卷不会自动重新执行 `schema.sql`，保留数据升级请使用下节的增量迁移，**不要重跑 schema 或删除卷**。环境变量 `PORT` 可修改应用监听端口（例如 `PORT=3001 npm start`）；使用启动日志显示的实际地址。环境变量 `DATABASE_URL` 可覆盖默认应用连接；数据库管理员凭据仅用于初始化与迁移，不传给应用服务。不要在公开网络暴露该服务。
 

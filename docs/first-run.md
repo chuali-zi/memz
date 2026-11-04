@@ -4,7 +4,7 @@
 
 1. 安装README列出的Docker Compose、Node和npm，进入仓库根目录运行npm ci。
 2. 确认5432与3000端口可用，执行docker compose up -d --wait。全新数据库卷会由官方PostgreSQL入口执行db/schema.sql，包括创建memz_app、表、约束、RLS及种子；已有卷不重跑初始化。
-3. 执行npm start，打开日志显示的地址。若3000已有服务，可用PORT=3001 npm start；不要因页面能打开就假设打开的是本次进程。数据库端口冲突需要先检查占用者，不能通过删除现有数据库解决。
+3. 执行node scripts/check-setup.js，按[只读诊断](setup-check.md)处理失败；通过后执行npm start，打开日志显示的地址。若3000已有服务，可用PORT=3001 npm start；不要因页面能打开就假设打开的是本次进程。数据库端口冲突需要先检查占用者，不能通过删除现有数据库解决。
 4. 使用公开owner演示账号登录，按README初始流程完成20号v1→15号v2、旧版本409、外部候选驳回、viewer拒绝及other项目隔离。
 5. 重复演示不重置数据，改用docs/demo-script.md的唯一主体流程。验证优先用test:system:evidence的临时库入口，不对已有演示库运行npm test。
 
@@ -30,3 +30,7 @@
 实测原始客户端得到种子20号v1；demo-story.js的JSON和--markdown两种命令分别完成独立七阶段故事，得到15号v2并验证旧依据、409和403；stdin以4096字节预算、limit=1读取，再以实际nextAfter续读，事实ID从1前进到2。原始JSON、Markdown、安装日志与报告保存在云端artifacts/onboarding/run-20261104T202254Z；该手工环境证据对应上述源提交，不冒充后续提交的CI或正式材料包证据。
 
 遇到并处理了受限npm缓存目录和600权限初始化SQL；具体操作与边界已加入[开发者指南](developer-quickstart.md)。应用业务逻辑无新增缺陷，因此本轮只完善有实测依据的接入文档，没有增加无依据功能。临时应用、容器、网络和独立数据卷均已清理；原5432演示库保留。没有验证Windows PowerShell、所有Node版本、首次镜像下载或生产部署。
+
+## 恢复旧卷后的基本前提
+
+已补只读安装诊断及隔离旧库复现：启动、登录和读取成功并不能证明幂等写入所需的迁移002存在。诊断不会改数据，缺迁移时提示备份后按顺序升级，不建议删卷或重跑完整schema。检测范围与限制见[安装诊断](setup-check.md)。
