@@ -3,9 +3,10 @@ function failure(code,status){return Object.assign(new Error(code),{code,...(sta
 function requireValue(condition,code){if(!condition)throw failure(code)}
 const serializeContext=value=>JSON.stringify(value,null,2)+'\n';
 const positive=value=>Number.isInteger(value)&&value>0&&value<=2147483647;
-async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId=1,query='',limit=25,timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes,fetchImpl=fetch}={}){
+async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId=1,query='',limit=25,after=0,timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes,fetchImpl=fetch}={}){
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
   requireValue(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&!base.search&&!base.hash&&base.pathname==='/','INVALID_BASE_URL');
+  requireValue(after===0||positive(after),'INVALID_AFTER');
   requireValue(positive(projectId),'INVALID_PROJECT');requireValue(Number.isInteger(limit)&&limit>=1&&limit<=100,'INVALID_LIMIT');
   requireValue(typeof query==='string'&&query.length<=200&&query.isWellFormed()&&!query.includes('\u0000'),'INVALID_QUERY');requireValue(typeof username==='string'&&username&&typeof password==='string'&&password,'INVALID_CREDENTIALS');
   requireValue(Number.isInteger(timeoutMs)&&timeoutMs>=1&&timeoutMs<=60000,'INVALID_TIMEOUT');
@@ -46,10 +47,10 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
   }
   try{
     await request('/api/login',{body:{username,password}});
-    const page=await request(`/api/projects/${projectId}/facts?q=${encodeURIComponent(query)}&limit=${limit}`);
+    const page=await request(`/api/projects/${projectId}/facts?q=${encodeURIComponent(query)}&limit=${limit}${after?`&after=${after}`:''}`);
     requireValue(page&&['owner','member','viewer'].includes(page.role)&&Array.isArray(page.facts)&&page.facts.length<=limit,'INVALID_FACTS_RESPONSE');
     requireValue(page.next_after===null||(positive(page.next_after)&&page.facts.length>0&&page.next_after===page.facts.at(-1).id),'INVALID_CURSOR_RESPONSE');
-    const facts=[];let previousId=0;
+    const facts=[];let previousId=after;
     for(const fact of page.facts){
       requireValue(positive(fact.id)&&fact.id>previousId&&positive(fact.version)&&['subject','predicate','value'].every(key=>typeof fact[key]==='string'&&fact[key].length<=(key==='value'?1000:100)),'INVALID_FACT_RESPONSE');previousId=fact.id;
       const proof=await request(`/api/projects/${projectId}/facts/${fact.id}/provenance?version=${fact.version}`);
@@ -57,7 +58,7 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
       requireValue(positive(proof.revision.id)&&positive(proof?.source?.id)&&typeof proof.source.title==='string'&&proof.source.title.length<=150&&typeof proof.source.content==='string'&&proof.source.content.length<=4000&&positive(proof?.candidate?.id)&&positive(proof.candidate.proposed_by)&&positive(proof.revision.approved_by),'INVALID_PROVENANCE_RESPONSE');
       facts.push({id:fact.id,subject:fact.subject,predicate:fact.predicate,value:fact.value,version:fact.version,revisionId:proof.revision.id,source:{id:proof.source.id,title:proof.source.title,content:proof.source.content},candidateId:proof.candidate.id,proposedBy:proof.candidate.proposed_by,approvedBy:proof.revision.approved_by});
     }
-    result={schemaVersion:1,projectId,query,limit,truncated:page.next_after!==null,nextAfter:page.next_after,sourceTextIsUntrusted:true,consistency:'One current-facts page; immutable provenance pinned to each returned version. Not necessarily current at completion.',facts};
+    result={schemaVersion:1,projectId,query,limit,...(after?{after}:{}),truncated:page.next_after!==null,nextAfter:page.next_after,sourceTextIsUntrusted:true,consistency:'One current-facts page; immutable provenance pinned to each returned version. Not necessarily current at completion.',facts};
     if(maxOutputBytes!==undefined){
       const minimum=facts.length?1:0;let fitted=false;
       for(let count=facts.length;count>=minimum;count--){
@@ -80,13 +81,13 @@ async function stdinRequest(){
     process.stdin.on('end',()=>done());process.stdin.on('error',()=>done(failure('INPUT_FAILED')));
   });
   let request;try{request=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch{throw failure('INVALID_STDIN_JSON')}
-  requireValue(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(key=>['projectId','query','limit','maxOutputBytes'].includes(key)),'INVALID_STDIN_REQUEST');
+  requireValue(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(key=>['projectId','query','limit','maxOutputBytes','after'].includes(key)),'INVALID_STDIN_REQUEST');
   return request;
 }
 async function main(){
   requireValue(process.argv.length===2||(process.argv.length===3&&process.argv[2]==='--stdin'),'INVALID_ARGUMENTS');
   const request=process.argv[2]==='--stdin'?await stdinRequest():{};
-  const context=await readContext({baseURL:process.env.MEMZ_BASE_URL||'http://127.0.0.1:3000',username:process.env.MEMZ_USERNAME||'viewer',password:process.env.MEMZ_PASSWORD||'demo-viewer',projectId:process.env.MEMZ_PROJECT_ID===undefined?1:Number(process.env.MEMZ_PROJECT_ID),query:process.env.MEMZ_QUERY||'',limit:process.env.MEMZ_LIMIT===undefined?25:Number(process.env.MEMZ_LIMIT),maxOutputBytes:process.env.MEMZ_MAX_OUTPUT_BYTES===undefined?undefined:Number(process.env.MEMZ_MAX_OUTPUT_BYTES),...request});
+  const context=await readContext({baseURL:process.env.MEMZ_BASE_URL||'http://127.0.0.1:3000',username:process.env.MEMZ_USERNAME||'viewer',password:process.env.MEMZ_PASSWORD||'demo-viewer',projectId:process.env.MEMZ_PROJECT_ID===undefined?1:Number(process.env.MEMZ_PROJECT_ID),query:process.env.MEMZ_QUERY||'',limit:process.env.MEMZ_LIMIT===undefined?25:Number(process.env.MEMZ_LIMIT),after:process.env.MEMZ_AFTER===undefined?0:Number(process.env.MEMZ_AFTER),maxOutputBytes:process.env.MEMZ_MAX_OUTPUT_BYTES===undefined?undefined:Number(process.env.MEMZ_MAX_OUTPUT_BYTES),...request});
   process.stdout.write(serializeContext(context));
 }
 if(require.main===module)main().catch(error=>{console.error(`Context read failed: ${error.code||'UNKNOWN_ERROR'}`);process.exitCode=1});

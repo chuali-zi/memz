@@ -50,3 +50,10 @@ test('stdio applies optional final output budget and returns no partial JSON whe
   const tiny=await invoke(JSON.stringify({projectId:1,maxOutputBytes:1}));assert.equal(tiny.code,1);assert.equal(tiny.stdout,'');assert.match(tiny.stderr,/OUTPUT_BUDGET_TOO_SMALL/);
   const before=requests,invalid=await invoke('{"maxOutputBytes":0}');assert.equal(invalid.code,1);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/INVALID_OUTPUT_BUDGET/);assert.equal(requests,before);
 });
+
+test('stdio accepts a continuation cursor and rejects invalid cursors before HTTP',async()=>{
+  const first=await invoke('{"projectId":1,"limit":1}');assert.equal(first.code,0,first.stderr);const firstContext=JSON.parse(first.stdout),after=firstContext.facts[0].id;
+  const next=await invoke(JSON.stringify({projectId:1,limit:1,after,maxOutputBytes:2000}));assert.equal(next.code,0,next.stderr);const result=JSON.parse(next.stdout);assert.equal(result.after,after);assert.ok(result.facts.every(f=>f.id>after));assert.ok(Buffer.byteLength(next.stdout)<=2000);
+  const end=await invoke('{"after":2147483647}');assert.equal(end.code,0);assert.deepEqual(JSON.parse(end.stdout).facts,[]);assert.equal(JSON.parse(end.stdout).nextAfter,null);
+  const before=requests,invalid=await invoke('{"after":-1}');assert.equal(invalid.code,1);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/INVALID_AFTER/);assert.equal(requests,before);
+});

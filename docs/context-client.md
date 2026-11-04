@@ -51,7 +51,7 @@ JSON包含事实值/版本、修订ID、完整来源、候选/提议者/批准�
 printf '%s' '{"projectId":1,"query":"项目","limit":10}' | node scripts/context-client.js --stdin
 ```
 
-输入只允许projectId、query、limit和可选maxOutputBytes，分别覆盖同名环境配置；不接受凭据、服务地址或其他字段。端点和账号由父进程环境配置，不能通过输入请求切换身份或目的地。环境变量不是密钥保险箱，同一操作系统用户的权限仍需由部署方管理。不要在命令行参数中传密码。原有环境变量模式和readContext库接口保持可用。
+输入只允许projectId、query、limit、after和可选maxOutputBytes，分别覆盖同名环境配置；不接受凭据、服务地址或其他字段。端点和账号由父进程环境配置，不能通过输入请求切换身份或目的地。环境变量不是密钥保险箱，同一操作系统用户的权限仍需由部署方管理。不要在命令行参数中传密码。原有环境变量模式和readContext库接口保持可用。
 
 这是单次JSON协议，不是NDJSON、常驻服务或MCP。stdin最多16 KiB，须在5秒内结束；多对象、无效UTF-8、未知字段及超量输入直接失败且不发HTTP请求。成功只向stdout输出一个JSON结果；失败stdout为空，stderr为固定错误码，退出码1。父进程应同时读取stdout和stderr并检查退出码。
 
@@ -110,3 +110,18 @@ printf '%s' '{"projectId":1,"query":"项目","limit":25,"maxOutputBytes":12000}'
 如果连第一条完整事实及元数据都装不下，报OUTPUT_BUDGET_TOO_SMALL，stdout为空并尝试注销；调用者应增大预算或缩小检索范围。空匹配允许返回空facts，但仍须容纳JSON元数据。非法预算在登录前报INVALID_OUTPUT_BUDGET。客户端仍先读取并验证整页的全部依据，再按预算取前缀；任何权限、溯源不一致或读取失败仍使整次失败，不能借省略掩盖错误。
 
 测试覆盖真实数据库的大来源、子进程实际stdout字节数、Unicode与JSON转义、恰好边界与少1字节、空匹配、服务端分页与预算省略的区别、后续游标、跨项目403和被省略事实的溯源503。预算没有减少该页的网络请求或自动建立跨请求快照；当前不提供压缩、去重来源、自动摘要或模型token估计。
+
+
+## 预算截断后的客户端续读
+
+此前nextAfter只能交给原始HTTP接口；库调用传after会被忽略，导致重复第一页。现在readContext和stdin支持可选after（0至2147483647整数，默认0），环境模式使用MEMZ_AFTER。把上一份结果的nextAfter原样传回，并保持projectId、query及所需身份配置一致；仅在truncated=true且nextAfter非null时续读。例如上一页实际返回nextAfter=42：
+
+```sh
+printf '%s' '{"projectId":1,"query":"项目","after":42,"maxOutputBytes":12000}' | node scripts/context-client.js --stdin
+```
+
+42只是示意，实际必须使用返回值。非零after会在结果顶层回显，并计入字节预算；默认第一页输出保持兼容。客户端要求返回事实ID严格大于after且递增，否则报INVALID_FACT_RESPONSE并尝试注销。无效after在登录前报INVALID_AFTER；游标超过所有匹配ID会返回空facts、truncated=false、nextAfter=null。
+
+续读是一次新的登录和事实页读取，**不是跨页共同快照**。较小ID已返回的事实之后被批准更新，下一页不会重新发送它；较大ID的新事实或更新可能出现在后页。某个旧事实后来才匹配查询但ID不大于游标时，此次遍历不会补回，需从after=0重新检索。nextAfter=null只表示该次读取没有后页，不保证未来没有新数据。整数游标不是授权凭据，也不绑定项目或关键词；换项目仍重新校验权限，改变查询后应从头开始。
+
+真实合成回归先按预算取第一条，再更新第一页事实、更新第二条并新增第四条；续读取到第二版后，在读取依据前又批准第三版，仍须返回第二版的准确来源。三次读取ID单调无重复、来源全文保留，但先前输出的第一页仍是历史v1，不宣称全部输出在同一时刻为最新。另覆盖环境模式真实子进程续读、stdin、空末页、无效游标、跨项目403和返回倒退ID的失败路径。客户端不自动循环，调用方须自行设置总页数/总字节/总时长限制。

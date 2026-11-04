@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {readContext}=require('../scripts/context-client');
 test('context client rejects unsafe or silently truncated configuration before login',async()=>{
   let calls=0;const fetchImpl=async()=>{calls++;throw new Error('unexpected request')};
-  for(const options of [{baseURL:'http://user:password@localhost:3000'},{baseURL:'http://localhost:3000/path'},{projectId:0},{limit:101},{query:'x'.repeat(201)},{query:'前\u0000后'},{query:'前\ud800后'},{query:'前\udc00后'},{timeoutMs:0},{maxOutputBytes:0},{maxOutputBytes:4194305},{maxOutputBytes:1.5},{maxOutputBytes:null}])await assert.rejects(()=>readContext({...options,fetchImpl}),e=>e.code.startsWith('INVALID_'));
+  for(const options of [{baseURL:'http://user:password@localhost:3000'},{baseURL:'http://localhost:3000/path'},{projectId:0},{limit:101},{query:'x'.repeat(201)},{query:'前\u0000后'},{query:'前\ud800后'},{query:'前\udc00后'},{timeoutMs:0},{after:-1},{after:2147483648},{after:1.5},{after:'1'},{after:null},{maxOutputBytes:0},{maxOutputBytes:4194305},{maxOutputBytes:1.5},{maxOutputBytes:null}])await assert.rejects(()=>readContext({...options,fetchImpl}),e=>e.code.startsWith('INVALID_'));
   assert.equal(calls,0);
 });
 test('context client reports transport timeout without exposing supplied credentials',async()=>{
@@ -56,4 +56,14 @@ test('output budget counts UTF-8, JSON escaping and final newline at the exact b
   const exact=await readContext({maxOutputBytes:budget,fetchImpl});assert.equal(Buffer.byteLength(JSON.stringify(exact,null,2)+'\n'),budget);assert.equal(exact.truncated,false);
   assert.equal(exact.facts[0].source.content,'😀\n"');
   await assert.rejects(()=>readContext({maxOutputBytes:budget-1,fetchImpl}),e=>e.code==='OUTPUT_BUDGET_TOO_SMALL');assert.equal(logouts,3);
+});
+
+test('continuation rejects a response that repeats or goes behind its cursor and logs out',async()=>{
+  let loggedOut=false;
+  await assert.rejects(()=>readContext({after:8,fetchImpl:async url=>{
+    const u=new URL(url);
+    if(u.pathname==='/api/login')return Response.json({csrf:'unit'},{headers:{'set-cookie':'sid=unit; HttpOnly'}});
+    if(u.pathname==='/api/logout'){loggedOut=true;return Response.json({})}
+    assert.equal(u.searchParams.get('after'),'8');return Response.json({role:'viewer',facts:[{id:8,subject:'旧',predicate:'值',value:'重复',version:1}],next_after:null});
+  }}),e=>e.code==='INVALID_FACT_RESPONSE');assert.equal(loggedOut,true);
 });
