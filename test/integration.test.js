@@ -7,6 +7,16 @@ const choose=(id)=>tx(1,c=>decide(c,1,1,id,'approve'));
 test('真实 PostgreSQL：权限、事务、并发、输入和检索',async()=>{const owner=await login('owner'),member=await login('member'),viewer=await login('viewer'),other=await login('other');
 const attr=(await pool.query("SELECT rolsuper,rolbypassrls,rolcreaterole FROM pg_roles WHERE rolname=current_user")).rows[0];assert.deepEqual(attr,{rolsuper:false,rolbypassrls:false,rolcreaterole:false});assert.equal((await pool.query('SELECT * FROM facts')).rowCount,0,'无上下文默认拒绝');
 assert.equal((await tx(1,c=>c.query('SELECT * FROM facts'))).rowCount,1);assert.equal((await tx(4,c=>c.query('SELECT * FROM facts'))).rowCount,0);assert.equal((await pool.query('SELECT * FROM facts')).rowCount,0,'连接复用不残留身份');
+// The database must reject pointers to another fact or another version,
+// even when a caller has the owner's project permissions.
+for(const sql of [
+  "INSERT INTO facts(project_id,subject,predicate,version,current_revision_id) VALUES(1,'错误指针','测试',1,1)",
+  'UPDATE facts SET version=2 WHERE id=1'
+]) await assert.rejects(()=>tx(1,c=>c.query(sql)),e=>e.code==='23503');
+for(const sql of [
+  'UPDATE facts SET current_revision_id=NULL WHERE id=1',
+  'UPDATE facts SET version=0 WHERE id=1'
+]) await assert.rejects(()=>tx(1,c=>c.query(sql)),e=>e.code==='23514');
 assert.equal((await call(other,'/api/projects/1/data')).status,403);assert.equal((await call(other,'/api/projects/1/data',null,{'X-User':'1'})).status,403);assert.equal((await candidate(viewer)).status,403);assert.equal((await candidate(member,{source_id:4})).status,400);assert.equal((await call(other,'/api/projects/1/candidates/1/approve',{})).status,403);
 await assert.rejects(()=>tx(2,c=>c.query("INSERT INTO candidates(project_id,subject,predicate,value,source_id,expected_version,proposed_by) VALUES(1,'跨项目','来源','x',4,0,2)")), e=>e.code==='23503');const rejected=(await candidate(member,{subject:'拒绝',predicate:'记录',expected_version:0})).data;await tx(1,c=>decide(c,1,1,rejected.id,'reject'));assert.equal((await call(owner,'/api/projects/1/data?q=%E6%8B%92%E7%BB%9D')).data.facts.length,0);
 const guard=(await candidate(member,{subject:'权限检查',predicate:'状态',expected_version:0})).data;const before=await readProject(1,1,'');for(const actor of [member,viewer])for(const decision of ['approve','reject'])assert.equal((await call(actor,`/api/projects/1/candidates/${guard.id}/${decision}`,{})).status,403);assert.deepEqual(await readProject(1,1,''),before,'非负责人操作不得更改事实、候选、修订或审计');for(const table of ['revisions','audit'])for(const verb of ['UPDATE','DELETE']){const sql=verb==='UPDATE'?`UPDATE ${table} SET project_id=project_id`:`DELETE FROM ${table}`;await assert.rejects(()=>tx(1,c=>c.query(sql)),e=>e.code==='42501',`${verb} ${table} 必须拒绝`)}
