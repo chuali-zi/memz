@@ -40,6 +40,15 @@ jobs:
           name: retrieval-evaluation
           path: artifacts/retrieval-report.json
           if-no-files-found: ignore
+      - run: npm run eval:plans
+        env:
+          PLAN_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: query-plan-evidence
+          path: artifacts/query-plans.json
+          if-no-files-found: ignore
       - run: npx playwright install --with-deps chromium
       - name: Verify Chinese font availability
         run: |

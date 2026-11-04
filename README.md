@@ -93,3 +93,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 数据库约束与迁移的原始TAP取证、清理记录及材料包对应关系见[数据库测试证据](docs/database-evidence.md)。
 
 首次启动、端口核对与有限彩排范围见[首次运行检查](docs/first-run.md)。
+
+来源分页的PostgreSQL执行计划、固定规模及正确性实验见[查询计划证据](docs/query-plans.md)，使用 `npm run eval:plans` 和显式PLAN_DATABASE_URL；CI单独归档query-plan-evidence。
