@@ -70,7 +70,7 @@ async function main(){
     const reduced=await readHistoryMeasurement('data?include_facts=false&include_history=false');
     const firstHistory=await readHistoryMeasurement('history?limit=25');
     const {history:allHistory,...contextRest}=context;assert.deepEqual(reduced.body,contextRest);
-    assert.deepEqual(firstHistory.body.history.map(({id,...row})=>row),allHistory.slice(0,25));
+    assert.deepEqual(firstHistory.body.history.map(({id,fact_id,...row})=>row),allHistory.slice(0,25));
     assert.ok(firstHistory.body.history.length<=25);
     contextScale.withoutHistoryBytes=reduced.bytes;contextScale.historyFirstPageBytes=firstHistory.bytes;
     contextScale.historyFirstPageRows=firstHistory.body.history.length;

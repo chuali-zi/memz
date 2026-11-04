@@ -47,6 +47,9 @@ function factControls(busy=false){
 }
 function renderFact(d,f,p){
   d.append(el('strong',`${f.subject} / ${f.predicate}：${f.value}`),el('span',`v${f.version}`,'badge'),el('div',`依据：${f.source}`,'meta'));
+  appendProvenance(d,f,p);
+}
+function appendProvenance(d,f,p){
   const button=el('button','查看依据','secondary'),panel=el('div',undefined,'provenance-detail');
   panel.hidden=true;panel.setAttribute('aria-live','polite');button.setAttribute('aria-expanded','false');
   let loaded=false;
@@ -100,7 +103,10 @@ async function loadHistory({reset=false,index=historyState.index,focus=false}={}
     historyState.index=index;historyState.next=page.next_before;
     historyState.cursors=historyState.cursors.slice(0,index+1);
     if(page.next_before!==null)historyState.cursors.push(page.next_before);
-    rows('#history',page.history,(d,h)=>d.append(el('strong',`${h.subject} / ${h.predicate}：${h.value}`),el('span',`v${h.version}`,'badge'),el('div',`来源：${h.source} · ${new Date(h.created_at).toLocaleString()}`,'meta')));
+    rows('#history',page.history,(d,h)=>{
+      d.append(el('strong',`${h.subject} / ${h.predicate}：${h.value}`),el('span',`v${h.version}`,'badge'),el('div',`来源：${h.source} · ${new Date(h.created_at).toLocaleString()}`,'meta'));
+      appendProvenance(d,{id:h.fact_id,version:h.version},p);
+    });
     $('#historyStatus').textContent=page.history.length?`历史第 ${index+1} 页 · ${page.history.length} 条${page.next_before===null?' · 已到末页':''}`:'暂无版本历史';
     historyControls();if(focus)$('#historyTitle').focus();
   }catch(e){

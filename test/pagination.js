@@ -101,7 +101,12 @@ test('history pages exactly reproduce legacy order and optional omission preserv
     assert.equal(body.next_before,before);assert.ok(rows.length<1000);
   }while(true);
   assert.equal(new Set(rows.map(r=>r.id)).size,rows.length);
-  assert.deepEqual(rows.map(({id,...r})=>r),expected);
+  assert.deepEqual(rows.map(({id,fact_id,...r})=>r),expected);
+  for(const row of rows)assert.ok(Number.isInteger(row.fact_id)&&row.fact_id>0);
+  for(const row of [rows[0],rows.at(-1)]){
+    const response=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/1/facts/${row.fact_id}/provenance?version=${row.version}`,{headers:{cookie:cookies.viewer}});
+    assert.equal(response.status,200);const proof=await response.json();assert.equal(proof.revision.id,row.id);assert.equal(proof.revision.value,row.value);assert.equal(proof.source.title,row.source);
+  }
   const viewer=await history('','viewer');assert.equal(viewer.status,200);assert.equal(viewer.body.role,'viewer');
   assert.deepEqual(viewer.body.history,(await history()).body.history);
   assert.equal((await history('','other')).status,403);

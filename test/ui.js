@@ -440,6 +440,19 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await capture('22-mobile-story-context.png','390px完整故事批准15号v2后，旧版本409与驳回未改变事实，显示更正原文','.card:has(#facts)');
     const clientContext=await require('../scripts/context-client').readContext({baseURL,query:storySubject,maxOutputBytes:4096});assert.equal(clientContext.facts.length,1);assert.equal(clientContext.facts[0].value,'15号');assert.equal(clientContext.facts[0].version,2);assert.equal(clientContext.facts[0].source.id,Number(changedSourceId));
     const oldStoryProof=await page.evaluate(id=>api(`/api/projects/1/facts/${id}/provenance?version=1`),clientContext.facts[0].id);assert.equal(oldStoryProof.source.id,Number(firstSourceId));assert.equal(oldStoryProof.revision.value,'20号');
+    const oldEntry=page.locator('#history .entry').filter({hasText:`${storySubject} / 截止日：20号`});
+    await oldEntry.waitFor();let historyProofRequests=0;
+    const oldProofRoute=`**/api/projects/1/facts/${clientContext.facts[0].id}/provenance?version=1`;
+    await page.route(oldProofRoute,route=>++historyProofRequests===1?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'历史依据测试故障'})}):route.continue());
+    await oldEntry.getByRole('button',{name:'查看依据',exact:true}).click();await oldEntry.getByText(/依据读取失败：503 历史依据测试故障/).waitFor();
+    await oldEntry.getByRole('button',{name:'重试依据',exact:true}).click();await oldEntry.getByText('项目截止日20号。',{exact:true}).waitFor();
+    assert.ok((await oldEntry.textContent()).includes(`来源 #${firstSourceId}：首次使用合成来源`));
+    assert.ok((await oldEntry.textContent()).includes('版本 v1'));assert.equal(historyProofRequests,2);
+    await oldEntry.getByRole('button',{name:'收起依据',exact:true}).click();assert.equal(await oldEntry.locator('.provenance-detail').isVisible(),false);
+    await oldEntry.getByRole('button',{name:'查看依据',exact:true}).click();assert.equal(historyProofRequests,2);
+    await capture('24-mobile-history-provenance.png','390px历史v1展开原始20号来源；当前事实仍为15号v2；503为明确注入，重试真实读取','#history .entry:has-text("浏览器完整故事（合成） / 截止日：20号")');
+    assert.equal((await require('../scripts/context-client').readContext({baseURL,query:storySubject})).facts[0].version,2);
+    await page.unroute(oldProofRoute);
     report.checks={...report.checks,firstUseStory:{inlineSourceFailure:true,inputPreserved:true,retrySaved:true,keyboardNavigation:true,conflictVisible:true,clientVersion:2,oldVersionPreserved:true,mobileOverflow:false}};
     await page.setViewportSize(report.environment.viewport);
     // Invalidate the real server session without navigating, as after expiry/restart.

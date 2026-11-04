@@ -87,7 +87,7 @@ app.get('/api/projects/:p/facts',route(async(req,res)=>{
 async function readHistoryPage(user,p,{limit=25,before=null}={}){
   return tx(user,async c=>{
     const r=await role(c,p,['owner','member','viewer']);
-    const rows=(await c.query(`SELECT r.id,f.subject,f.predicate,r.version,r.value,s.title source,r.created_at
+    const rows=(await c.query(`SELECT r.id,r.fact_id,f.subject,f.predicate,r.version,r.value,s.title source,r.created_at
       FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id
       WHERE r.project_id=$1 AND ($2::int IS NULL OR r.id<$2)
       ORDER BY r.id DESC LIMIT $3`,[p,before,limit+1])).rows;
