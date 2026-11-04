@@ -4,6 +4,8 @@
 
 ## 启动
 
+首次接入者可按[开发者完整上手指南](docs/developer-quickstart.md)从空库走到来源、审批和客户端上下文；包含第二终端配置、预算续读以及实际遇到的安装问题。以下命令使用POSIX shell语法。
+
 需要 Docker Compose、Node.js 20+ 和 npm，端口 5432、3000 可用。仅本机监听；不需外部账号或 API key。
 
 ```sh
