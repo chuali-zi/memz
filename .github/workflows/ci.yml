@@ -3,6 +3,7 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16
@@ -35,7 +36,10 @@ jobs:
           path: artifacts/retrieval-report.json
           if-no-files-found: ignore
       - run: npx playwright install --with-deps chromium
-      - run: sudo apt-get install -y fonts-noto-cjk
+      - name: Verify Chinese font availability
+        run: |
+          test -n "$(fc-list :lang=zh family)"
+          fc-match :lang=zh
       - run: npm run test:ui:evidence
         env:
           UI_TEST_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz

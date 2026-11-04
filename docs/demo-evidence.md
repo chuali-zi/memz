@@ -12,7 +12,7 @@ UI_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz 
 CHROMIUM_PATH=/usr/bin/chromium npm run test:ui:evidence
 ```
 
-没有系统浏览器时先运行 `npx playwright install --with-deps chromium`。CI 使用锁文件对应的 Playwright Chromium，并安装中文字体。
+没有系统浏览器时先运行 `npx playwright install --with-deps chromium`。CI 使用锁文件对应的 Playwright Chromium，依赖安装包含文泉驿中文字体，随后用fontconfig检查中文字体可用；不额外重复下载字体包。
 
 此命令需显式测试管理员连接，只创建和删除随机 `memz_ui_*` 临时库；应用连接为memz_app，服务监听127.0.0.1随机端口。评测不修改管理员连接指定的库，不要求停止现有3000端口服务。进程被强制终止时可能残留临时库，需要核对后清理，不应批量删除不明数据库。不要提供生产管理员凭据。
 
