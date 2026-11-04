@@ -64,3 +64,7 @@ ALTER TABLE facts ADD CONSTRAINT facts_current_revision_state
 ## 6. 创建幂等回执
 
 新增idempotency.js的createOnce：在当前写事务中按项目/用户/操作/键获取锁，检查输入摘要，返回原回执或执行业务及审计后保存回执。新回执与业务一起提交或回滚。服务端先检查当前写权限，不通过缓存绕过授权；不传键仍执行原路径。完整合同与并发测试见[idempotent-creation.md](idempotent-creation.md)。
+
+## 历史有界读取
+
+`readHistoryPage`按修订ID倒序并以排他before游标取limit+1行，复用角色校验、RLS及单页只读快照。`readProject`仅在include_history=false时跳过历史读取，默认兼容。页面loadHistory独立维护页起点与请求代次，刷新时旧响应不可覆盖新页；较新修订需刷新第一页。它不提供跨请求共同快照，也未解决来源和候选的全量加载。

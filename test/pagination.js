@@ -79,3 +79,44 @@ test('higher-ID inserts between pages do not repeat rows and appear on later pag
   const combined=[...first.facts,...second.facts];assert.equal(combined.length,126);assert.equal(new Set(combined.map(r=>r.id)).size,126);
   assert.ok(second.facts.some(r=>r.subject==='分页条目新增'));assert.equal(second.next_after,null);
 });
+
+async function history(query='',user='owner',project=1){
+  const r=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/${project}/history${query}`,{headers:{cookie:cookies[user]}});
+  return {status:r.status,body:await r.json()};
+}
+test('history pages exactly reproduce legacy order and optional omission preserves other sections',async()=>{
+  const base=`http://127.0.0.1:${server.address().port}/api/projects/1/data`;
+  const read=async q=>{const r=await fetch(base+q,{headers:{cookie:cookies.owner}});assert.equal(r.status,200);return r.json()};
+  const full=await read(''),without=await read('?include_facts=false&include_history=false');
+  const {facts,history:expected,...rest}=full;assert.deepEqual(without,rest);
+  assert.deepEqual(await read('?include_history=true'),full);
+  assert.equal((await history()).body.history.length,25);
+  assert.equal((await history('?limit=100')).body.history.length,100);
+  const rows=[];let before=null;
+  do{
+    const {status,body}=await history(`?limit=13${before===null?'':`&before=${before}`}`);assert.equal(status,200);
+    assert.deepEqual(Object.keys(body).sort(),['history','next_before','role']);assert.ok(body.history.length<=13);
+    for(const row of body.history){if(before!==null)assert.ok(row.id<before);before=row.id;rows.push(row)}
+    if(body.next_before===null)break;
+    assert.equal(body.next_before,before);assert.ok(rows.length<1000);
+  }while(true);
+  assert.equal(new Set(rows.map(r=>r.id)).size,rows.length);
+  assert.deepEqual(rows.map(({id,...r})=>r),expected);
+  const viewer=await history('','viewer');assert.equal(viewer.status,200);assert.equal(viewer.body.role,'viewer');
+  assert.deepEqual(viewer.body.history,(await history()).body.history);
+  assert.equal((await history('','other')).status,403);
+  assert.equal((await history('','other',2)).body.history.length,1);
+  assert.deepEqual((await history('?before=1')).body.history,[]);
+  assert.equal((await history('?before=1')).body.next_before,null);
+  for(const q of ['?limit=0','?limit=101','?limit=1e2','?limit=1&limit=2','?before=0','?before=-1','?before=1.5','?before=2147483648','?before=','?before=2&before=3'])assert.equal((await history(q)).status,400,q);
+  for(const q of ['?include_history=no','?include_history=false&include_history=true'])assert.equal((await fetch(base+q,{headers:{cookie:cookies.owner}})).status,400);
+});
+test('new revisions between descending history pages do not shift older pages; refresh sees the new revision',async()=>{
+  const first=(await history()).body;
+  const oldSecond=(await history(`?before=${first.next_before}`)).body;
+  await create('历史翻页期间','新修订');
+  const second=(await history(`?before=${first.next_before}`)).body;
+  assert.deepEqual(second,oldSecond);
+  assert.equal(new Set([...first.history,...second.history].map(r=>r.id)).size,50);
+  const latest=(await history()).body;assert.equal(latest.history[0].subject,'历史翻页期间');assert.ok(latest.history[0].id>first.history[0].id);
+});

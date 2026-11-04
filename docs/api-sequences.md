@@ -101,4 +101,4 @@ sequenceDiagram
 
 `GET /api/projects/:p/facts` 是可选的游标分页读取：校验参数 → 只读事务身份与角色 → 当前修订查询 limit+1 → 提交 → 返回 role/facts/next_after。单页一致、多页不是同一快照；详见[接口契约及测量](bounded-retrieval.md)。原聚合读取时序保持不变。
 
-页面现使用 `/data?include_facts=false` 加载侧栏，并行使用 `/facts` 加载第一页。搜索与翻页只读 `/facts`；刷新工作台重新读取两者并重置页码。旧 `/data` 缺省响应不变。两个请求各自有一致快照，但不是共同快照；界面有明确提示。
+页面现使用 `/data?include_facts=false&include_history=false` 加载来源/候选/审计，并行使用 `/facts` 和 `/history` 加载各自第一页。事实搜索与翻页只读 `/facts`，历史翻页/刷新只读 `/history`；刷新工作台重新读取三者并重置页码。旧 `/data` 缺省响应不变。各请求有独立一致快照，但不是共同快照；界面有明确提示。历史参数与倒序游标说明见[历史分页](history-pagination.md)。

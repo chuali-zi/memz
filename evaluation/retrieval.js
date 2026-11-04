@@ -59,6 +59,22 @@ async function main(){
       const r=await fetch(`${base}/api/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:user,password:`demo-${user}`})});
       assert.equal(r.status,200);cookies[user]=r.headers.get('set-cookie').split(';')[0];await r.json();
     }
+    const contextResponse=await fetch(`${base}/api/projects/1/data?include_facts=false`,{headers:{cookie:cookies.owner}});
+    assert.equal(contextResponse.status,200);
+    const contextRaw=await contextResponse.text(),context=JSON.parse(contextRaw);
+    const contextScale={aggregateBytes:Buffer.byteLength(contextRaw),sections:Object.fromEntries(['sources','candidates','history','audit'].map(key=>[key,{rows:context[key].length,jsonArrayBytes:Buffer.byteLength(JSON.stringify(context[key]))}]))};
+    async function readHistoryMeasurement(path){
+      const response=await fetch(`${base}/api/projects/1/${path}`,{headers:{cookie:cookies.owner}});
+      assert.equal(response.status,200);const raw=await response.text();return {body:JSON.parse(raw),bytes:Buffer.byteLength(raw)};
+    }
+    const reduced=await readHistoryMeasurement('data?include_facts=false&include_history=false');
+    const firstHistory=await readHistoryMeasurement('history?limit=25');
+    const {history:allHistory,...contextRest}=context;assert.deepEqual(reduced.body,contextRest);
+    assert.deepEqual(firstHistory.body.history.map(({id,...row})=>row),allHistory.slice(0,25));
+    assert.ok(firstHistory.body.history.length<=25);
+    contextScale.withoutHistoryBytes=reduced.bytes;contextScale.historyFirstPageBytes=firstHistory.bytes;
+    contextScale.historyFirstPageRows=firstHistory.body.history.length;
+    contextScale.initialCombinedBytes=reduced.bytes+firstHistory.bytes;
     async function pagedFacts(item){
       const facts=[],seen=new Set();let after=0,pages=0,totalBytes=0,firstPageBytes,maxRows=0,status;
       while(true){
@@ -105,7 +121,7 @@ async function main(){
       environment:{node:process.version,postgres:(await owner.query('SHOW server_version')).rows[0].server_version,platform:process.platform,arch:process.arch,cpu:os.cpus()[0]?.model},
       method:{transport:'HTTP localhost including full project response JSON parsing',concurrency:1,warmupsPerCase:warmups,measuredRequestsPerCase:repeats,
         percentile:'nearest rank',note:'Legacy aggregate timings only. Paged endpoint is traversed once per case for correctness and JSON byte counts; no timing comparison or production/load claims.'},
-      counts,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
+      counts,contextScale,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
     fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/retrieval-report.json',JSON.stringify(report,null,2)+'\n');
     console.log(`Retrieval evaluation: ${report.passedCases}/${report.totalCases} cases passed; ${counts.facts} current facts. Report: artifacts/retrieval-report.json`);
     assert.ok(report.passed,'Retrieval evaluation failed; inspect the report');
