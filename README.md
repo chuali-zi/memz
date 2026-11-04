@@ -95,3 +95,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 首次启动、端口核对与有限彩排范围见[首次运行检查](docs/first-run.md)。
 
 来源分页的PostgreSQL执行计划、固定规模及正确性实验见[查询计划证据](docs/query-plans.md)，使用 `npm run eval:plans` 和显式PLAN_DATABASE_URL；CI单独归档query-plan-evidence。
+
+当前事实可按版本查看确切原文、修订与候选ID，接口与合成接入步骤见[上下文接入及溯源](docs/context-client.md)。

@@ -33,4 +33,26 @@ const rollback=(await candidate(member,{expected_version:2,value:'不应出现'}
 const one=(await candidate(member,{subject:'首次',predicate:'键',expected_version:0})).data,two=(await candidate(member,{subject:'首次',predicate:'键',expected_version:0})).data;const first=await Promise.allSettled([choose(one.id),choose(two.id)]);assert.equal(first.filter(x=>x.status==='fulfilled').length,1);assert.equal(first.filter(x=>x.status==='rejected'&&x.reason.status===409).length,1);
 const bad=(await candidate(member,{subject:'文本',predicate:'安全',value:`<script>alert('x')</script> 100%_`,expected_version:0})).data;await choose(bad.id);for(const query of ['文本',"'",'%', '_','<script>']){const r=await call(owner,`/api/projects/1/data?q=${encodeURIComponent(query)}`);assert.equal(r.status,200);assert.ok(r.data.facts.some(f=>f.value.includes('<script>')))}assert.equal((await call(owner,'/api/projects/1/data?q=%E6%88%AA%E6%AD%A2%E6%97%A5')).data.facts.length,1);assert.equal((await call(owner,'/api/projects/1/data?q=不应出现')).data.facts.length,0);
 const prototypeLogin=await fetch(`http://127.0.0.1:${server.address().port}/api/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'__proto__'})});assert.equal(prototypeLogin.status,401);const forged=await fetch(`http://127.0.0.1:${server.address().port}/api/projects`,{headers:{'X-User':'1'}});assert.equal(forged.status,401);const noCsrf=await call(owner,'/api/projects/1/candidates',{subject:'x'}, {'x-csrf-token':''});assert.equal(noCsrf.status,403);
+// Duplicate titles must not make provenance ambiguous, even after a later approval.
+const sourceA=(await call(member,'/api/projects/1/sources',{title:'同名溯源（合成）',content:'原文甲'})).data;
+const sourceB=(await call(member,'/api/projects/1/sources',{title:'同名溯源（合成）',content:'原文乙'})).data;
+const proposalA=(await candidate(member,{subject:'精确溯源',source_id:sourceA.id,expected_version:0,value:'第一版'})).data;
+assert.equal((await call(owner,`/api/projects/1/candidates/${proposalA.id}/approve`,{})).status,200);
+const fact=(await call(owner,'/api/projects/1/facts?q=精确溯源')).data.facts[0];
+const proofPath=`/api/projects/1/facts/${fact.id}/provenance`;
+const proofA=await call(viewer,proofPath+'?version=1');assert.equal(proofA.status,200);
+assert.deepEqual(proofA.data.source,{id:sourceA.id,title:'同名溯源（合成）',content:'原文甲'});
+assert.equal(proofA.data.revision.value,'第一版');assert.equal(proofA.data.candidate.id,proposalA.id);
+assert.equal(proofA.data.revision.approved_by,1);assert.equal(proofA.data.candidate.proposed_by,2);
+const proposalB=(await candidate(member,{subject:'精确溯源',source_id:sourceB.id,expected_version:1,value:'第二版'})).data;
+assert.equal((await call(owner,`/api/projects/1/candidates/${proposalB.id}/approve`,{})).status,200);
+assert.deepEqual((await call(viewer,proofPath+'?version=1')).data,proofA.data,'pinned provenance survives a newer approval');
+const currentProof=await call(owner,proofPath);assert.equal(currentProof.status,200);
+assert.equal(currentProof.data.revision.version,2);assert.equal(currentProof.data.source.id,sourceB.id);assert.equal(currentProof.data.source.content,'原文乙');
+assert.equal((await call(other,proofPath+'?version=1')).status,403);
+assert.equal((await call(other,`/api/projects/2/facts/${fact.id}/provenance`)).status,404);
+assert.equal((await call(owner,proofPath+'?version=99')).status,404);
+for(const suffix of ['?version=0','?version=-1','?version=1&version=2','?version=1.5'])assert.equal((await call(owner,proofPath+suffix)).status,400);
+assert.equal((await fetch(`http://127.0.0.1:${server.address().port}${proofPath}`)).status,401);
+
 });

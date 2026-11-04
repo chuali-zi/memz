@@ -11,6 +11,7 @@
 | POST /api/logout | cookie、CSRF；无请求体也可 | ok:true；清除会话/cookie | 未登录401；CSRF错误403 |
 | GET /api/projects | cookie | id/name/role 数组 | 仅当前用户所属项目 |
 | GET /api/projects/:p/data?q= | 项目ID、可选q | role,facts,sources,candidates,history,audit | 项目成员；跨项目403 |
+| GET /api/projects/:p/facts/:id/provenance?version= | 正事实ID；可选正版本整数 | role,fact,revision,source,candidate，固定一条修订及原文 | 项目成员；跨项目403；无事实/修订404；无效参数400 |
 | POST /api/projects/:p/sources | title,content | 新来源完整行 | owner/member；字段不合法400；无权限403 |
 | POST /api/projects/:p/candidates | subject,predicate,value,source_id,expected_version | 新候选完整行 | owner/member；来源跨项目/无效输入400；无权限403 |
 | POST /api/projects/:p/candidates/:id/approve | 路径参数；无需请求体 | status:approved,version | owner；候选不存在404；已处理/版本冲突409 |
@@ -18,7 +19,7 @@
 
 决策路径除approve/reject外返回400。ID接受正整数或十进制数字字符串；expected_version接受0至2147483647的整数或数字字符串。字符串必填、非空，trim后使用，长度在trim前校验；上限见数据字典。所有已处理API错误返回 `{error:说明}`，包括登录Origin拒绝和已认证未知API路由404。登录、来源、候选要求Content-Type为application/json（允许charset参数）：缺少或不支持的类型415；类型正确但空请求体、数组、标量或坏JSON400；超过16KiB为413；不支持的字符集/编码415。合法空对象仍由字段/凭据校验判定。审批、驳回和退出保持支持无请求体。解析错误使用固定消息，不反射输入原文，且保留安全响应头。解析器先于认证运行，坏JSON可能先被拒绝；其他业务写请求先经过会话与CSRF门禁。断开的传输连接不保证还能收到错误正文。
 
-q是单个字符串时截取前200个 UTF-16 code units，否则当空串。检索不trim q；空串匹配全部当前事实。仅过滤facts的主体、属性和值，其他返回数组不按q过滤。facts按ID升序；候选/历史按ID降序；审计按ID降序最多100条；没有分页。
+q是单个字符串时截取前200个 UTF-16 code units，否则当空串。检索不trim q；空串匹配全部当前事实。仅过滤facts的主体、属性和值，其他返回数组不按q过滤。facts按ID升序；候选/历史按ID降序；审计按ID降序最多100条；此处描述兼容聚合/data，页面使用的独立列表分页见后文。
 
 ### 候选请求示例
 
@@ -95,7 +96,7 @@ sequenceDiagram
 
 ## 当前范围与后续缺口
 
-这是本机演示API：内存会话、无真实用户注册、仅来源/候选支持可选幂等键、无列表分页、无通用结构化审计查询。网络层重试已成功的审批会得到409，不重复生成修订；客户端需重新读取状态判断。不要把这些限制写成已实现功能。已补JSON对象及错误响应校验；后续应根据受控测量优化响应规模，并管理创建回执增长与客户端跨刷新重试限制。
+这是本机演示API：内存会话、无真实用户注册、仅来源/候选支持可选幂等键、独立列表已有分页、无通用结构化审计查询。网络层重试已成功的审批会得到409，不重复生成修订；客户端需重新读取状态判断。不要把这些限制写成已实现功能。已补JSON对象及错误响应校验；后续应根据受控测量优化响应规模，并管理创建回执增长与客户端跨刷新重试限制。
 
 ## 只读取当前事实
 
@@ -106,3 +107,12 @@ sequenceDiagram
 候选审批成功或409后刷新工作台，保留筛选并重置页码。决定事务仍独立复核权限、pending状态及版本，不信任旧列表状态。契约与并发限制见[候选分页](candidate-pagination.md)。
 
 来源按标题检索和升序游标翻页，依据选择独立保留。新来源保存后明确提示选中新ID；项目切换清空原选择，候选提交仍由服务端复核来源项目。见[来源分页](source-pagination.md)。
+
+
+## 按版本读取溯源
+
+检索/facts得到事实id与version后，请求GET /api/projects/:p/facts/:id/provenance?version=该版本。单个只读快照连接事实、指定修订、来源和候选，返回确定的source.id及正文、revision.id/value/version、candidate.id/expected_version/proposed_by和approved_by。仅返回一条修订，不扫描整个历史或按不唯一标题猜测来源。
+
+省略version读取请求快照中的当前版本；指定version读取该不可变历史版本，即使检索后另一次审批推进当前值，也不会把旧值与新原文拼在一起。响应fact不带“当前版本”字段，revision.version明确表示本次所选版本。来源正文不等于外部真实性背书，批准者只是公开演示用户ID。接口没有模型调用、自动审批或新增写权限。
+
+详情是按需读取，固定一条来源正文仍可能较长。版本0、负数、数组、分数等无效参数400；授权项目内不存在的事实/版本404；对无权限项目先返回403。用户仍需会话与项目成员权限，版本号不作为授权凭证。

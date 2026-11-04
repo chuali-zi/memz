@@ -65,7 +65,13 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     assert.deepEqual(invalidProjectRequests,[]);
     report.checks={...report.checks,projectRecovery:{initialFailure:true,emptyState:true,staleFailureIgnored:true,retryLoadedProject:true,invalidProjectRequests:0}};
     await page.unroute('**/api/projects');
-    await capture('02-workspace.png','负责人看到初始当前事实 20号 v1 与来源');
+    await page.route('**/facts/*/provenance?version=*',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'溯源测试故障'})}));
+    await page.locator('#facts').getByRole('button',{name:'查看依据',exact:true}).click();
+    await page.locator('#facts').getByText(/依据读取失败：503 溯源测试故障/).waitFor();
+    await page.unroute('**/facts/*/provenance?version=*');
+    await page.locator('#facts').getByRole('button',{name:'重试依据',exact:true}).click();
+    await page.locator('#facts .provenance-detail').getByText('原计划截止日为20号。',{exact:true}).waitFor();
+    await capture('02-workspace.png','初始20号v1及按版本读取的会议纪要原文');
     await page.locator('#sourceSelect').selectOption({label:'#2 负责人更正（合成）'});
     const creationRequest=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/api/projects/1/candidates'));
     await page.getByRole('button',{name:'提交候选'}).click();
@@ -77,7 +83,12 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#history').getByText('项目 / 截止日：15号',{exact:true}).waitFor();
     await page.locator('#history').getByText('项目 / 截止日：20号',{exact:true}).waitFor();
     assert.equal(await page.locator('#history .entry').count(),2);
-    await capture('03-approved.png','批准后当前值为15号，历史同时保留20号与15号');
+    await page.locator('#facts').getByRole('button',{name:'查看依据',exact:true}).click();
+    await page.locator('#facts .provenance-detail').getByText('项目截止日更正为15号。',{exact:true}).waitFor();
+    const pinned=await page.evaluate(()=>api('/api/projects/1/facts/1/provenance?version=1'));
+    assert.equal(pinned.revision.version,1);assert.equal(pinned.revision.value,'20号');assert.equal(pinned.source.id,1);assert.equal(pinned.source.content,'原计划截止日为20号。');
+    report.checks={...report.checks,provenance:{versionPinned:true,sourceRead:true,retryRecovered:true}};
+    await capture('03-approved.png','批准后15号v2与更正原文，历史保留20号和15号');
     await page.getByRole('button',{name:'模拟旧版本 agent：提交 v1 → 25号'}).click();
     await page.getByText('模拟客户端已提交候选，尚未改变当前事实').waitFor();
     await page.locator('#candidates .entry').filter({hasText:'25号'}).first().getByRole('button',{name:'批准'}).click();

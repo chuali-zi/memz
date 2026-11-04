@@ -46,6 +46,26 @@ async function readFactsPage(user,p,q,{limit=50,after=0}={}){
     return {role:r,facts,next_after:more?facts[facts.length-1].id:null};
   },{snapshot:true});
 }
+app.get('/api/projects/:p/facts/:id/provenance',route(async(req,res)=>{
+  const p=num(req.params.p),id=num(req.params.id);
+  const version=req.query.version===undefined?null:integer(req.query.version,1,'版本无效');
+  res.json(await tx(req.user.id,async c=>{
+    const access=await role(c,p,['owner','member','viewer']);
+    const row=(await c.query(`SELECT f.id AS fact_id,f.subject,f.predicate,
+      r.id AS revision_id,r.version,r.value,r.created_at,r.approved_by,
+      s.id AS source_id,s.title,s.content,c.id AS candidate_id,c.expected_version,c.proposed_by
+      FROM facts f JOIN revisions r ON r.fact_id=f.id AND r.project_id=f.project_id
+      JOIN sources s ON s.id=r.source_id AND s.project_id=r.project_id
+      JOIN candidates c ON c.id=r.candidate_id AND c.project_id=r.project_id
+      WHERE f.project_id=$1 AND f.id=$2
+        AND (($3::int IS NULL AND r.id=f.current_revision_id) OR r.version=$3)`,[p,id,version])).rows[0];
+    if(!row)throw fail(404,'事实或修订不存在');
+    return {role:access,fact:{id:row.fact_id,subject:row.subject,predicate:row.predicate},
+      revision:{id:row.revision_id,version:row.version,value:row.value,created_at:row.created_at,approved_by:row.approved_by},
+      source:{id:row.source_id,title:row.title,content:row.content},
+      candidate:{id:row.candidate_id,expected_version:row.expected_version,proposed_by:row.proposed_by}};
+  },{snapshot:true}));
+}));
 app.get('/api/projects/:p/facts',route(async(req,res)=>{
   const p=num(req.params.p),limit=req.query.limit===undefined?50:integer(req.query.limit,1,'分页大小无效');
   if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');

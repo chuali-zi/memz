@@ -9,3 +9,5 @@ button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,input:focus-v
 .grid{align-items:start}
 
 #sourceSelection{overflow-wrap:anywhere}
+
+.provenance-detail p{white-space:pre-wrap}.provenance-detail{margin-top:10px;padding:12px;background:#f3f6f3;border-radius:8px}

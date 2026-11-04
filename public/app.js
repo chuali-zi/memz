@@ -41,6 +41,24 @@ function factControls(busy=false){
   $('#factsPrevious').disabled=busy||factState.index===0;
   $('#factsNext').disabled=busy||factState.next===null;
 }
+function renderFact(d,f,p){
+  d.append(el('strong',`${f.subject} / ${f.predicate}：${f.value}`),el('span',`v${f.version}`,'badge'),el('div',`依据：${f.source}`,'meta'));
+  const button=el('button','查看依据','secondary'),panel=el('div',undefined,'provenance-detail');
+  panel.hidden=true;panel.setAttribute('aria-live','polite');button.setAttribute('aria-expanded','false');
+  let loaded=false;
+  button.onclick=async()=>{
+    if(loaded){panel.hidden=!panel.hidden;button.textContent=panel.hidden?'查看依据':'收起依据';button.setAttribute('aria-expanded',String(!panel.hidden));return}
+    panel.hidden=false;button.disabled=true;button.setAttribute('aria-expanded','true');panel.textContent='正在读取该版本依据…';
+    try{
+      const proof=await api(`/api/projects/${p}/facts/${f.id}/provenance?version=${f.version}`);
+      if(p!==projectId||!d.isConnected)return;
+      panel.replaceChildren(el('p',`版本 v${proof.revision.version} · 修订 #${proof.revision.id} · 候选 #${proof.candidate.id}`,'meta'),el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`提议用户 ${proof.candidate.proposed_by} · 批准用户 ${proof.revision.approved_by}`,'meta'));
+      loaded=true;button.textContent='收起依据';
+    }catch(error){if(p===projectId&&d.isConnected){panel.textContent=`依据读取失败：${error.message}。可点击重试。`;button.textContent='重试依据'}}
+    finally{button.disabled=false}
+  };
+  d.append(button,panel);
+}
 async function loadFacts({reset=false,index=factState.index,focus=false}={}){
   if(projectId===null)return;
   if(reset){factState={query:$('#searchForm').q.value,cursors:[0],index:0,next:null};index=0}
@@ -52,7 +70,7 @@ async function loadFacts({reset=false,index=factState.index,focus=false}={}){
     factState.index=index;factState.next=page.next_after;
     factState.cursors=factState.cursors.slice(0,index+1);
     if(page.next_after!==null)factState.cursors.push(page.next_after);
-    rows('#facts',page.facts,(d,f)=>d.append(el('strong',`${f.subject} / ${f.predicate}：${f.value}`),el('span',`v${f.version}`,'badge'),el('div',`依据：${f.source}`,'meta')));
+    rows('#facts',page.facts,(d,f)=>renderFact(d,f,p));
     $('#factsStatus').textContent=page.facts.length?`第 ${index+1} 页 · ${page.facts.length} 条${page.next_after===null?' · 已到末页':''}`:(index===0?'没有匹配的当前事实':'本页已无匹配事实，请返回上一页或刷新');
     factControls();if(focus)$('#factsTitle').focus();
   }catch(e){
