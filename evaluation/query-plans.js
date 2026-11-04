@@ -6,7 +6,7 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 async function main(){
   const adminURL=process.env.PLAN_DATABASE_URL;
   assert.ok(adminURL,'Set PLAN_DATABASE_URL to an initialized test PostgreSQL administrator connection');
-  const report={schemaVersion:1,synthetic:true,passed:false,startedAt:new Date().toISOString(),source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),files:Object.fromEntries(['server.js','db/schema.sql','evaluation/query-plans.js'].map(f=>[f,hash(fs.readFileSync(f))]))},method:{scales:[200,2000],pageSize:25,plansPerCase:2,queryOrigin:'Captured from actual readProject/readSourcesPage calls',baseline:'Existing compatibility full-source read, not an equivalent single-page workload',planner:'Default planner settings, ANALYZE after fixture changes, no forced index',cache:'Queries and correctness traversal precede EXPLAIN; not a cold-cache experiment',timing:'EXPLAIN ANALYZE instrumentation, not HTTP latency or throughput'},scales:[],cleanup:{temporaryDatabaseDropped:false}};
+  const report={schemaVersion:1,synthetic:true,passed:false,startedAt:new Date().toISOString(),source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),files:Object.fromEntries(['server.js','db/schema.sql','evaluation/query-plans.js','evaluation/search-options.js'].map(f=>[f,hash(fs.readFileSync(f))]))},method:{scales:[200,2000],pageSize:25,plansPerCase:2,queryOrigin:'Captured from actual readProject/readSourcesPage calls',baseline:'Existing compatibility full-source read, not an equivalent single-page workload',planner:'Default planner settings, ANALYZE after fixture changes, no forced index',cache:'Queries and correctness traversal precede EXPLAIN; not a cold-cache experiment',timing:'EXPLAIN ANALYZE instrumentation, not HTTP latency or throughput'},scales:[],cleanup:{temporaryDatabaseDropped:false}};
   const admin=new Client({connectionString:adminURL}),db=`memz_plans_${crypto.randomBytes(8).toString('hex')}`;
   let created=false,owner,service,failure;
   try{
@@ -64,6 +64,9 @@ async function main(){
         scale.cases.push({name,sql:captured.sql,params:captured.params,expectedRows,plans});
       }
     }
+    const sourceSQL=report.scales[1].cases.find(c=>c.name==='page-first').sql;
+    report.searchOptions={passed:false};
+    await require('./search-options').compareSearchOptions({owner,service,sourceSQL,result:report.searchOptions});
     report.passed=true;
   }catch(error){failure=error;report.error=error.code||error.name}
   finally{
@@ -72,7 +75,7 @@ async function main(){
     try{await admin.end()}catch(error){failure=failure||error;report.passed=false}
     report.finishedAt=new Date().toISOString();fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/query-plans.json',JSON.stringify(report,null,2)+'\n');
   }
-  console.log(`Query plans: ${report.passed?'passed':'failed'}; ${report.scales.reduce((n,s)=>n+s.cases.length,0)} cases; artifacts/query-plans.json`);
+  console.log(`Query plans: ${report.passed?'passed':'failed'}; ${report.scales.reduce((n,s)=>n+s.cases.length,0)} baseline cases; search comparison ${report.searchOptions?.passed?'passed':'incomplete'}; artifacts/query-plans.json`);
   if(failure)throw failure;
 }
 main().catch(error=>{console.error(error.code||error.name);process.exitCode=1});
