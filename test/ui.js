@@ -409,8 +409,8 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     assert.equal(await page.locator('#sourceForm [name=title]').evaluate(e=>e===document.activeElement),true);
     await page.locator('#sourceForm [name=title]').fill('首次使用合成来源');await page.locator('#sourceForm [name=content]').fill('项目截止日20号。');
     await page.route('**/api/projects/1/sources',route=>route.request().method()==='POST'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'保存演练故障'})}):route.continue());
-    await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.getByText('503 保存演练故障',{exact:true}).waitFor();
-    const errorBox=await page.getByText('503 保存演练故障',{exact:true}).boundingBox();assert.ok(errorBox.y>=0&&errorBox.y+errorBox.height<=844,'source-save error must be in the viewport, not far above the form');
+    await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.locator('#sourceFeedback').filter({hasText:'503 保存演练故障'}).waitFor();
+    const errorBox=await page.locator('#sourceFeedback').filter({hasText:'503 保存演练故障'}).boundingBox();assert.ok(errorBox.y>=0&&errorBox.y+errorBox.height<=844,'source-save error must be in the viewport, not far above the form');
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'首次使用合成来源');
     await capture('21-mobile-source-error.png','390px视口中保存503错误在原表单内可见，输入保留；503为注入故障','#sourceForm');
     await page.unroute('**/api/projects/1/sources');

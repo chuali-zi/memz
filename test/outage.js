@@ -58,7 +58,10 @@ async function main(){
     owner=new Client({connectionString:ownerURL});await owner.connect();connected=true;
     for(const title of [body.title,uncertain.title])assert.equal((await owner.query('SELECT count(*)::int AS n FROM sources WHERE title=$1',[title])).rows[0].n,1);
     const foreign=await request('/api/projects/2/facts');assert.equal(foreign.status,403);await foreign.json();
-    report.checks.push('committed-response-loss-replay-no-duplicate','project-boundary-preserved');report.passed=true;
+    report.checks.push('committed-response-loss-replay-no-duplicate','project-boundary-preserved');
+    await owner.end();connected=false;
+    report.browser=await require('./outage-browser')({base,stop:()=>docker('stop','--time','5',container),start:async()=>{await docker('start',container);await ready()},count:async title=>{const c=new Client({connectionString:ownerURL});try{await c.connect();return (await c.query('SELECT count(*)::int AS n FROM sources WHERE title=$1',[title])).rows[0].n}finally{await c.end()}}});
+    report.passed=true;
   }finally{
     try{
       try{if(connected)await owner.end()}finally{try{if(server)await new Promise(r=>server.close(r))}finally{if(pool)await pool.end()}}

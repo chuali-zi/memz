@@ -10,6 +10,10 @@ async function createRecord(path,body){
     if(pendingCreations.get(intent)===key)pendingCreations.delete(intent);return result;
   }catch(error){
     if(error.status>=400&&error.status<500&&pendingCreations.get(intent)===key)pendingCreations.delete(intent);
+    if(!error.status||error.status>=500){
+      if(!error.message.includes('写入结果可能不确定'))error.message+='。写入结果可能不确定';
+      error.message+='。请保持本页和内容不变，恢复后再次提交；系统会复用本次请求。不要刷新页面或修改内容后重试。';
+    }
     throw error;
   }
 }
