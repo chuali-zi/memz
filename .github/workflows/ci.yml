@@ -31,6 +31,13 @@ jobs:
           name: system-test-evidence
           path: artifacts/system/
           if-no-files-found: ignore
+      - run: npm run test:outage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: outage-evidence
+          path: artifacts/outage-report.json
+          if-no-files-found: error
       - run: npm run eval:retrieval
         env:
           EVALUATION_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz

@@ -175,7 +175,9 @@ app.use((err,req,res,next)=>{
     'request.aborted':[400,'请求体不完整'],
     'request.size.invalid':[400,'请求体长度无效']
   };
-  const [status,message]=parseErrors[err.type]||(['Z_DATA_ERROR','Z_BUF_ERROR'].includes(err.code)?[400,'压缩请求体无效']:[err.status||500,err.status&&err.status<500?err.message:'请求无法处理']);
+  const databaseUnavailable=['ECONNREFUSED','ECONNRESET','ETIMEDOUT','EPIPE','57P01','57P02','57P03'].includes(err.code)||/^08[A-Z0-9]{3}$/.test(err.code||'')||err.message==='Connection terminated unexpectedly';
+  const unavailableMessage=['GET','HEAD'].includes(req.method)?'数据库暂时不可用，请稍后重试':'数据库连接中断，写入结果可能不确定；请先核实，创建重试请复用原幂等键';
+  const [status,message]=parseErrors[err.type]||(databaseUnavailable?[503,unavailableMessage]:null)||(['Z_DATA_ERROR','Z_BUF_ERROR'].includes(err.code)?[400,'压缩请求体无效']:[err.status||500,err.status&&err.status<500?err.message:'请求无法处理']);
   if(status>=500)console.error('Request failed:',err.code||err.name);
   if(res.headersSent)return next(err);
   res.status(status).json({error:message});
