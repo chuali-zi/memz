@@ -88,4 +88,6 @@ await assert.rejects(()=>readContext({baseURL,query:'精确溯源',fetchImpl:asy
   return response;
 }}),e=>e.code==='PROVENANCE_MISMATCH');
 
+await require('./context-scenarios')({baseURL,call,owner,member,viewer,other});
+
 });
