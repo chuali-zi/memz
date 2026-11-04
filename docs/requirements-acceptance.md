@@ -24,10 +24,12 @@
 | R18 历史有界读取 | 页面25条；完整遍历与旧历史一致；新增修订不推移较旧页；独立失败恢复 | GET /history、include_history、loadHistory | test/pagination.js；UI截图13–14；contextScale响应测量 |
 | R19 候选有界读取与筛选 | 四种筛选完整遍历；审批保持筛选；并发决定仅一次成功且旧页面刷新 | GET /candidates、include_candidates、loadCandidates | 数据库及UI回归；截图15–17；candidateScale实测 |
 | R20 来源有界读取与依据保持 | 标题检索及分页；跨页保留来源ID；候选/事实/修订引用一致；新来源明确选中 | GET /sources、include_sources、loadSources、selectedSource | 数据库与UI回归；截图18–20；sourceScale增长测量 |
-| R21 材料与代码同提交 | 拒绝脏/过期/失败报告、缺图、校验值变化及实际检索值矛盾；离线校验文件集合；明确合成与CI边界 | scripts/package-evidence.js | evidence.test.js十组；competition-evidence artifact |
+| R21 材料与代码同提交 | 拒绝脏/过期/失败报告、缺图、校验值变化及实际检索值矛盾；离线校验文件集合；明确合成与CI边界 | scripts/package-evidence.js | evidence.test.js反例与完整包回归；competition-evidence artifact |
+| R22 初次加载可恢复 | 项目列表503后刷新可恢复；空项目有明确提示；无项目时不发送null/0项目请求；晚到失败不覆盖新结果 | loadProjects代次保护、load的初始化分支、各列表空项目守卫 | UI真实登录与明确503/空列表/延迟响应注入，report.checks.projectRecovery |
 
 ## 运行条件与取证方法
 
+- `npm run test:system:evidence`：推荐入口，显式管理员连接，随机临时库执行核心与迁移测试并保留TAP，不重置已有演示数据。
 - `npm test`：初始种子的测试数据库；包含数据库集成和请求体测试。请求体测试对连接池设置拒绝访问哨兵，验证这些拒绝路径不触及数据库。
 - `npm run test:migrations`：显式测试管理员连接，只创建/删除随机临时库；验证升级及保留数据。
 - `npm run eval:retrieval`：显式测试管理员连接，固定207条当前事实，保存原始HTTP耗时。正确性是硬条件，耗时不设跨环境门槛。

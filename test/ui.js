@@ -34,8 +34,37 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.getByRole('button',{name:'进入项目'}).click();
     await page.getByText('401 账号或密码错误').waitFor({state:'visible'});
     await page.locator('[name=password]').fill('demo-owner');
+    const invalidProjectRequests=[];
+    page.on('request',request=>{if(/\/api\/projects\/(null|0)\//.test(request.url()))invalidProjectRequests.push(request.url())});
+    await page.route('**/api/projects',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'项目列表测试故障'})}));
     await page.getByRole('button',{name:'进入项目'}).click();
+    await page.getByText(/503 项目列表测试故障/).waitFor();
+    assert.equal(await page.getByRole('button',{name:'提交候选'}).isDisabled(),true);
+    await page.unroute('**/api/projects');
+    await page.route('**/api/projects',route=>route.fulfill({status:200,contentType:'application/json',body:'[]'}));
+    await page.getByRole('button',{name:'刷新工作台',exact:true}).click();
+    await page.getByText(/当前账号没有可访问的项目/).waitFor();
+    assert.equal(await page.locator('#project option').count(),0);
+    for(const selector of ['#searchForm button','#refreshHistory','#refreshCandidates','#refreshSources'])await page.locator(selector).click();
+    assert.equal(await page.getByRole('button',{name:'提交候选'}).isDisabled(),true);
+    await page.unroute('**/api/projects');
+    let releaseProject,projectSeen,projectRequests=0;
+    const projectHeld=new Promise(resolve=>{releaseProject=resolve}),projectObserved=new Promise(resolve=>{projectSeen=resolve});
+    await page.route('**/api/projects',async route=>{
+      if(++projectRequests===1){projectSeen();await projectHeld;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'过期项目失败'})})}
+      else await route.continue();
+    });
+    await page.getByRole('button',{name:'刷新工作台',exact:true}).click();await projectObserved;
+    await page.getByRole('button',{name:'刷新工作台',exact:true}).click();
     await page.locator('#facts').getByText('项目 / 截止日：20号',{exact:true}).waitFor();
+    const lateProjectResponse=page.waitForResponse(response=>response.url().endsWith('/api/projects')&&response.status()===503);
+    releaseProject();await lateProjectResponse;
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.locator('#notice').textContent(),'');
+    assert.equal(await page.locator('#project').inputValue(),'1');
+    assert.deepEqual(invalidProjectRequests,[]);
+    report.checks={...report.checks,projectRecovery:{initialFailure:true,emptyState:true,staleFailureIgnored:true,retryLoadedProject:true,invalidProjectRequests:0}};
+    await page.unroute('**/api/projects');
     await capture('02-workspace.png','负责人看到初始当前事实 20号 v1 与来源');
     await page.locator('#sourceSelect').selectOption({label:'#2 负责人更正（合成）'});
     const creationRequest=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/api/projects/1/candidates'));

@@ -20,7 +20,21 @@ async function switchAccount(){
   // An expired session is already logged out; let the user authenticate again.
   location.reload();
 }
-async function loadProjects(){const projects=await api('/api/projects');const select=$('#project');select.replaceChildren();projects.forEach(p=>{const o=el('option',`${p.name} · ${p.role}`);o.value=p.id;select.append(o)});projectId=Number(select.value);await load()}
+let projectGeneration=0;
+async function loadProjects(){
+  const generation=++projectGeneration;
+  projectId=null;data=null;selectedSource=null;sourcePage=[];
+  const select=$('#project');select.replaceChildren();
+  for(const button of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))button.disabled=true;
+  message('正在加载项目…');
+  try{
+    const projects=await api('/api/projects');
+    if(generation!==projectGeneration)return;
+    projects.forEach(p=>{const o=el('option',`${p.name} · ${p.role}`);o.value=p.id;select.append(o)});
+    if(!projects.length){message('当前账号没有可访问的项目。请切换账号或刷新工作台重试。');return}
+    projectId=Number(select.value);message('');await load();
+  }catch(error){if(generation===projectGeneration)message(`项目列表加载失败：${error.message}。请刷新工作台重试。`)}
+}
 let contextGeneration=0,factGeneration=0,factState={query:'',cursors:[0],index:0,next:null};
 function factControls(busy=false){
   $('#facts').setAttribute('aria-busy',String(busy));
@@ -28,6 +42,7 @@ function factControls(busy=false){
   $('#factsNext').disabled=busy||factState.next===null;
 }
 async function loadFacts({reset=false,index=factState.index,focus=false}={}){
+  if(projectId===null)return;
   if(reset){factState={query:$('#searchForm').q.value,cursors:[0],index:0,next:null};index=0}
   const generation=++factGeneration,p=projectId,query=factState.query,after=factState.cursors[index];
   factControls(true);$('#facts').replaceChildren();$('#factsStatus').textContent='正在加载当前事实…';
@@ -53,6 +68,7 @@ function historyControls(busy=false){
   $('#historyNext').disabled=busy||historyState.next===null;
 }
 async function loadHistory({reset=false,index=historyState.index,focus=false}={}){
+  if(projectId===null)return;
   if(reset){historyState={cursors:[null],index:0,next:null};index=0}
   const generation=++historyGeneration,p=projectId,before=historyState.cursors[index];
   historyControls(true);$('#history').replaceChildren();$('#historyStatus').textContent='正在加载版本历史…';
@@ -97,6 +113,7 @@ function renderCandidate(d,c,role,p){
   d.append(actions);
 }
 async function loadCandidates({reset=false,index=candidateState.index,focus=false}={}){
+  if(projectId===null)return;
   if(reset){candidateState={status:$('#candidateFilter').value,cursors:[null],index:0,next:null};index=0}
   const generation=++candidateGeneration,p=projectId,before=candidateState.cursors[index],status=candidateState.status;
   candidateControls(true);$('#candidates').replaceChildren();$('#candidatesStatus').textContent='正在加载候选…';
@@ -136,6 +153,7 @@ function sourceControls(busy=false){
   $('#sourcesNext').disabled=busy||sourceState.next===null;
 }
 async function loadSources({reset=false,index=sourceState.index,focus=false}={}){
+  if(projectId===null)return;
   if(reset){sourceState={query:$('#sourceSearchForm').q.value,cursors:[0],index:0,next:null};index=0}
   const generation=++sourceGeneration,p=projectId,query=sourceState.query,after=sourceState.cursors[index];
   sourcePage=[];sourceOptions();sourceControls(true);$('#sources').replaceChildren();$('#sourcesStatus').textContent='正在加载来源…';
@@ -163,6 +181,7 @@ async function loadSources({reset=false,index=sourceState.index,focus=false}={})
   }
 }
 async function load(){
+  if(projectId===null)return loadProjects();
   const generation=++contextGeneration,p=projectId;
   data=null;
   for(const id of ['#sources','#candidates','#history','#audit'])$(id).replaceChildren();
