@@ -1,0 +1,95 @@
+// Run against a disposable database; never seed the supplied administrator DB.
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const crypto=require('node:crypto');
+const os=require('node:os');
+const {execFileSync}=require('node:child_process');
+const {Client}=require('pg');
+const fixtureBytes=fs.readFileSync('evaluation/retrieval-cases.json');
+const fixture=JSON.parse(fixtureBytes);
+const checksum=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+const repeats=10,warmups=2;
+const tuple=f=>[f.subject,f.predicate,f.value];
+const ordered=rows=>rows.map(tuple).map(JSON.stringify).sort();
+const percentile=(values,p)=>[...values].sort((a,b)=>a-b)[Math.ceil(values.length*p)-1];
+async function main(){
+  if(!process.env.EVALUATION_DATABASE_URL)throw new Error('Set EVALUATION_DATABASE_URL to an initialized test PostgreSQL administrator connection.');
+  const admin=new Client({connectionString:process.env.EVALUATION_DATABASE_URL});
+  await admin.connect();
+  const db=`memz_eval_${crypto.randomBytes(8).toString('hex')}`;
+  let owner,pool,server,created=false;
+  try{
+    assert.equal((await admin.query("SELECT 1 FROM pg_roles WHERE rolname='memz_app'")).rowCount,1,'Initialize the demo schema once to create memz_app');
+    await admin.query(`CREATE DATABASE ${db}`);created=true;
+    const url=new URL(process.env.EVALUATION_DATABASE_URL);url.pathname=`/${db}`;
+    owner=new Client({connectionString:url.href});await owner.connect();
+    await owner.query(fs.readFileSync('db/schema.sql','utf8').replace(/^CREATE ROLE memz_app .*;\r?\n/m,''));
+    url.username='memz_app';url.password='memz_demo_only';
+    process.env.DATABASE_URL=url.href;
+    const service=require('../server');pool=service.pool;
+    const {tx,decide}=service;
+    const known={seed:{subject:'项目',predicate:'截止日',value:'20号'}};
+    async function propose(f,{user=1,project=1,version=0,decision='approve',source=2}={}){
+      return tx(user,async c=>{
+        const r=await c.query(`INSERT INTO candidates(project_id,subject,predicate,value,source_id,expected_version,proposed_by)
+          VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,[project,f.subject,f.predicate,f.value,source,version,user]);
+        if(decision)await decide(c,user,project,r.rows[0].id,decision);
+      });
+    }
+    for(const f of fixture.facts){
+      if(f.previous)await propose({...f,value:f.previous});
+      await propose(f,{version:f.previous?1:0});known[f.key]=f;
+    }
+    for(let i=0;i<fixture.fillerCount;i++){
+      const f={subject:`评测条目${String(i).padStart(4,'0')}`,predicate:'描述',value:`合成记忆 ${i}`};
+      await propose(f);known[`filler-${i}`]=f;
+    }
+    await propose({subject:'评测待审',predicate:'状态',value:'待审专用词'},{decision:null});
+    await propose({subject:'评测驳回',predicate:'状态',value:'驳回专用词'},{decision:'reject'});
+    await tx(1,c=>c.query("INSERT INTO sources(project_id,title,content) VALUES(1,'合成来源','来源正文专用词')"));
+    const allProject1=Object.values(known);
+    known.isolated={subject:'独立评测',predicate:'内部',value:'隔离秘密词'};
+    await propose(known.isolated,{user:4,project:2,source:4});
+    server=await new Promise(resolve=>{const s=service.app.listen(0,'127.0.0.1',()=>resolve(s))});
+    const base=`http://127.0.0.1:${server.address().port}`;
+    const cookies={};
+    for(const user of ['owner','viewer','other']){
+      const r=await fetch(`${base}/api/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:user,password:`demo-${user}`})});
+      assert.equal(r.status,200);cookies[user]=r.headers.get('set-cookie').split(';')[0];await r.json();
+    }
+    const results=[];
+    for(const item of fixture.cases){
+      const expected=item.expected==='all-project-1'?allProject1:(item.expected||[]).map(key=>{assert.ok(known[key],`Unknown expected key ${key}`);return known[key]});
+      const samples=[];let actualStatus,actualRows,passed=true,error;
+      for(let i=0;i<warmups+repeats;i++){
+        const start=performance.now();
+        const r=await fetch(`${base}/api/projects/${item.project||1}/data?q=${encodeURIComponent(item.query)}`,{headers:{cookie:cookies[item.user||'owner']}});
+        const body=await r.json();const elapsed=performance.now()-start;
+        if(i>=warmups)samples.push(elapsed);
+        actualStatus=r.status;actualRows=Array.isArray(body.facts)?body.facts:[];
+        try{assert.equal(r.status,item.status||200);if(r.status===200)assert.deepEqual(ordered(actualRows),ordered(expected))}
+        catch(e){passed=false;error=e.message}
+      }
+      results.push({name:item.name,query:item.query,user:item.user||'owner',project:item.project||1,passed,
+        expectedStatus:item.status||200,actualStatus,expected:expected.map(tuple),actual:actualRows.map(tuple),
+        latencyMs:{samples:samples.length,rawSamples:samples,median:percentile(samples,0.5),p95:percentile(samples,0.95),min:Math.min(...samples),max:Math.max(...samples)},...(error?{error}:{})});
+    }
+    const counts={};for(const table of ['facts','revisions','candidates','sources'])counts[table]=Number((await owner.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
+    const report={schemaVersion:1,dataset:fixture.dataset,synthetic:true,generatedAt:new Date().toISOString(),
+      source:{gitCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),
+        datasetSha256:checksum(fixtureBytes),serverSha256:checksum(fs.readFileSync('server.js')),runnerSha256:checksum(fs.readFileSync(__filename))},
+      environment:{node:process.version,postgres:(await owner.query('SHOW server_version')).rows[0].server_version,platform:process.platform,arch:process.arch,cpu:os.cpus()[0]?.model},
+      method:{transport:'HTTP localhost including full project response JSON parsing',concurrency:1,warmupsPerCase:warmups,measuredRequestsPerCase:repeats,
+        percentile:'nearest rank',note:'Small synthetic corpus, warmed serial requests; no production/load/semantic-retrieval claims or timing pass threshold.'},
+      counts,passed:results.every(r=>r.passed),passedCases:results.filter(r=>r.passed).length,totalCases:results.length,cases:results};
+    fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/retrieval-report.json',JSON.stringify(report,null,2)+'\n');
+    console.log(`Retrieval evaluation: ${report.passedCases}/${report.totalCases} cases passed; ${counts.facts} current facts. Report: artifacts/retrieval-report.json`);
+    assert.ok(report.passed,'Retrieval evaluation failed; inspect the report');
+  }finally{
+    if(server)await new Promise((resolve,reject)=>server.close(e=>e?reject(e):resolve()));
+    if(pool)await pool.end();if(owner)await owner.end();
+    if(created)await admin.query(`DROP DATABASE ${db}`);
+    await admin.end();
+  }
+}
+main().catch(e=>{console.error(e.message);process.exitCode=1});

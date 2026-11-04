@@ -1,0 +1,33 @@
+{
+  "dataset": "memz-synthetic-retrieval-v1",
+  "description": "Synthetic fixtures only; exact case-insensitive substring matching, not semantic retrieval.",
+  "fillerCount": 200,
+  "facts": [
+    {"key":"deadline","subject":"评测项目","predicate":"截止日","value":"15号","previous":"旧截止日20号"},
+    {"key":"case","subject":"评测API","predicate":"状态","value":"Ready"},
+    {"key":"literal","subject":"评测符号","predicate":"原文","value":"100%_保留"},
+    {"key":"quote","subject":"评测引号","predicate":"原文","value":"' OR 1=1 --"},
+    {"key":"html","subject":"评测外部文本","predicate":"原文","value":"<script>alert('demo')</script>"}
+  ],
+  "cases": [
+    {"name":"中文主体","query":"评测项目","expected":["deadline"]},
+    {"name":"中文属性","query":"截止日","expected":["seed","deadline"]},
+    {"name":"当前值","query":"15号","expected":["deadline"]},
+    {"name":"大小写","query":"ready","expected":["case"]},
+    {"name":"百分号是字面量","query":"%","expected":["literal"]},
+    {"name":"下划线是字面量","query":"_","expected":["literal"]},
+    {"name":"SQL文本是字面量","query":"' OR 1=1 --","expected":["quote"]},
+    {"name":"HTML文本可检索","query":"<script>","expected":["html"]},
+    {"name":"不混入旧版本","query":"旧截止日20号","expected":[]},
+    {"name":"不混入待审","query":"待审专用词","expected":[]},
+    {"name":"不混入驳回","query":"驳回专用词","expected":[]},
+    {"name":"不混入来源正文","query":"来源正文专用词","expected":[]},
+    {"name":"不混入其他项目","query":"隔离秘密词","expected":[]},
+    {"name":"无匹配","query":"绝不存在的查询词","expected":[]},
+    {"name":"合成语料精确条目","query":"评测条目0199","expected":["filler-199"]},
+    {"name":"空查询返回全部当前事实","query":"","expected":"all-project-1"},
+    {"name":"只读者可检索","user":"viewer","query":"15号","expected":["deadline"]},
+    {"name":"其他项目自己的事实","user":"other","project":2,"query":"隔离秘密词","expected":["isolated"]},
+    {"name":"其他项目拒绝访问","user":"other","project":1,"query":"","status":403}
+  ]
+}

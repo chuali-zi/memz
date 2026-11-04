@@ -26,3 +26,38 @@ RLS 对所有业务表生效，以 security-definer 函数查询成员角色，�
 ## 检验范围
 
 `test/integration.test.js` 使用 PostgreSQL 直接验证角色属性、无上下文、连接复用、并发、回滚、重复审批、来源项目约束、伪造 HTTP 身份和关键词。浏览器脚本提供真实交互截图。尚未做负载评测、真实模型效果评测或生产级安全测试；演示效果不能当作科研结果。
+
+新增[合成检索评测](retrieval-evaluation.md)：固定数据和 19 个期望结果用例，通过真实 HTTP 检查当前事实检索与隔离，并记录串行热身后的原始耗时样本。该小语料基线不等于负载或模型效果评测。
+
+## 功能模型与实现边界
+
+```mermaid
+flowchart TD
+    Login[演示账号登录] --> Project[选择有权限的项目]
+    Project --> Read[浏览当前事实、来源、历史与审计]
+    Read --> Search[中文子串关键词检索当前事实]
+    Project --> Propose[负责人或成员提交带来源候选]
+    Propose --> Pending[待审批：不改变当前事实]
+    Pending --> Owner[负责人决策]
+    Owner --> Reject[驳回并记录审计]
+    Owner --> Version{基于当前版本?}
+    Version -->|否| Conflict[409 冲突：保留待审候选和当前事实]
+    Version -->|是| Approve[同一事务追加修订、更新当前指针和审计]
+    Approve --> Read
+    Sim[固定模拟客户端] --> Propose
+```
+
+只读者仅能浏览和检索；成员可添加来源并提议；负责人可批准或驳回。另一项目用户只能访问其所属项目。图中的模拟客户端仅构造固定候选，没有真实模型调用。检索只过滤当前事实字段，来源、候选、历史在独立区域展示。
+
+## 系统结构
+
+```mermaid
+flowchart LR
+    Browser[浏览器：静态页面与交互] -->|同源 HTTP / JSON| API[Express API]
+    API --> Session[内存会话与 CSRF 校验]
+    API --> Transaction[带事务局部身份的连接池]
+    Transaction --> PG[PostgreSQL：RLS、复合外键、修订、审计]
+    Owner[迁移管理员] -->|初始化或增量迁移| PG
+```
+
+应用连接使用 `memz_app`，管理员只执行初始化、备份和升级。聚合读取采用只读快照；审批采用行锁、事实键 advisory lock 和版本比较。服务仅监听本机 HTTP，固定公开账号与内存会话属于演示限制。测试报告通过独立临时数据库生成，不往现有演示库导入评测数据。
