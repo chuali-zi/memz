@@ -117,4 +117,6 @@ const boundarySource=await call(member,'/api/projects/1/sources',{title:'界'.re
 const sourceSearch=await call(viewer,`/api/projects/1/sources?q=${encodeURIComponent('界'.repeat(149)+'😀尾')}`);assert.equal(sourceSearch.status,200);assert.ok(sourceSearch.data.sources.some(s=>s.id===boundarySource.data.id));
 
 
+await require('./context-budget')({baseURL,call,owner,member});
+
 });

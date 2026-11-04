@@ -98,4 +98,4 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 当前事实可按版本查看确切原文、修订与候选ID，接口与合成接入步骤见[上下文接入及溯源](docs/context-client.md)。
 
-可执行只读客户端：服务启动后运行 `MEMZ_QUERY=项目 npm run --silent demo:context`，输出固定版本与精确依据的JSON；无模型或SDK依赖，配置、截断及失败处理见上述接入说明。其他本地进程可运行 `node scripts/context-client.js --stdin`，发送单个JSON请求并关闭输入；凭据由父进程环境配置，输入及响应均有大小和时间限制。
+可执行只读客户端：服务启动后运行 `MEMZ_QUERY=项目 npm run --silent demo:context`，输出固定版本与精确依据的JSON；无模型或SDK依赖，配置、截断及失败处理见上述接入说明。其他本地进程可运行 `node scripts/context-client.js --stdin`，发送单个JSON请求并关闭输入；凭据由父进程环境配置，输入及响应均有大小和时间限制。可选 `maxOutputBytes`（或 `MEMZ_MAX_OUTPUT_BYTES`）限制整份UTF-8 JSON输出，按完整事实及依据取前缀并标明省略，不截断来源正文。

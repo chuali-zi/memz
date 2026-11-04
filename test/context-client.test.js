@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {readContext}=require('../scripts/context-client');
 test('context client rejects unsafe or silently truncated configuration before login',async()=>{
   let calls=0;const fetchImpl=async()=>{calls++;throw new Error('unexpected request')};
-  for(const options of [{baseURL:'http://user:password@localhost:3000'},{baseURL:'http://localhost:3000/path'},{projectId:0},{limit:101},{query:'x'.repeat(201)},{query:'前\u0000后'},{query:'前\ud800后'},{query:'前\udc00后'},{timeoutMs:0}])await assert.rejects(()=>readContext({...options,fetchImpl}),e=>e.code.startsWith('INVALID_'));
+  for(const options of [{baseURL:'http://user:password@localhost:3000'},{baseURL:'http://localhost:3000/path'},{projectId:0},{limit:101},{query:'x'.repeat(201)},{query:'前\u0000后'},{query:'前\ud800后'},{query:'前\udc00后'},{timeoutMs:0},{maxOutputBytes:0},{maxOutputBytes:4194305},{maxOutputBytes:1.5},{maxOutputBytes:null}])await assert.rejects(()=>readContext({...options,fetchImpl}),e=>e.code.startsWith('INVALID_'));
   assert.equal(calls,0);
 });
 test('context client reports transport timeout without exposing supplied credentials',async()=>{
@@ -39,4 +39,21 @@ test('whole-read deadline stops further reads but still attempts logout',async()
     return new Response('{}');
   }}),e=>e.code==='TOTAL_TIMEOUT');
   assert.deepEqual(paths,['/api/login','/api/logout']);
+});
+
+test('output budget counts UTF-8, JSON escaping and final newline at the exact boundary',async()=>{
+  let logouts=0;
+  const fetchImpl=async url=>{
+    const path=new URL(url).pathname;
+    if(path==='/api/login')return new Response('{"csrf":"unit"}',{headers:{'set-cookie':'sid=unit; HttpOnly'}});
+    if(path==='/api/logout'){logouts++;return new Response('{}')}
+    const fact={id:1,subject:'中文😀',predicate:'原文',value:'😀\n"',version:1};
+    if(path.endsWith('/facts'))return Response.json({role:'viewer',facts:[fact],next_after:null});
+    return Response.json({fact:{id:1,subject:fact.subject,predicate:fact.predicate},revision:{id:1,version:1,value:fact.value,approved_by:1},source:{id:1,title:'依据',content:'😀\n"'},candidate:{id:1,proposed_by:2}});
+  };
+  const full=await readContext({maxOutputBytes:5000,fetchImpl});
+  let budget=5000;for(let i=0;i<5;i++){full.outputBudget.maxBytes=budget;budget=Buffer.byteLength(JSON.stringify(full,null,2)+'\n')}
+  const exact=await readContext({maxOutputBytes:budget,fetchImpl});assert.equal(Buffer.byteLength(JSON.stringify(exact,null,2)+'\n'),budget);assert.equal(exact.truncated,false);
+  assert.equal(exact.facts[0].source.content,'😀\n"');
+  await assert.rejects(()=>readContext({maxOutputBytes:budget-1,fetchImpl}),e=>e.code==='OUTPUT_BUDGET_TOO_SMALL');assert.equal(logouts,3);
 });

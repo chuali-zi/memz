@@ -44,3 +44,9 @@ test('stdio rejects escaped unpaired Unicode surrogates without a session',async
     const before=requests,result=await invoke(JSON.stringify({query}));assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_QUERY/);assert.equal(requests,before);
   }
 });
+
+test('stdio applies optional final output budget and returns no partial JSON when too small',async()=>{
+  const result=await invoke(JSON.stringify({projectId:1,query:'项目',limit:1,maxOutputBytes:2000}));assert.equal(result.code,0,result.stderr);assert.ok(Buffer.byteLength(result.stdout)<=2000);assert.equal(JSON.parse(result.stdout).outputBudget.maxBytes,2000);
+  const tiny=await invoke(JSON.stringify({projectId:1,maxOutputBytes:1}));assert.equal(tiny.code,1);assert.equal(tiny.stdout,'');assert.match(tiny.stderr,/OUTPUT_BUDGET_TOO_SMALL/);
+  const before=requests,invalid=await invoke('{"maxOutputBytes":0}');assert.equal(invalid.code,1);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/INVALID_OUTPUT_BUDGET/);assert.equal(requests,before);
+});

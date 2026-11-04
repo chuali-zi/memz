@@ -1,8 +1,9 @@
 // Read-only synthetic-demo client. No model calls and no external dependencies.
 function failure(code,status){return Object.assign(new Error(code),{code,...(status===undefined?{}:{status})})}
 function requireValue(condition,code){if(!condition)throw failure(code)}
+const serializeContext=value=>JSON.stringify(value,null,2)+'\n';
 const positive=value=>Number.isInteger(value)&&value>0&&value<=2147483647;
-async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId=1,query='',limit=25,timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,fetchImpl=fetch}={}){
+async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId=1,query='',limit=25,timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes,fetchImpl=fetch}={}){
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
   requireValue(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&!base.search&&!base.hash&&base.pathname==='/','INVALID_BASE_URL');
   requireValue(positive(projectId),'INVALID_PROJECT');requireValue(Number.isInteger(limit)&&limit>=1&&limit<=100,'INVALID_LIMIT');
@@ -10,6 +11,7 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
   requireValue(Number.isInteger(timeoutMs)&&timeoutMs>=1&&timeoutMs<=60000,'INVALID_TIMEOUT');
   requireValue(Number.isInteger(totalTimeoutMs)&&totalTimeoutMs>=1&&totalTimeoutMs<=60000,'INVALID_TOTAL_TIMEOUT');
   requireValue(Number.isInteger(maxResponseBytes)&&maxResponseBytes>=1&&maxResponseBytes<=1048576,'INVALID_RESPONSE_LIMIT');
+  requireValue(maxOutputBytes===undefined||(Number.isInteger(maxOutputBytes)&&maxOutputBytes>=1&&maxOutputBytes<=4194304),'INVALID_OUTPUT_BUDGET');
   const deadline=Date.now()+totalTimeoutMs;
   let cookie='',csrf='',result,problem;
   async function request(path,{body,logout=false}={}){
@@ -56,6 +58,15 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
       facts.push({id:fact.id,subject:fact.subject,predicate:fact.predicate,value:fact.value,version:fact.version,revisionId:proof.revision.id,source:{id:proof.source.id,title:proof.source.title,content:proof.source.content},candidateId:proof.candidate.id,proposedBy:proof.candidate.proposed_by,approvedBy:proof.revision.approved_by});
     }
     result={schemaVersion:1,projectId,query,limit,truncated:page.next_after!==null,nextAfter:page.next_after,sourceTextIsUntrusted:true,consistency:'One current-facts page; immutable provenance pinned to each returned version. Not necessarily current at completion.',facts};
+    if(maxOutputBytes!==undefined){
+      const minimum=facts.length?1:0;let fitted=false;
+      for(let count=facts.length;count>=minimum;count--){
+        const omitted=facts.length-count;
+        const candidate={...result,facts:facts.slice(0,count),truncated:omitted>0||result.truncated,nextAfter:omitted>0?facts[count-1].id:result.nextAfter,outputBudget:{maxBytes:maxOutputBytes,unit:'utf8-json-bytes',omittedFacts:omitted}};
+        if(Buffer.byteLength(serializeContext(candidate),'utf8')<=maxOutputBytes){result=candidate;fitted=true;break}
+      }
+      requireValue(fitted,'OUTPUT_BUDGET_TOO_SMALL');
+    }
   }catch(error){problem=error}
   if(cookie){try{await request('/api/logout',{body:{},logout:true})}catch(error){problem=problem||error}}
   if(problem)throw problem;return result;
@@ -69,14 +80,14 @@ async function stdinRequest(){
     process.stdin.on('end',()=>done());process.stdin.on('error',()=>done(failure('INPUT_FAILED')));
   });
   let request;try{request=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch{throw failure('INVALID_STDIN_JSON')}
-  requireValue(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(key=>['projectId','query','limit'].includes(key)),'INVALID_STDIN_REQUEST');
+  requireValue(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(key=>['projectId','query','limit','maxOutputBytes'].includes(key)),'INVALID_STDIN_REQUEST');
   return request;
 }
 async function main(){
   requireValue(process.argv.length===2||(process.argv.length===3&&process.argv[2]==='--stdin'),'INVALID_ARGUMENTS');
   const request=process.argv[2]==='--stdin'?await stdinRequest():{};
-  const context=await readContext({baseURL:process.env.MEMZ_BASE_URL||'http://127.0.0.1:3000',username:process.env.MEMZ_USERNAME||'viewer',password:process.env.MEMZ_PASSWORD||'demo-viewer',projectId:process.env.MEMZ_PROJECT_ID===undefined?1:Number(process.env.MEMZ_PROJECT_ID),query:process.env.MEMZ_QUERY||'',limit:process.env.MEMZ_LIMIT===undefined?25:Number(process.env.MEMZ_LIMIT),...request});
-  console.log(JSON.stringify(context,null,2));
+  const context=await readContext({baseURL:process.env.MEMZ_BASE_URL||'http://127.0.0.1:3000',username:process.env.MEMZ_USERNAME||'viewer',password:process.env.MEMZ_PASSWORD||'demo-viewer',projectId:process.env.MEMZ_PROJECT_ID===undefined?1:Number(process.env.MEMZ_PROJECT_ID),query:process.env.MEMZ_QUERY||'',limit:process.env.MEMZ_LIMIT===undefined?25:Number(process.env.MEMZ_LIMIT),maxOutputBytes:process.env.MEMZ_MAX_OUTPUT_BYTES===undefined?undefined:Number(process.env.MEMZ_MAX_OUTPUT_BYTES),...request});
+  process.stdout.write(serializeContext(context));
 }
 if(require.main===module)main().catch(error=>{console.error(`Context read failed: ${error.code||'UNKNOWN_ERROR'}`);process.exitCode=1});
 module.exports={readContext};
