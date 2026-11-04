@@ -48,3 +48,31 @@
 输入累计解析缓冲上限 16 KiB，严格 UTF-8；同时只运行一个业务调用，其余返回 BUSY / not_attempted。5 秒内完成初始化；已有读客户端总时限 30 秒、写客户端 15 秒，退出会话最多另加 5 秒。输出发送等待 5 秒，单条或积压输出超过 256 KiB 时断开。异常诊断为固定码，不输出凭据、cookie、响应正文或原始输入。stdio 关闭不等于撤销在途业务调用。
 
 `node --test test/mcp.test.js` 启动真实进程验证握手、未初始化拒绝、只读发现、未知工具、参数越界和非法输入；不访问数据库。`npm run test:system:evidence` 的隔离 PostgreSQL 流程通过官方 SDK 客户端连接独立进程，验证提交只产生待审候选、同键重放一条审计、同键异参 409、viewer/跨项目 403、错误来源 400，以及负责人显式批准后读取相同来源与版本。所有数据为合成；未调用付费服务，未宣称语义理解效果或生产级安全。
+
+## 生成宿主配置，不修改宿主
+
+在准备运行 Memz 的同一台机器上执行（需要已安装仓库依赖）：
+
+```sh
+node scripts/mcp-config.js --host claude-desktop
+node scripts/mcp-config.js --host vscode
+```
+
+生成器只向 stdout 输出 JSON，不读取环境中的账号、密码或宿主配置，不写任何配置文件。生成的 Node 可执行文件和脚本均为绝对路径；不依赖宿主 cwd 或 PATH。固定公开 viewer 演示账号、项目 1 和只读开关，不能因父进程存在写入环境变量而默认开启提交。移动项目或更换 Node 安装位置后需重新生成。
+
+| 宿主配置 | 输出格式 | 核查来源 |
+| --- | --- | --- |
+| Claude Desktop | 顶层 `mcpServers`，内含 `memz.command/args/env` | [官方本机接入说明](https://modelcontextprotocol.io/docs/develop/connect-local-servers) |
+| VS Code | 顶层 `servers`，`memz.type` 为 `stdio` | [官方配置参考](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) |
+
+以上是可审阅的配置片段。由用户合并 `memz` 项，不能覆盖已有服务器配置；不要直接将整份输出覆盖用户文件。VS Code 的便携 Copilot 配置另用 `mcpServers`，不要把两种顶层格式混用。远程窗口的本机地址指远端运行环境，不是用户电脑；生成器应在实际宿主运行环境执行。这里没有端口转发、HTTP MCP 地址、OAuth、自动批准或宿主设置修改。
+
+验证范围：官方 SDK 1.32.2 客户端实际加载两种输出中的启动项，在带空格的临时工作目录及精简环境中启动独立进程，完成握手、只读发现，并拒绝提交和审批。测试没有调用真实演示库，也未安装/登录 Claude Desktop 或 VS Code。**配置符合所查官方格式，不等于已验证任意宿主版本的端到端界面兼容**；只接受新版 2026-07-28 的宿主仍不能使用当前适配。协议兼容要求仍是接受协商返回的 2025-11-25。
+
+## SDK 输入边界核验
+
+已安装 npm 发布物为 `@modelcontextprotocol/sdk@1.32.2`，registry 的 gitHead 为 `3b73021a0a2272c0c04c3917bcdb03398b3ec63f`。核对[该提交的传输构造器](https://github.com/modelcontextprotocol/typescript-sdk/blob/3b73021a0a2272c0c04c3917bcdb03398b3ec63f/src/server/stdio.ts)和[缓冲实现](https://github.com/modelcontextprotocol/typescript-sdk/blob/3b73021a0a2272c0c04c3917bcdb03398b3ec63f/src/shared/stdio.ts)：第三参数支持 `maxBufferSize`，会传入缓冲；新增字节超限先清空并抛错，再由适配器关闭连接。不是依据其他 SDK 版本猜测。
+
+`test/mcp.test.js` 使用真实进程，在初始化完成后保持 stdin 打开：先写入 9000 字节不含换行的数据，进程保持运行；再写入 7384 字节达到 16384 字节仍保持运行，最后追加 1 字节，要求两秒内关闭并只输出固定诊断。因为没有 EOF 或完整 JSON，排除了“只因文件结束/JSON 解析失败才关闭”的解释。已有单块 16385 字节测试也保留。
+
+16 KiB 是累计解析缓冲限制，不是整个进程 RSS 限额；同一输入 chunk 含多条消息也可能触及该限制。Node 运行时、SDK、流缓冲及 HTTP 响应另有内存开销，本项目没有测量或承诺整个进程的硬内存上限。业务调用并发限制和响应大小限制独立生效。

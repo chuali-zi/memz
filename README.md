@@ -115,3 +115,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 需要同时接入来源写入时，按[来源到候选的两步流程](docs/source-client.md)先调用source-client，再将实际返回的sourceId绑定到proposal-client。两个步骤独立保留幂等键，部分失败不会自动删除来源或批准候选。
 
 本机智能体可使用 [MCP stdio 兼容适配](docs/mcp-local.md)：固定项目、默认只读，显式开启后可提交待审；支持 2025-11-25 握手，不提供审批工具。
+
+宿主配置可用 `node scripts/mcp-config.js --host claude-desktop` 或 `--host vscode` 生成，只输出待审阅 JSON，不修改用户设置。

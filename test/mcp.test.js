@@ -43,3 +43,18 @@ test('unsupported handshake version negotiates the documented compatibility vers
     assert.equal(response.result.protocolVersion,'2025-11-25');
   }finally{await c.close()}
 });
+
+test('SDK stdio buffer limit closes a live stream across chunks before EOF',async()=>{
+  const c=child();let ended=false;c.closed.then(()=>ended=true);
+  try{
+    await c.request('initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'synthetic-boundary',version:'1'}});
+    c.notify('notifications/initialized');await c.request('tools/list',{});
+    c.proc.stdin.write(Buffer.alloc(9000,120));
+    await new Promise(r=>setTimeout(r,100));assert.equal(ended,false,'partial input under the buffer cap remains open');
+    c.proc.stdin.write(Buffer.alloc(7384,120));
+    await new Promise(r=>setTimeout(r,100));assert.equal(ended,false,'exactly 16384 buffered bytes remain open');
+    c.proc.stdin.write('x');
+    await Promise.race([c.closed,new Promise((_,reject)=>setTimeout(()=>reject(new Error('buffer cap did not close live stream')),2000).unref())]);
+    assert.equal(c.stderr(),'MCP_PROTOCOL_ERROR\n');
+  }finally{if(!ended)c.proc.kill();await c.closed}
+});
