@@ -132,6 +132,7 @@ assert.equal(story.comparison.rows[4].current.sourceId,story.context.facts[0].so
 assert.ok(narrative.includes('不是外部聊天产品或模型实测'));
 console.log('Synthetic reviewer rehearsal result:',JSON.stringify(story));
 await require('./proposal-process')({baseURL,call,owner,member,viewer});
+await require('./mcp-recovery')({baseURL,call,owner,member,viewer});
 await require('./mcp-process')({baseURL,call,owner,member,viewer});
 await require('./candidate-source')({call,owner,member,viewer,other});
 
