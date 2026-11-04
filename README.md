@@ -44,7 +44,7 @@ docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migra
 SYSTEM_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz npm run test:system:evidence
 ```
 
-它在随机临时库执行核心和迁移回归，保存原始TAP并清理自己创建的库。原 `npm test` 会修改 `DATABASE_URL` 指向的数据库，且要求初始种子状态；不要对已有演示或业务库直接运行，也不需要为了推荐测试流程删除现有卷。
+它在随机临时库执行核心、真实备份恢复和迁移回归，保存原始TAP并清理自己创建的库。恢复测试需要PostgreSQL 16的pg_dump/pg_restore（优先使用/usr/lib/postgresql/16/bin，否则PATH）；本地只有数据库Docker工具时，可额外设置 `PG_TOOLS_CONTAINER=数据库容器名`，要求该容器可通过连接URL的主机和端口访问测试库。参见[备份恢复演练](docs/backup-recovery.md)。直接运行 `npm test` 还需显式 `MIGRATION_TEST_DATABASE_URL` 测试管理员连接供恢复测试创建随机库。原 `npm test` 会修改 `DATABASE_URL` 指向的数据库，且要求初始种子状态；不要对已有演示或业务库直接运行，也不需要为了推荐测试流程删除现有卷。
 
 迁移测试在已经初始化的测试 PostgreSQL 上执行，显式提供管理员连接；它只创建和删除随机命名的 `memz_migration_*` 测试库，不修改连接指定的数据库。不要使用生产管理员凭据运行测试。
 

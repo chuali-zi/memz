@@ -28,11 +28,12 @@
 | R22 初次加载可恢复 | 项目列表503后刷新可恢复；空项目有明确提示；无项目时不发送null/0项目请求；晚到失败不覆盖新结果 | loadProjects代次保护、load的初始化分支、各列表空项目守卫 | UI真实登录与明确503/空列表/延迟响应注入，report.checks.projectRecovery |
 | R23 按版本精确溯源 | 同名来源可区分；指定版本返回旧原文；按需读取与失败重试；成员隔离 | GET /facts/:id/provenance、renderFact | HTTP集成同名来源/版本推进/权限/参数回归；UI 02/03与checks.provenance |
 | R24 接入方完整读取 | 一页有界事实与固定版本依据一致；失败不输出部分上下文；标明截断；注销会话 | scripts/context-client.js | 真实HTTP并发审批/权限/失败回归、context-client.test.js、context-process.test.js与context-scenarios.js（105版本、跨项目同名事实及过期冲突） |
+| R25 备份可恢复 | 自定义格式备份恢复后数据、序列、约束、RLS、幂等回执保留；可继续批准；损坏归档失败 | pg_dump/pg_restore与既有HTTP接口 | test/restore.test.js真实随机库及子进程；系统TAP原始记录 |
 
 ## 运行条件与取证方法
 
 - `npm run test:system:evidence`：推荐入口，显式管理员连接，随机临时库执行核心与迁移测试并保留TAP，不重置已有演示数据。
-- `npm test`：初始种子的测试数据库；包含数据库集成和请求体测试。请求体测试对连接池设置拒绝访问哨兵，验证这些拒绝路径不触及数据库。
+- `npm test`：初始种子的测试数据库及显式MIGRATION_TEST_DATABASE_URL管理员连接、PostgreSQL工具；包含数据库集成、恢复和请求体测试。请求体测试对连接池设置拒绝访问哨兵，验证这些拒绝路径不触及数据库。
 - `npm run test:migrations`：显式测试管理员连接，只创建/删除随机临时库；验证升级及保留数据。
 - `npm run eval:retrieval`：显式测试管理员连接，固定207条当前事实，保存原始HTTP耗时。正确性是硬条件，耗时不设跨环境门槛。
 - `npm run test:ui:evidence`：显式测试管理员连接及Chromium，在临时库运行真实页面交互，生成截图与report.json。
