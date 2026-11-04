@@ -21,7 +21,7 @@ docker compose down -v
 docker compose up -d --wait
 ```
 
-已有卷不会自动重新执行 `schema.sql`，保留数据升级请使用下节的增量迁移，**不要重跑 schema 或删除卷**。环境变量 `DATABASE_URL` 可覆盖默认应用连接；数据库管理员凭据仅用于初始化与迁移，不传给应用服务。不要在公开网络暴露该服务。
+已有卷不会自动重新执行 `schema.sql`，保留数据升级请使用下节的增量迁移，**不要重跑 schema 或删除卷**。环境变量 `PORT` 可修改应用监听端口（例如 `PORT=3001 npm start`）；使用启动日志显示的实际地址。环境变量 `DATABASE_URL` 可覆盖默认应用连接；数据库管理员凭据仅用于初始化与迁移，不传给应用服务。不要在公开网络暴露该服务。
 
 ## 保留数据升级
 
@@ -38,12 +38,13 @@ docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migra
 
 ## 验证
 
-集成测试会修改演示数据，先重置，再运行（使用真实 PostgreSQL）：
+推荐在已初始化的测试PostgreSQL上运行独立临时库系统测试，无需重置现有演示数据：
 
 ```sh
-docker compose down -v && docker compose up -d --wait
-npm test
+SYSTEM_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz npm run test:system:evidence
 ```
+
+它在随机临时库执行核心和迁移回归，保存原始TAP并清理自己创建的库。原 `npm test` 会修改 `DATABASE_URL` 指向的数据库，且要求初始种子状态；不要对已有演示或业务库直接运行，也不需要为了推荐测试流程删除现有卷。
 
 迁移测试在已经初始化的测试 PostgreSQL 上执行，显式提供管理员连接；它只创建和删除随机命名的 `memz_migration_*` 测试库，不修改连接指定的数据库。不要使用生产管理员凭据运行测试。
 
@@ -87,6 +88,8 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 ## 比赛材料与证据包
 
-[六项初赛材料草稿](docs/submission-report.md)和[可重复演示步骤](docs/demo-script.md)按已知要求整理。先在同一干净提交生成检索与UI报告，再运行 `npm run evidence:package`，离线校验并输出源码、文档、20图、原始报告及SHA-256清单。解包后可运行 `node scripts/package-evidence.js verify .`。CI另归档competition-evidence；包的存在不等于整次CI已成功。操作条件与真实性限制见[材料包说明](docs/evidence-package.md)。
+[六项初赛材料草稿](docs/submission-report.md)和[可重复演示步骤](docs/demo-script.md)按已知要求整理。先在同一干净提交生成数据库系统、检索与UI报告，再运行 `npm run evidence:package`，离线校验并输出源码、文档、20图、原始报告及SHA-256清单。解包后可运行 `node scripts/package-evidence.js verify .`。CI另归档competition-evidence；包的存在不等于整次CI已成功。操作条件与真实性限制见[材料包说明](docs/evidence-package.md)。
 
 数据库约束与迁移的原始TAP取证、清理记录及材料包对应关系见[数据库测试证据](docs/database-evidence.md)。
+
+首次启动、端口核对与有限彩排范围见[首次运行检查](docs/first-run.md)。

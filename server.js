@@ -150,5 +150,5 @@ app.use((err,req,res,next)=>{
   if(res.headersSent)return next(err);
   res.status(status).json({error:message});
 });
-if(require.main===module)app.listen(process.env.PORT||3000,'127.0.0.1',()=>console.log('Memz http://127.0.0.1:3000'));
+if(require.main===module){const server=app.listen(process.env.PORT||3000,'127.0.0.1',()=>console.log(`Memz http://127.0.0.1:${server.address().port}`))}
 module.exports={app,pool,tx,decide,readProject,readFactsPage,readHistoryPage,readCandidatesPage,readSourcesPage};
