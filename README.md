@@ -21,7 +21,19 @@ docker compose down -v
 docker compose up -d --wait
 ```
 
-已有卷不会自动重新执行迁移；这是初版的一次性 schema，修改后请重置，勿用于保存重要数据。环境变量 `DATABASE_URL` 可覆盖默认应用连接；数据库管理员凭据仅用于初始化。不要在公开网络暴露该服务。
+已有卷不会自动重新执行 `schema.sql`，保留数据升级请使用下节的增量迁移，**不要重跑 schema 或删除卷**。环境变量 `DATABASE_URL` 可覆盖默认应用连接；数据库管理员凭据仅用于初始化与迁移，不传给应用服务。不要在公开网络暴露该服务。
+
+## 保留数据升级
+
+`001-current-revision-integrity.sql` 支持原始 schema 和当前新安装版本，可重复执行。它只更新约束，不修改事实、来源、候选、历史、审计或序列。先暂停应用写入，备份并确认备份可用，再以 schema owner 执行：
+
+```sh
+mkdir -p backups
+docker compose exec -T db pg_dump -U postgres -d memz -Fc > backups/before-001.dump
+docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/001-current-revision-integrity.sql
+```
+
+迁移在单事务内锁定 facts/revisions 并验证既有数据。锁等待超过 5 秒或单条语句超过 60 秒即失败；安排维护窗口，确认没有活跃长事务后重试。若现有指针指向错误事实、版本不匹配或正版本缺少指针，迁移会报错并整体回滚，业务数据保留；不要用删除数据来绕过校验，应先核对来源与历史。迁移成功后再启动应用。此脚本不提供自动降级，不是通用迁移框架。
 
 ## 验证
 
@@ -31,6 +43,14 @@ docker compose up -d --wait
 docker compose down -v && docker compose up -d --wait
 npm test
 ```
+
+迁移测试在已经初始化的测试 PostgreSQL 上执行，显式提供管理员连接；它只创建和删除随机命名的 `memz_migration_*` 测试库，不修改连接指定的数据库。不要使用生产管理员凭据运行测试。
+
+```sh
+MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz npm run test:migrations
+```
+
+测试覆盖有历史数据升级、新安装、重复和并发执行、异常数据整体回滚、迁移权限与锁超时、升级后应用角色继续写入及完整 HTTP 集成流程。`test/fixtures/schema-5317607.sql` 为提交 `5317607` 的原始 schema 快照。
 
 界面测试同样会修改数据；先重置、启动服务，再在另一个终端运行 `npm run test:ui`。需要 Chromium，默认 `/usr/bin/chromium`，也可用 `CHROMIUM_PATH` 指定。截图与日志输出到被 Git 忽略的 `artifacts/`。测试结果不代表生产安全认证。
 
