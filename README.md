@@ -66,6 +66,8 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 ## 演示（约 7 分钟）
 
+完整合成故事可运行 `MEMZ_DEMO_BASE_URL=http://127.0.0.1:3000 node scripts/demo-story.js --markdown`：在显式选定的本地演示库新增唯一主体记录，展示实际批准、冲突、历史依据和客户端上下文；不会删除已有数据。执行范围与失败处理见[演示脚本](docs/demo-script.md)。
+
 1. 用负责人登录，查看截止日 20号、v1、会议纪要来源和历史；指出账号与数据是合成的。
 2. 在候选表单选择「负责人更正」，填 15号、基于 v1 并提交；审批后当前事实为 15号、v2，历史保留 v1。
 3. 点击模拟旧版本 agent，审批其 v1 候选，显示 409；当前值不变。重复审批已批准候选也会被拒绝。

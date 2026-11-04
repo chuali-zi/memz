@@ -119,4 +119,10 @@ const sourceSearch=await call(viewer,`/api/projects/1/sources?q=${encodeURICompo
 
 await require('./context-budget')({baseURL,call,owner,member});
 
+// Run the reviewer's full story through a real separate Node process.
+const {stdout:storyOutput}=await require('node:util').promisify(require('node:child_process').execFile)(process.execPath,['scripts/demo-story.js'],{env:{...process.env,MEMZ_DEMO_BASE_URL:baseURL},timeout:30000});
+const story=JSON.parse(storyOutput);assert.equal(story.synthetic,true);assert.equal(story.steps.length,7);assert.equal(story.context.facts[0].value,'15号');assert.equal(story.context.facts[0].version,2);assert.equal(story.provenanceV1.value,'20号');assert.ok(!storyOutput.includes('sid='));assert.ok(!storyOutput.includes('demo-owner'));
+const narrative=require('../scripts/demo-story').markdown(story);assert.ok(narrative.includes('独立客户端实际得到的上下文'));assert.ok(narrative.includes(story.subject));
+console.log('Synthetic reviewer rehearsal result:',JSON.stringify(story));
+
 });

@@ -42,3 +42,6 @@ node scripts/package-evidence.js verify .
 数据库测试原始TAP、摘要与清理记录也纳入材料包；详见[数据库取证](database-evidence.md)。系统报告默认取最新，SYSTEM_REPORT_PATH可显式指定；同样拒绝混用旧提交、脏工作区或跳过测试的结果。
 
 材料入口提供“六项设计→01–08业务图→09–20规模图→报告/TAP→关键代码”的阅读顺序。每张截图的图意直接取自同提交UI报告的claim字段；缺失或空白图意会拒绝打包。它不自动生成新的事实或把图意当成额外验证结论，仍须结合原始报告和截图审核。
+
+
+完整故事记录：包含scripts/demo-story.js的版本须从成功core.tap中提取唯一的Synthetic reviewer rehearsal result，生成evidence/demo-story.json和demo-story.md。离线校验将JSON与原始TAP逐项比对，并从同一记录重新渲染Markdown；缺失、重复或不一致即失败。所有值来自该次合成进程演示，不用手填示意ID替代实际证据。

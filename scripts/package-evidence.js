@@ -74,6 +74,14 @@ function listFiles(root,prefix=''){
     return entry.isDirectory()?listFiles(root,name):[name];
   }).sort();
 }
+function rehearsalFromTap(tap){
+  const lines=tap.split('\n').filter(line=>line.startsWith('# Synthetic reviewer rehearsal result: '));
+  assert.equal(lines.length,1,'Expected exactly one real rehearsal record in core TAP');
+  const story=JSON.parse(lines[0].slice('# Synthetic reviewer rehearsal result: '.length));
+  assert.equal(story.schemaVersion,1);assert.equal(story.synthetic,true);assert.equal(story.steps.length,7);
+  assert.equal(story.context.facts.length,1);assert.equal(story.context.facts[0].value,'15号');assert.equal(story.context.facts[0].version,2);assert.equal(story.provenanceV1.value,'20号');
+  return story;
+}
 function verifyPackage(root){
   const manifest=readJSON(checkedFile(root,'manifest.json'));
   assert.equal(manifest.schemaVersion,1);
@@ -81,6 +89,11 @@ function verifyPackage(root){
   assert.deepEqual(Object.keys(manifest.files).sort(),listFiles(root).filter(p=>p!=='manifest.json'),'Package file set changed');
   for(const [file,checksum] of Object.entries(manifest.files))assert.equal(hash(fs.readFileSync(checkedFile(root,file))),checksum,`Package file changed: ${file}`);
   verifyEvidence({root,commit:manifest.commit,uiReportPath:checkedFile(root,'evidence/ui/report.json'),retrievalReportPath:checkedFile(root,'evidence/retrieval-report.json'),systemReportPath:checkedFile(root,'evidence/system/report.json')});
+  if(fs.existsSync(path.join(root,'scripts/demo-story.js'))){
+    const story=rehearsalFromTap(fs.readFileSync(checkedFile(root,'evidence/system/core.tap'),'utf8'));
+    assert.deepEqual(readJSON(checkedFile(root,'evidence/demo-story.json')),story,'Rehearsal differs from original TAP');
+    assert.equal(fs.readFileSync(checkedFile(root,'evidence/demo-story.md'),'utf8'),require('./demo-story').markdown(story),'Rehearsal narrative differs from actual record');
+  }
   return manifest;
 }
 function buildPackage(root=path.resolve(__dirname,'..')){
@@ -105,8 +118,14 @@ function buildPackage(root=path.resolve(__dirname,'..')){
     for(const file of ['report.json','core.tap','core.stderr.txt','migrations.tap','migrations.stderr.txt'])copy(checkedFile(path.dirname(systemReportPath),file),`evidence/system/${file}`);
     copy(uiReportPath,'evidence/ui/report.json');copy(retrievalReportPath,'evidence/retrieval-report.json');
     for(const file of screenshotNames)copy(checkedFile(path.dirname(uiReportPath),file),`evidence/ui/${file}`);
+    const hasStory=fs.existsSync(path.join(root,'scripts/demo-story.js'));
+    if(hasStory){
+      const story=rehearsalFromTap(fs.readFileSync(path.join(staging,'evidence/system/core.tap'),'utf8'));
+      fs.writeFileSync(path.join(staging,'evidence/demo-story.json'),JSON.stringify(story,null,2)+'\n');
+      fs.writeFileSync(path.join(staging,'evidence/demo-story.md'),require('./demo-story').markdown(story));
+    }
     const caption=file=>ui.screenshots.find(s=>s.file===file).claim.replace(/\s+/g,' ').replace(/[\\`*_[\]<>]/g,'\\$&');
-    const index=`# Memz 可核验演示材料包\n\n提交：${commit}\n\n[六项初赛材料](docs/submission-report.md) · [演示步骤](docs/demo-script.md) · [完整需求验收表](docs/requirements-acceptance.md)\n\n此包来自同一干净提交的合成数据测试，不能证明外部材料真实、生产安全或比赛成绩。校验值可检测文件变化，但不是数字签名；报告及校验值若同时被重写，不能证明真实性。CI终态须独立核对，本打包程序不宣称CI已经成功。\n\n## 阅读顺序\n\n1. 先读六项材料的需求与数据库设计，用“20号→15号”数据链理解来源、候选、修订和当前指针。\n2. 结合下方01–08图复核批准、冲突、驳回与角色隔离；09–20图作为分页和规模场景补充。\n3. 用原始报告及TAP核对测试结果，再查看[关键实现](docs/key-implementation.md)与[数据字典](docs/data-dictionary.md)。\n\n## 实际报告\n\n- [浏览器报告](evidence/ui/report.json)：${ui.screenshots.length}张截图，未捕获脚本错误${ui.pageErrors.length}个。\n- [检索与规模报告](evidence/retrieval-report.json)：${retrieval.passedCases}/${retrieval.totalCases}例；sourceScale为独立来源增长场景。\n- [数据库系统报告](evidence/system/report.json)：${system.suites.map(s=>`${s.name} ${s.summary.pass}/${s.summary.tests}`).join('；')}；[集成 TAP](evidence/system/core.tap) 与 [迁移 TAP](evidence/system/migrations.tap)，临时库已清理。\n- [清单与SHA-256](manifest.json)：在解包目录运行 \`node scripts/package-evidence.js verify .\`。\n\n## 必要截图\n\n${screenshotNames.map(file=>`- [${file}](evidence/ui/${file})：${caption(file)}`).join('\n')}\n\n截图与报告的时间、环境和合成场景以原始报告为准。官方模板、原通知全文及最终提交渠道尚待人工复核；此包不自动报名或提交。\n`;
+    const index=`# Memz 可核验演示材料包\n\n提交：${commit}\n\n[六项初赛材料](docs/submission-report.md) · [演示步骤](docs/demo-script.md) · [完整需求验收表](docs/requirements-acceptance.md)\n\n此包来自同一干净提交的合成数据测试，不能证明外部材料真实、生产安全或比赛成绩。校验值可检测文件变化，但不是数字签名；报告及校验值若同时被重写，不能证明真实性。CI终态须独立核对，本打包程序不宣称CI已经成功。\n\n## 阅读顺序\n\n${hasStory?'先看[本次完整演示实际记录](evidence/demo-story.md)及[原始JSON](evidence/demo-story.json)，从批准后的上下文回查数据库依据。\n\n':''}1. 先读六项材料的需求与数据库设计，用“20号→15号”数据链理解来源、候选、修订和当前指针。\n2. 结合下方01–08图复核批准、冲突、驳回与角色隔离；09–20图作为分页和规模场景补充。\n3. 用原始报告及TAP核对测试结果，再查看[关键实现](docs/key-implementation.md)与[数据字典](docs/data-dictionary.md)。\n\n## 实际报告\n\n- [浏览器报告](evidence/ui/report.json)：${ui.screenshots.length}张截图，未捕获脚本错误${ui.pageErrors.length}个。\n- [检索与规模报告](evidence/retrieval-report.json)：${retrieval.passedCases}/${retrieval.totalCases}例；sourceScale为独立来源增长场景。\n- [数据库系统报告](evidence/system/report.json)：${system.suites.map(s=>`${s.name} ${s.summary.pass}/${s.summary.tests}`).join('；')}；[集成 TAP](evidence/system/core.tap) 与 [迁移 TAP](evidence/system/migrations.tap)，临时库已清理。\n- [清单与SHA-256](manifest.json)：在解包目录运行 \`node scripts/package-evidence.js verify .\`。\n\n## 必要截图\n\n${screenshotNames.map(file=>`- [${file}](evidence/ui/${file})：${caption(file)}`).join('\n')}\n\n截图与报告的时间、环境和合成场景以原始报告为准。官方模板、原通知全文及最终提交渠道尚待人工复核；此包不自动报名或提交。\n`;
     fs.writeFileSync(path.join(staging,'index.md'),index);
     const files=Object.fromEntries(listFiles(staging).map(file=>[file,hash(fs.readFileSync(checkedFile(staging,file)))]));
     const manifest={schemaVersion:1,commit,tree:git('rev-parse','HEAD^{tree}'),createdAt:new Date().toISOString(),synthetic:true,ciConclusion:'not-verified-by-packager',files};
@@ -120,4 +139,4 @@ if(require.main===module){
     else{assert.equal(process.argv.length,2,'Usage: package-evidence.js [verify directory]');console.log(`Submission package: ${buildPackage()}`)}
   }catch(error){console.error(`Evidence rejected: ${error.message}`);process.exitCode=1}
 }
-module.exports={hash,uiSources,screenshotNames,evaluationSources,expectedResults,verifyEvidence,verifyPackage,buildPackage};
+module.exports={hash,uiSources,screenshotNames,evaluationSources,expectedResults,verifyEvidence,verifyPackage,buildPackage,rehearsalFromTap};

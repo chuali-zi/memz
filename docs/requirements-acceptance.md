@@ -29,6 +29,7 @@
 | R23 按版本精确溯源 | 同名来源可区分；指定版本返回旧原文；按需读取与失败重试；成员隔离 | GET /facts/:id/provenance、renderFact | HTTP集成同名来源/版本推进/权限/参数回归；UI 02/03与checks.provenance |
 | R24 接入方完整读取 | 一页有界事实与固定版本依据一致；失败不输出部分上下文；标明截断；可选最终UTF-8字节预算保留完整依据；after续读不重复旧ID并明确跨页快照限制；注销会话 | scripts/context-client.js | 真实HTTP并发审批/权限/失败回归、context-client.test.js、context-process.test.js、context-budget.js与context-scenarios.js（105版本、跨项目同名事实及过期冲突） |
 | R25 备份可恢复 | 自定义格式备份恢复后数据、序列、约束、RLS、幂等回执保留；可继续批准；损坏归档失败 | pg_dump/pg_restore与既有HTTP接口 | test/restore.test.js真实随机库及子进程；系统TAP原始记录 |
+| R26 可复现完整演示 | 从来源到批准上下文、冲突、驳回、历史依据和权限形成真实独立进程故事；材料记录来自TAP | scripts/demo-story.js | integration.test.js初始/升级数据库进程回归；evidence/demo-story.json与.md离线一致性校验 |
 
 ## 运行条件与取证方法
 
