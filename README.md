@@ -113,3 +113,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 外部本地进程可用[候选提交客户端](docs/proposal-client.md)通过标准输入提交绑定来源、带预期版本和稳定幂等键的候选。客户端管理会话与CSRF，只创建待审候选；批准仍由负责人通过原界面完成。
 
 需要同时接入来源写入时，按[来源到候选的两步流程](docs/source-client.md)先调用source-client，再将实际返回的sourceId绑定到proposal-client。两个步骤独立保留幂等键，部分失败不会自动删除来源或批准候选。
+
+本机智能体可使用 [MCP stdio 兼容适配](docs/mcp-local.md)：固定项目、默认只读，显式开启后可提交待审；支持 2025-11-25 握手，不提供审批工具。
