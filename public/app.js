@@ -123,6 +123,20 @@ function candidateControls(busy=false){
 }
 function renderCandidate(d,c,role,p){
   d.append(el('strong',`${c.subject} / ${c.predicate} → ${c.value}`),el('span',({pending:'待审批',approved:'已批准',rejected:'已驳回'})[c.status],'badge'),el('div',`#${c.id} · 基于 v${c.expected_version} · 来源：${c.source}`,'meta'));
+  const preview=el('button','核对来源原文','secondary'),panel=el('div',undefined,'provenance-detail');
+  panel.hidden=true;panel.setAttribute('aria-live','polite');preview.setAttribute('aria-expanded','false');let loaded=false;
+  preview.onclick=async()=>{
+    if(loaded){panel.hidden=!panel.hidden;preview.textContent=panel.hidden?'核对来源原文':'收起来源原文';preview.setAttribute('aria-expanded',String(!panel.hidden));return}
+    panel.hidden=false;preview.disabled=true;preview.setAttribute('aria-expanded','true');panel.textContent='正在读取候选绑定的来源…';
+    try{
+      const proof=await api(`/api/projects/${p}/candidates/${c.id}/source`);
+      if(p!==projectId||!d.isConnected)return;
+      panel.replaceChildren(el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`候选 #${proof.candidate.id} · 基于 v${proof.candidate.expected_version} · 读取时${({pending:'待审批',approved:'已批准',rejected:'已驳回'})[proof.candidate.status]}`,'meta'),el('p','原文仅供人工核查，不是审批结论。','hint'));
+      loaded=true;preview.textContent='收起来源原文';
+    }catch(error){if(p===projectId&&d.isConnected){panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
+    finally{preview.disabled=false}
+  };
+  d.append(preview,panel);
   if(c.status!=='pending'||role!=='owner')return;
   const actions=el('div',undefined,'actions');
   for(const [label,action] of [['批准','approve'],['驳回','reject']]){

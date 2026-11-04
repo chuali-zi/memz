@@ -148,6 +148,17 @@ app.post('/api/projects/:p/sources',requireJsonObject,route(async(req,res)=>{
     });
   }));
 }));
+app.get('/api/projects/:p/candidates/:id/source',route(async(req,res)=>{
+  const p=num(req.params.p),id=num(req.params.id);
+  res.json(await tx(req.user.id,async c=>{
+    const access=await role(c,p,['owner','member','viewer']);
+    const row=(await c.query(`SELECT c.id,c.subject,c.predicate,c.value,c.expected_version,c.status,c.source_id,s.title,s.content
+      FROM candidates c JOIN sources s ON s.id=c.source_id AND s.project_id=c.project_id
+      WHERE c.project_id=$1 AND c.id=$2`,[p,id])).rows[0];
+    if(!row)throw fail(404,'候选不存在');
+    const {title,content,...candidate}=row;return {role:access,candidate,source:{id:row.source_id,title,content}};
+  },{snapshot:true}));
+}));
 app.post('/api/projects/:p/candidates',requireJsonObject,route(async(req,res)=>{
   const p=num(req.params.p),subject=str(req.body.subject,100),predicate=str(req.body.predicate,100),value=str(req.body.value,1000),source=num(req.body.source_id),expected=integer(req.body.expected_version,0,'版本无效'),key=requestKey(req);
   res.json(await tx(req.user.id,async c=>{

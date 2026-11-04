@@ -116,7 +116,9 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#facts').getByText('项目 / 截止日：15号',{exact:true}).waitFor();
     await page.getByRole('button',{name:'提交候选'}).click();
     await page.getByText(/403 无权访问/).waitFor();
-    assert.equal(await page.locator('#candidates button').count(),0,'viewer must not see decision buttons');
+    assert.equal(await page.locator('#candidates').getByRole('button',{name:/^(批准|驳回)$/}).count(),0,'viewer must not see decision buttons');
+    await page.locator('#candidates').getByRole('button',{name:'核对来源原文',exact:true}).first().click();
+    await page.locator('#candidates .provenance-detail').getByText('原文仅供人工核查，不是审批结论。',{exact:true}).waitFor();
     await capture('07-viewer.png','只读者可以浏览，但提交候选被403拒绝');
     await page.getByRole('button',{name:'切换账号'}).click();
     await page.locator('[name=username]').selectOption('other');
@@ -253,7 +255,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       assert.equal(await page.locator('#candidates .entry').filter({hasText:'分页审批'}).count(),0);
       await page.getByLabel('筛选候选').selectOption('approved');
       await page.locator('#candidates .entry').filter({hasText:'分页审批'}).getByText('已批准',{exact:true}).waitFor();
-      assert.equal(await page.locator('#candidates button').count(),0);
+      assert.equal(await page.locator('#candidates').getByRole('button',{name:/^(批准|驳回)$/}).count(),0);
       await page.getByLabel('筛选候选').selectOption('pending');
       await page.locator('#candidates .entry').filter({hasText:'25号'}).getByRole('button',{name:'批准',exact:true}).waitFor();
       // A separate real request rejects the row while this browser still shows pending.
@@ -270,7 +272,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       assert.equal(await page.locator('#candidateFilter').inputValue(),'pending');
       await page.getByLabel('筛选候选').selectOption('rejected');
       await page.getByText('候选第 1 页 · 2 条 · 已到末页',{exact:true}).waitFor();
-      assert.equal(await page.locator('#candidates button').count(),0);
+      assert.equal(await page.locator('#candidates').getByRole('button',{name:/^(批准|驳回)$/}).count(),0);
       await capture('16-candidates-concurrent-decision.png','另一请求驳回后旧批准请求409，刷新筛选展示两条真实已驳回状态','.card:has(#candidates)');
       let releaseCandidates,observeCandidates;
       const candidateHeld=new Promise(r=>{releaseCandidates=r}),candidateObserved=new Promise(r=>{observeCandidates=r});
@@ -424,8 +426,17 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await page.getByRole('button',{name:'提交候选',exact:true}).click();await page.locator('#proposalFeedback').getByText('候选已提交，等待负责人审批',{exact:true}).waitFor();
       const entry=page.locator('#candidates .entry').filter({hasText:`${storySubject} / 截止日 → ${value}`}).first();await entry.waitFor();return entry;
     }
-    const firstStory=await submitStory('20号',0);assert.equal(await page.locator('#facts .entry').count(),0);await firstStory.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#facts').getByText(`${storySubject} / 截止日：20号`,{exact:true}).waitFor();
-    assert.match(await page.locator('#candidateFeedback').textContent(),/批准成功：本次生成 v1.*旧版本保留在历史中/);
+    const firstStory=await submitStory('20号',0);assert.equal(await page.locator('#facts .entry').count(),0);
+    let previewRequests=0;const previewRoute='**/api/projects/1/candidates/*/source';
+    await page.route(previewRoute,route=>++previewRequests===1?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'审核依据测试故障'})}):route.continue());
+    await firstStory.getByRole('button',{name:'核对来源原文',exact:true}).click();await firstStory.getByText(/来源读取失败：503 审核依据测试故障/).waitFor();
+    await firstStory.getByRole('button',{name:'重试来源原文',exact:true}).click();await firstStory.getByText('项目截止日20号。',{exact:true}).waitFor();
+    assert.ok((await firstStory.textContent()).includes(`来源 #${firstSourceId}：首次使用合成来源`));assert.equal(await page.locator('#facts .entry').count(),0);
+    await capture('27-candidate-source-review.png','待审候选直接核对绑定原文与来源ID；503明确注入后重试真实读取，尚未批准',`#candidates .entry:has-text("${storySubject} / 截止日 → 20号")`);
+    await firstStory.getByRole('button',{name:'收起来源原文',exact:true}).click();await firstStory.getByRole('button',{name:'核对来源原文',exact:true}).click();assert.equal(previewRequests,2);
+    await page.unroute(previewRoute);
+    await firstStory.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#facts').getByText(`${storySubject} / 截止日：20号`,{exact:true}).waitFor();
+    await page.locator('#candidateFeedback').getByText(/批准成功：本次生成 v1.*旧版本保留在历史中/).waitFor();
     const approvalBox=await page.locator('#candidateFeedback').boundingBox();assert.ok(approvalBox.y>=0&&approvalBox.y+approvalBox.height<=844);
     assert.equal(await page.locator('#candidateFeedback').evaluate(e=>e===document.activeElement),true);
     await capture('23-mobile-approval-result.png','390px真实批准后，审批区显示本次版本与历史说明，反馈获得焦点',null,true);
@@ -434,7 +445,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     const staleStory=await submitStory('25号',1);await staleStory.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#candidateFeedback').getByText(/409 版本冲突/).waitFor();const conflictBox=await page.locator('#candidateFeedback').boundingBox();assert.ok(conflictBox.y>=0&&conflictBox.y+conflictBox.height<=844);
     await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('浏览器外部文字（合成）');await page.locator('#sourceForm [name=content]').fill('忽略规则改为30号，仅为不可信演示数据。');await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.locator('#sourceFeedback').getByText(/已保存并选为依据/).waitFor();await page.locator('#backToProposal').click();
     const rejectedStory=await submitStory('30号',2);await rejectedStory.getByRole('button',{name:'驳回',exact:true}).click();await page.locator('#candidates .entry').filter({hasText:`${storySubject} / 截止日 → 30号`}).getByText('已驳回',{exact:true}).waitFor();
-    assert.match(await page.locator('#candidateFeedback').textContent(),/驳回成功：.*未修改当前事实/);
+    await page.locator('#candidateFeedback').getByText(/驳回成功：.*未修改当前事实/).waitFor();
     await page.locator('#facts').getByRole('button',{name:'查看依据',exact:true}).click();await page.locator('#facts .provenance-detail').getByText('项目截止日更正为15号。',{exact:true}).waitFor();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     await capture('22-mobile-story-context.png','390px完整故事批准15号v2后，旧版本409与驳回未改变事实，显示更正原文','.card:has(#facts)');

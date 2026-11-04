@@ -45,6 +45,7 @@ module.exports=async({page,baseURL,capture,dir})=>{
   await page.locator('#searchForm [name=q]').fill(subject);await page.getByRole('button',{name:'搜索',exact:true}).click();await page.getByText('没有匹配的当前事实',{exact:true}).waitFor();await page.locator('#refreshWorkspace').click();
   const entry=page.locator('#candidates .entry').filter({hasText:`${subject} / 截止日 → 18号`});await entry.getByText('待审批',{exact:true}).waitFor();
   await capture('25-agent-pending-handoff.png','独立候选进程提交后被SIGKILL，新进程以原键恢复；候选仍待人工审批',`#candidates .entry:has-text("${subject}")`);
+  await entry.getByRole('button',{name:'核对来源原文',exact:true}).click();await entry.getByText(source.content,{exact:true}).waitFor();assert.ok((await entry.textContent()).includes(`来源 #${sourceId}：${source.title}`));
   await entry.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#candidateFeedback').getByText(/批准成功/).waitFor();
   await page.locator('#facts').getByRole('button',{name:'查看依据',exact:true}).click();await page.locator('#facts').getByText(source.content,{exact:true}).waitFor();
   const after=await worker('context-client',query);assert.equal(after.code,0,after.stderr);const context=JSON.parse(after.stdout);assert.equal(context.facts.length,1);assert.equal(context.facts[0].value,'18号');assert.equal(context.facts[0].version,1);assert.equal(context.facts[0].source.id,sourceId);assert.equal(context.facts[0].source.content,source.content);assert.equal(context.facts[0].candidateId,candidateId);
