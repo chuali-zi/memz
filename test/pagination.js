@@ -191,10 +191,10 @@ test('large source lists traverse exactly once, search titles literally, and pre
   const base=`http://127.0.0.1:${server.address().port}/api/projects/1/data`;
   const read=async q=>{const r=await fetch(base+q,{headers:{cookie:cookies.owner}});assert.equal(r.status,200);return r.json()};
   const full=await read(''),{sources:expected,...rest}=full;assert.deepEqual(await read('?include_sources=false'),rest);assert.deepEqual(await read('?include_sources=true'),full);
-  const onlyAudit=await read('?include_facts=false&include_history=false&include_candidates=false&include_sources=false');assert.deepEqual(onlyAudit,{role:full.role,audit:full.audit});
+  const onlyAudit=await read('?include_facts=false&include_history=false&include_candidates=false&include_sources=false');assert.deepEqual(onlyAudit,{sourceTextIsUntrusted:true,role:full.role,audit:full.audit});
   assert.equal((await sources()).body.sources.length,25);
   const rows=[];let after=0;
-  do{const page=(await sources(`?limit=11&after=${after}`)).body;assert.ok(page.sources.length<=11);
+  do{const page=(await sources(`?limit=11&after=${after}`)).body;assert.equal(page.sourceTextIsUntrusted,true);assert.ok(page.sources.length<=11);
     for(const row of page.sources){assert.ok(row.id>after);after=row.id;rows.push(row)}
     if(page.next_after===null)break;assert.equal(page.next_after,after);assert.ok(rows.length<1000);
   }while(true);

@@ -119,3 +119,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 宿主配置可用 `node scripts/mcp-config.js --host claude-desktop` 或 `--host vscode` 生成，只输出待审阅 JSON，不修改用户设置。
 
 无需真实智能体账号即可演示只读 MCP：启动本机服务后运行 `node scripts/mcp-read-example.js "项目"`，通过官方 SDK 返回已批准版本及来源原文，详见 [MCP 说明](docs/mcp-local.md)。
+
+来源与记忆文字始终是不可信数据，批准不使其中的指令可信。接口标记及宿主责任见 [记忆信任边界](docs/untrusted-memory.md)；未声称完整防提示注入或真实模型对抗验证。

@@ -43,7 +43,7 @@ function str(x,max=500){if(typeof x!=='string'||!x.trim()||x.length>max)throw fa
 async function role(c,p,allowed){const r=(await c.query('SELECT role FROM memberships WHERE project_id=$1 AND user_id=nullif(current_setting(\'app.user_id\',true),\'\')::int',[p])).rows[0];if(!r||!allowed.includes(r.role))throw fail(403,'无权访问此项目或执行此操作');return r.role}
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 app.get('/api/projects',route(async(req,res)=>res.json(await tx(req.user.id,async c=>(await c.query('SELECT p.id,p.name,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=$1 ORDER BY p.id',[req.user.id])).rows))));
-async function readProject(user,p,q,{includeFacts=true,includeHistory=true,includeCandidates=true,includeSources=true}={}){return tx(user,async c=>{const r=await role(c,p,['owner','member','viewer']);const facts=includeFacts?(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id WHERE f.project_id=$1 AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0 ORDER BY f.id`,[p,q])).rows:[];const sources=includeSources?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 ORDER BY id',[p])).rows:[];const candidates=includeCandidates?(await c.query('SELECT c.*,s.title source FROM candidates c JOIN sources s ON s.id=c.source_id WHERE c.project_id=$1 ORDER BY c.id DESC',[p])).rows:[];const history=includeHistory?(await c.query('SELECT f.subject,f.predicate,r.version,r.value,s.title source,r.created_at FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id WHERE r.project_id=$1 ORDER BY r.id DESC',[p])).rows:[];const audit=(await c.query('SELECT * FROM audit WHERE project_id=$1 ORDER BY id DESC LIMIT 100',[p])).rows;return {role:r,...(includeFacts?{facts}:{}),...(includeSources?{sources}:{}),...(includeCandidates?{candidates}:{}),...(includeHistory?{history}:{}),audit}},{snapshot:true})}
+async function readProject(user,p,q,{includeFacts=true,includeHistory=true,includeCandidates=true,includeSources=true}={}){return tx(user,async c=>{const r=await role(c,p,['owner','member','viewer']);const facts=includeFacts?(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id WHERE f.project_id=$1 AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0 ORDER BY f.id`,[p,q])).rows:[];const sources=includeSources?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 ORDER BY id',[p])).rows:[];const candidates=includeCandidates?(await c.query('SELECT c.*,s.title source FROM candidates c JOIN sources s ON s.id=c.source_id WHERE c.project_id=$1 ORDER BY c.id DESC',[p])).rows:[];const history=includeHistory?(await c.query('SELECT f.subject,f.predicate,r.version,r.value,s.title source,r.created_at FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id WHERE r.project_id=$1 ORDER BY r.id DESC',[p])).rows:[];const audit=(await c.query('SELECT * FROM audit WHERE project_id=$1 ORDER BY id DESC LIMIT 100',[p])).rows;return {sourceTextIsUntrusted:true,role:r,...(includeFacts?{facts}:{}),...(includeSources?{sources}:{}),...(includeCandidates?{candidates}:{}),...(includeHistory?{history}:{}),audit}},{snapshot:true})}
 async function readFactsPage(user,p,q,{limit=50,after=0}={}){
   return tx(user,async c=>{
     const r=await role(c,p,['owner','member','viewer']);
@@ -70,7 +70,7 @@ app.get('/api/projects/:p/facts/:id/provenance',route(async(req,res)=>{
       WHERE f.project_id=$1 AND f.id=$2
         AND (($3::int IS NULL AND r.id=f.current_revision_id) OR r.version=$3)`,[p,id,version])).rows[0];
     if(!row)throw fail(404,'事实或修订不存在');
-    return {role:access,fact:{id:row.fact_id,subject:row.subject,predicate:row.predicate},
+    return {sourceTextIsUntrusted:true,role:access,fact:{id:row.fact_id,subject:row.subject,predicate:row.predicate},
       revision:{id:row.revision_id,version:row.version,value:row.value,created_at:row.created_at,approved_by:row.approved_by},
       source:{id:row.source_id,title:row.title,content:row.content},
       candidate:{id:row.candidate_id,expected_version:row.expected_version,proposed_by:row.proposed_by}};
@@ -126,7 +126,7 @@ async function readSourcesPage(user,p,q,{limit=25,after=0}={}){
       WHERE project_id=$1 AND id>$3 AND position(lower($2) in lower(title))>0
       ORDER BY id LIMIT $4`,[p,q,after,limit+1])).rows;
     const more=rows.length>limit,sources=rows.slice(0,limit);
-    return {role:r,sources,next_after:more?sources[sources.length-1].id:null};
+    return {sourceTextIsUntrusted:true,role:r,sources,next_after:more?sources[sources.length-1].id:null};
   },{snapshot:true});
 }
 app.get('/api/projects/:p/sources',route(async(req,res)=>{
@@ -159,7 +159,7 @@ app.get('/api/projects/:p/candidates/:id/source',route(async(req,res)=>{
     const current=(await c.query(`SELECT f.id AS fact_id,f.version,r.value,r.source_id,r.candidate_id,s.title AS source_title
       FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id
       WHERE f.project_id=$1 AND f.subject=$2 AND f.predicate=$3`,[p,row.subject,row.predicate])).rows[0]||null;
-    const {title,content,...candidate}=row;return {role:access,candidate,source:{id:row.source_id,title,content},current,
+    const {title,content,...candidate}=row;return {sourceTextIsUntrusted:true,role:access,candidate,source:{id:row.source_id,title,content},current,
       comparison:{expectedVersion:row.expected_version,currentVersion:current?.version||0,matches:row.expected_version===(current?.version||0)}};
   },{snapshot:true}));
 }));
