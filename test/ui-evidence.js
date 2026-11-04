@@ -16,7 +16,13 @@ async function main(){
     const service=require('../server');pool=service.pool;
     server=await new Promise(resolve=>{const s=service.app.listen(0,'127.0.0.1',()=>resolve(s))});
     await runUI({baseURL:`http://127.0.0.1:${server.address().port}`,executablePath:process.env.CHROMIUM_PATH||null,
-      databaseVersion:(await owner.query('SHOW server_version')).rows[0].server_version});
+      databaseVersion:(await owner.query('SHOW server_version')).rows[0].server_version,
+      preparePagination:async()=>{
+        for(let i=0;i<55;i++)await service.tx(1,async c=>{
+          const id=(await c.query("INSERT INTO candidates(project_id,subject,predicate,value,source_id,expected_version,proposed_by) VALUES(1,$1,'状态','合成分页事实',2,0,1) RETURNING id",[`分页演示${String(i).padStart(2,'0')}`])).rows[0].id;
+          await service.decide(c,1,1,id,'approve');
+        });
+      }});
   }finally{
     if(server)await new Promise((resolve,reject)=>server.close(e=>e?reject(e):resolve()));
     if(pool)await pool.end();if(owner)await owner.end();

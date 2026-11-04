@@ -51,6 +51,17 @@ test('paged keyword matching excludes old, pending, rejected and foreign facts',
   for(const q of ['%','_','分页条目0124'])assert.equal((await all(q)).length,1);
   assert.equal((await all('状态',100)).length,126);
 });
+test('optional context response omits facts while legacy aggregate remains compatible',async()=>{
+  async function context(query,user='owner'){
+    const r=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/1/data${query}`,{headers:{cookie:cookies[user]}});
+    return {status:r.status,body:await r.json()};
+  }
+  const full=await context(''),explicit=await context('?include_facts=true'),contextOnly=await context('?include_facts=false');
+  assert.equal(full.status,200);assert.ok(full.body.facts.length>100);assert.deepEqual(explicit,full);
+  const {facts,...rest}=full.body;assert.deepEqual(contextOnly.body,rest);assert.equal(contextOnly.status,200);
+  assert.equal((await context('?include_facts=false','other')).status,403);
+  for(const q of ['?include_facts=no','?include_facts=false&include_facts=true'])assert.equal((await context(q)).status,400);
+});
 test('viewer access and project isolation remain enforced on every page',async()=>{
   const owner=await get('?limit=7'),viewer=await get('?limit=7','viewer');assert.equal(viewer.status,200);assert.equal(viewer.body.role,'viewer');assert.deepEqual(viewer.body.facts,owner.body.facts);
   assert.equal((await get('?after=1','other')).status,403);
