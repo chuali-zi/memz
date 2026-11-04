@@ -18,7 +18,8 @@ module.exports=async({call,owner,member,viewer,other})=>{
   const competing=await call(member,'/api/projects/1/candidates',{subject:'审核来源1',predicate:'截止日',value:'21号',source_id:sources[0].id,expected_version:0});assert.equal(competing.status,200);
   assert.equal((await call(owner,`/api/projects/1/candidates/${ids[1]}/approve`,{})).status,200);
   const changed=await call(viewer,`/api/projects/1/candidates/${competing.data.id}/source`);assert.equal(changed.status,200);
-  assert.deepEqual(changed.data.comparison,{expectedVersion:0,currentVersion:1,matches:false});assert.equal(changed.data.current.value,'19号');assert.equal(changed.data.current.source_id,sources[1].id);
+  assert.deepEqual(changed.data.comparison,{expectedVersion:0,currentVersion:1,matches:false});assert.equal(changed.data.current.value,'19号');assert.equal(changed.data.current.source_id,sources[1].id);assert.equal(changed.data.current.candidate_id,ids[1]);
+  assert.deepEqual((await call(member,`/api/projects/1/candidates/${competing.data.id}/source`)).data.current,changed.data.current);
   assert.equal((await call(owner,`/api/projects/1/candidates/${competing.data.id}/approve`,{})).status,409);
   assert.deepEqual((await call(viewer,`/api/projects/1/candidates/${competing.data.id}/source`)).data,changed.data);
   const rejected=await call(viewer,`/api/projects/1/candidates/${ids[0]}/source`);assert.equal(rejected.data.candidate.status,'rejected');assert.deepEqual(rejected.data.source,{id:sources[0].id,title:sources[0].title,content:sources[0].content});

@@ -119,6 +119,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     assert.equal(await page.locator('#candidates').getByRole('button',{name:/^(批准|驳回)$/}).count(),0,'viewer must not see decision buttons');
     await page.locator('#candidates').getByRole('button',{name:'核对来源原文',exact:true}).first().click();
     await page.locator('#candidates .provenance-detail').getByText('原文仅供人工核查，不是审批结论。',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'用最新版本填写新候选',exact:true}).count(),0);
     await capture('07-viewer.png','只读者可以浏览，但提交候选被403拒绝');
     await page.getByRole('button',{name:'切换账号'}).click();
     await page.locator('[name=username]').selectOption('other');
@@ -512,7 +513,51 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     for(const row of beforePrepare.audit.filter(a=>a.detail.includes(`候选 ${compareFixture.first}`)))assert.ok(afterReproposal.audit.some(a=>JSON.stringify(a)===JSON.stringify(row)),'old audit retained');
     const recovered=await require('../scripts/context-client').readContext({baseURL,query:'审核刷新演练（合成）'});
     assert.equal(recovered.facts[0].value,'20号');assert.equal(recovered.facts[0].version,3);
-    report.checks.reproposal={freshVersion:2,approvedVersion:3,preparationReadOnly:true,originalCandidatePreserved:true,auditPreserved:true};
+    const oldReview=page.locator('#candidates .entry').filter({hasText:'审核刷新演练（合成） / 截止日 → 20号'}).filter({hasText:'基于 v0'});
+    await oldReview.getByRole('button',{name:'核对来源原文',exact:true}).click();
+    await oldReview.getByText(/当前事实已采用相同值与同一来源/).waitFor();
+    assert.ok((await oldReview.textContent()).includes('当前事实已采用相同值与同一来源'),'old proposal must explain identical approved content');
+    const approvedCandidate=afterReproposal.candidates.find(c=>c.subject==='审核刷新演练（合成）'&&c.expected_version===2);
+    assert.ok((await oldReview.textContent()).includes(`批准候选 #${approvedCandidate.id}`));
+    assert.equal(await oldReview.getByRole('button',{name:'用最新版本填写新候选',exact:true}).count(),0);
+    assert.equal((await page.evaluate(()=>api('/api/projects/1/data'))).candidates.find(c=>c.id===compareFixture.first).status,'pending');
+    await capture('30-old-candidate-review.png','390px旧候选仍待审，当前相同内容已由另一候选批准；提示核对并保留人工处理','#candidates .entry:has-text("审核刷新演练（合成） / 截止日 → 20号"):has-text("基于 v0")');
+    await oldReview.getByRole('button',{name:'驳回',exact:true}).click();await page.locator('#candidateFeedback').getByText(/驳回成功/).waitFor();
+    const closed=await page.evaluate(()=>api('/api/projects/1/data'));
+    assert.equal(closed.candidates.find(c=>c.id===compareFixture.first).status,'rejected');
+    assert.ok(closed.audit.some(a=>a.action==='propose'&&a.detail===`候选 ${compareFixture.first}`));
+    assert.equal(closed.audit.filter(a=>a.action==='reject'&&a.detail===`候选 ${compareFixture.first}`).length,1);
+    assert.equal((await require('../scripts/context-client').readContext({baseURL,query:'审核刷新演练（合成）'})).facts[0].version,3);
+    const concurrent=await page.evaluate(async id=>{
+      const proof=await api(`/api/projects/1/candidates/${id}/source`);
+      const c=await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({...proof.candidate,value:'24号',expected_version:0})});return c.id;
+    },compareFixture.first);
+    await page.locator('#refreshCandidates').click();
+    const concurrentRow=page.locator('#candidates .entry').filter({hasText:'审核刷新演练（合成） / 截止日 → 24号'});
+    await concurrentRow.getByRole('button',{name:'核对来源原文',exact:true}).click();
+    await concurrentRow.getByRole('button',{name:'用最新版本填写新候选',exact:true}).waitFor();
+    await page.evaluate(async id=>{
+      const proof=await api(`/api/projects/1/candidates/${id}/source`);
+      const c=await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({...proof.candidate,expected_version:3})});
+      await api(`/api/projects/1/candidates/${c.id}/approve`,{method:'POST'});
+    },concurrent);
+    const raceInput=await page.locator('#proposal').evaluate(f=>Object.fromEntries(new FormData(f)));
+    await concurrentRow.getByRole('button',{name:'用最新版本填写新候选',exact:true}).click();
+    await page.locator('#candidateFeedback').getByText(/当前事实已采用相同值与同一来源，请刷新核对/).waitFor();
+    assert.deepEqual(await page.locator('#proposal').evaluate(f=>Object.fromEntries(new FormData(f))),raceInput);
+    await concurrentRow.getByRole('button',{name:'刷新核对',exact:true}).click();
+    await concurrentRow.getByText(/当前事实已采用相同值与同一来源；/).waitFor();
+    assert.equal(await concurrentRow.getByRole('button',{name:'用最新版本填写新候选',exact:true}).count(),0);
+    await page.evaluate(async()=>{
+      const source=await api('/api/projects/1/sources',{method:'POST',body:JSON.stringify({title:'同值不同依据（合成）',content:'独立来源也提到24号，尚未审核。'})});
+      await api('/api/projects/1/candidates',{method:'POST',body:JSON.stringify({subject:'审核刷新演练（合成）',predicate:'截止日',value:'24号',source_id:source.id,expected_version:0})});
+    });
+    await page.locator('#refreshCandidates').click();
+    const differentSource=page.locator('#candidates .entry').filter({hasText:'同值不同依据（合成）'});
+    await differentSource.getByRole('button',{name:'核对来源原文',exact:true}).click();
+    await differentSource.getByRole('button',{name:'用最新版本填写新候选',exact:true}).waitFor();
+    assert.equal(await differentSource.getByText(/当前事实已采用相同值与同一来源/).count(),0);
+    report.checks.reproposal={freshVersion:2,approvedVersion:3,preparationReadOnly:true,originalCandidatePreserved:true,auditPreserved:true,explicitRejectionOnly:true,concurrentSameContentPreservesInput:true};
 
     await page.setViewportSize(report.environment.viewport);
     // Invalidate the real server session without navigating, as after expiry/restart.

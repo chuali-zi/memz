@@ -132,10 +132,11 @@ function renderCandidate(d,c,role,p){
       const proof=await api(`/api/projects/${p}/candidates/${c.id}/source`);
       if(p!==projectId||!d.isConnected)return;
       const comparison=proof.comparison;
-      const status=proof.candidate.status==='pending'?(comparison.matches?'读取时基于版本一致；批准时仍会再次校验。':`版本不一致：提议基于 v${comparison.expectedVersion}，读取时当前 v${comparison.currentVersion}。请核对后重新提议或驳回，不能直接覆盖。`):'该候选已处理；以下为读取时的当前事实，不是当时审批结果。';
+      const sameContent=proof.current?.value===proof.candidate.value&&proof.current?.source_id===proof.candidate.source_id;
+      const status=proof.candidate.status==='pending'?(sameContent?'当前事实已采用相同值与同一来源；本候选仍待审，不代表已处理。请核对当前批准记录，避免重复提议；负责人可另行驳回旧候选。':comparison.matches?'读取时基于版本一致；批准时仍会再次校验。':`版本不一致：提议基于 v${comparison.expectedVersion}，读取时当前 v${comparison.currentVersion}。请核对后重新提议或驳回，不能直接覆盖。`):'该候选已处理；以下为读取时的当前事实，不是当时审批结果。';
       const refresh=el('button','刷新核对','secondary');refresh.onclick=async()=>{loaded=false;await preview.onclick();if(p===projectId&&d.isConnected)(panel.querySelector('button')||preview).focus()};
-      panel.replaceChildren(el('strong',`提议值：${proof.candidate.value}`),el('p',proof.current?`读取时当前值：${proof.current.value} · v${proof.current.version} · 来源 #${proof.current.source_id}：${proof.current.source_title}`:'读取时暂无已批准事实（v0）'),el('p',status,'hint'),refresh,el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`候选 #${proof.candidate.id} · 基于 v${proof.candidate.expected_version} · 读取时${({pending:'待审批',approved:'已批准',rejected:'已驳回'})[proof.candidate.status]}`,'meta'),el('p','原文仅供人工核查，不是审批结论。','hint'));
-      if(proof.candidate.status==='pending'&&!comparison.matches&&['owner','member'].includes(proof.role)){
+      panel.replaceChildren(el('strong',`提议值：${proof.candidate.value}`),el('p',proof.current?`读取时当前值：${proof.current.value} · v${proof.current.version} · 批准候选 #${proof.current.candidate_id} · 来源 #${proof.current.source_id}：${proof.current.source_title}`:'读取时暂无已批准事实（v0）'),el('p',status,'hint'),refresh,el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`候选 #${proof.candidate.id} · 基于 v${proof.candidate.expected_version} · 读取时${({pending:'待审批',approved:'已批准',rejected:'已驳回'})[proof.candidate.status]}`,'meta'),el('p','原文仅供人工核查，不是审批结论。','hint'));
+      if(proof.candidate.status==='pending'&&!sameContent&&!comparison.matches&&['owner','member'].includes(proof.role)){
         const prepare=el('button','用最新版本填写新候选','secondary');
         panel.append(el('p','将替换候选表单内容；不会自动提交或删除原提案。','hint'),prepare);
         prepare.onclick=()=>perform(async()=>{
@@ -144,6 +145,7 @@ function renderCandidate(d,c,role,p){
             const latest=await api(`/api/projects/${p}/candidates/${c.id}/source`);
             if(p!==projectId||!d.isConnected)return;
             if(!['owner','member'].includes(latest.role)||latest.candidate.status!=='pending'||latest.comparison.matches)throw new Error('候选状态或权限已变化，请刷新核对后再操作');
+            if(latest.current?.value===latest.candidate.value&&latest.current?.source_id===latest.candidate.source_id)throw new Error('当前事实已采用相同值与同一来源，请刷新核对；原候选仍待处理');
             const form=$('#proposal');
             for(const name of ['subject','predicate','value'])form.elements[name].value=latest.candidate[name];
             form.elements.expected_version.value=latest.comparison.currentVersion;
