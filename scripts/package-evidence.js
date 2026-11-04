@@ -1,4 +1,5 @@
 const fs=require('node:fs');
+const {verifySystemEvidence}=require('./system-evidence');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const assert=require('node:assert/strict');
@@ -28,7 +29,7 @@ function canonicalTuples(rows){
   for(const tuple of rows)assert.ok(Array.isArray(tuple)&&tuple.length===3&&tuple.every(value=>typeof value==='string'),'Invalid retrieval tuple');
   return rows.map(row=>JSON.stringify(row)).sort();
 }
-function verifyEvidence({root,uiReportPath,retrievalReportPath,commit}){
+function verifyEvidence({root,uiReportPath,retrievalReportPath,systemReportPath,commit}){
   assert.match(commit,/^[a-f0-9]{40}$/,'Expected a full Git commit');
   const ui=readJSON(uiReportPath),retrieval=readJSON(retrievalReportPath);
   assert.equal(ui.schemaVersion,1);assert.equal(retrieval.schemaVersion,2);
@@ -59,7 +60,8 @@ function verifyEvidence({root,uiReportPath,retrievalReportPath,commit}){
     assert.equal(item.paged.factsCount,expected[index].length,`Paged result count differs: ${item.name}`);
   }
   assert.ok(retrieval.sourceScale&&retrieval.candidateScale&&retrieval.contextScale,'Missing scale evidence');
-  return {ui,retrieval};
+  const system=verifySystemEvidence({root,reportPath:systemReportPath,commit,checkedFile});
+  return {ui,retrieval,system};
 }
 function listFiles(root,prefix=''){
   return fs.readdirSync(path.join(root,prefix),{withFileTypes:true}).flatMap(entry=>{
@@ -74,7 +76,7 @@ function verifyPackage(root){
   for(const file of ['index.md','docs/submission-report.md','docs/demo-script.md'])assert.ok(Object.hasOwn(manifest.files,file),`Missing required deliverable: ${file}`);
   assert.deepEqual(Object.keys(manifest.files).sort(),listFiles(root).filter(p=>p!=='manifest.json'),'Package file set changed');
   for(const [file,checksum] of Object.entries(manifest.files))assert.equal(hash(fs.readFileSync(checkedFile(root,file))),checksum,`Package file changed: ${file}`);
-  verifyEvidence({root,commit:manifest.commit,uiReportPath:checkedFile(root,'evidence/ui/report.json'),retrievalReportPath:checkedFile(root,'evidence/retrieval-report.json')});
+  verifyEvidence({root,commit:manifest.commit,uiReportPath:checkedFile(root,'evidence/ui/report.json'),retrievalReportPath:checkedFile(root,'evidence/retrieval-report.json'),systemReportPath:checkedFile(root,'evidence/system/report.json')});
   return manifest;
 }
 function buildPackage(root=path.resolve(__dirname,'..')){
@@ -85,7 +87,10 @@ function buildPackage(root=path.resolve(__dirname,'..')){
   const uiReportPath=process.env.UI_REPORT_PATH?path.resolve(root,process.env.UI_REPORT_PATH):fs.readdirSync(uiParent).map(dir=>path.join(uiParent,dir,'report.json')).filter(file=>fs.existsSync(file)).sort((a,b)=>fs.statSync(b).mtimeMs-fs.statSync(a).mtimeMs)[0];
   assert.ok(uiReportPath,'Run test:ui:evidence first');
   const retrievalReportPath=path.join(root,'artifacts/retrieval-report.json');
-  const {ui,retrieval}=verifyEvidence({root,commit,uiReportPath,retrievalReportPath});
+  const systemParent=path.join(root,'artifacts/system');
+  const systemReportPath=process.env.SYSTEM_REPORT_PATH?path.resolve(root,process.env.SYSTEM_REPORT_PATH):fs.readdirSync(systemParent).map(dir=>path.join(systemParent,dir,'report.json')).filter(file=>fs.existsSync(file)).sort((a,b)=>fs.statSync(b).mtimeMs-fs.statSync(a).mtimeMs)[0];
+  assert.ok(systemReportPath,'Run test:system:evidence first');
+  const {ui,retrieval,system}=verifyEvidence({root,commit,uiReportPath,retrievalReportPath,systemReportPath});
   const tracked=git('ls-files','-z').split('\0').filter(Boolean);
   const include=file=>/^(docs|db|public|test|evaluation|scripts)\//.test(file)||['README.md','server.js','idempotency.js','package.json','package-lock.json','compose.yml','.github/workflows/ci.yml','.gitignore','.gitattributes'].includes(file);
   const destination=path.join(root,'artifacts/submission',`${commit.slice(0,12)}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`);
@@ -93,9 +98,10 @@ function buildPackage(root=path.resolve(__dirname,'..')){
   const copy=(from,to)=>{fs.mkdirSync(path.dirname(path.join(staging,to)),{recursive:true});fs.copyFileSync(from,path.join(staging,to))};
   try{
     for(const file of tracked.filter(include))copy(checkedFile(root,file),file);
+    for(const file of ['report.json','core.tap','core.stderr.txt','migrations.tap','migrations.stderr.txt'])copy(checkedFile(path.dirname(systemReportPath),file),`evidence/system/${file}`);
     copy(uiReportPath,'evidence/ui/report.json');copy(retrievalReportPath,'evidence/retrieval-report.json');
     for(const file of screenshotNames)copy(checkedFile(path.dirname(uiReportPath),file),`evidence/ui/${file}`);
-    const index=`# Memz 可核验演示材料包\n\n提交：${commit}\n\n[六项初赛材料](docs/submission-report.md) · [演示步骤](docs/demo-script.md) · [完整需求验收表](docs/requirements-acceptance.md)\n\n此包来自同一干净提交的合成数据测试，不能证明外部材料真实、生产安全或比赛成绩。校验值可检测文件变化，但不是数字签名；报告及校验值若同时被重写，不能证明真实性。CI终态须独立核对，本打包程序不宣称CI已经成功。\n\n## 实际报告\n\n- [浏览器报告](evidence/ui/report.json)：${ui.screenshots.length}张截图，未捕获脚本错误${ui.pageErrors.length}个。\n- [检索与规模报告](evidence/retrieval-report.json)：${retrieval.passedCases}/${retrieval.totalCases}例；sourceScale为独立来源增长场景。\n- [清单与SHA-256](manifest.json)：在解包目录运行 \`node scripts/package-evidence.js verify .\`。\n\n## 必要截图\n\n${screenshotNames.map(file=>`- [${file}](evidence/ui/${file})`).join('\n')}\n\n截图与报告的时间、环境和合成场景以原始报告为准。官方模板、原通知全文及最终提交渠道尚待人工复核；此包不自动报名或提交。\n`;
+    const index=`# Memz 可核验演示材料包\n\n提交：${commit}\n\n[六项初赛材料](docs/submission-report.md) · [演示步骤](docs/demo-script.md) · [完整需求验收表](docs/requirements-acceptance.md)\n\n此包来自同一干净提交的合成数据测试，不能证明外部材料真实、生产安全或比赛成绩。校验值可检测文件变化，但不是数字签名；报告及校验值若同时被重写，不能证明真实性。CI终态须独立核对，本打包程序不宣称CI已经成功。\n\n## 实际报告\n\n- [浏览器报告](evidence/ui/report.json)：${ui.screenshots.length}张截图，未捕获脚本错误${ui.pageErrors.length}个。\n- [检索与规模报告](evidence/retrieval-report.json)：${retrieval.passedCases}/${retrieval.totalCases}例；sourceScale为独立来源增长场景。\n- [数据库系统报告](evidence/system/report.json)：${system.suites.map(s=>`${s.name} ${s.summary.pass}/${s.summary.tests}`).join('；')}；[集成 TAP](evidence/system/core.tap) 与 [迁移 TAP](evidence/system/migrations.tap)，临时库已清理。\n- [清单与SHA-256](manifest.json)：在解包目录运行 \`node scripts/package-evidence.js verify .\`。\n\n## 必要截图\n\n${screenshotNames.map(file=>`- [${file}](evidence/ui/${file})`).join('\n')}\n\n截图与报告的时间、环境和合成场景以原始报告为准。官方模板、原通知全文及最终提交渠道尚待人工复核；此包不自动报名或提交。\n`;
     fs.writeFileSync(path.join(staging,'index.md'),index);
     const files=Object.fromEntries(listFiles(staging).map(file=>[file,hash(fs.readFileSync(checkedFile(staging,file)))]));
     const manifest={schemaVersion:1,commit,tree:git('rev-parse','HEAD^{tree}'),createdAt:new Date().toISOString(),synthetic:true,ciConclusion:'not-verified-by-packager',files};

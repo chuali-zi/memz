@@ -6,6 +6,8 @@ const path=require('node:path');
 const {execFileSync}=require('node:child_process');
 const {hash,uiSources,screenshotNames,evaluationSources,expectedResults,verifyEvidence,verifyPackage,buildPackage}=require('../scripts/package-evidence');
 
+const {sourceFiles,coreTestFiles,parseTap}=require('../scripts/system-evidence');
+
 // Deliberate unit fixtures, not browser or competition evidence.
 function fixture(fn){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'memz-evidence-unit-'));
@@ -15,13 +17,20 @@ function fixture(fn){
   try{
     for(const file of new Set([...uiSources,...Object.values(evaluationSources)]))write(file,`unit fixture ${file}`);
     json('evaluation/retrieval-cases.json',dataset);
+    write('test/fixture.test.js','// synthetic fixture');
+    write('test/migrations.js','// synthetic fixture');
+    for(const file of ['scripts/package-evidence.js','scripts/system-evidence.js'])write(file,fs.readFileSync(path.join(__dirname,'..',file)));
+    const tap='TAP version 13\nok 1 - synthetic fixture\n# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
+    const system={schemaVersion:1,synthetic:true,passed:true,source:{commit,workingTreeDirty:false,files:Object.fromEntries(sourceFiles(root).map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},cleanup:{temporaryDatabaseDropped:true},suites:['core','migrations'].map(name=>({name,testFiles:name==='core'?coreTestFiles(root):['test/migrations.js'],exitCode:0,signal:null,passed:true,stdout:name+'.tap',stderr:name+'.stderr.txt',stdoutSha256:hash(tap),stderrSha256:hash(''),summary:parseTap(tap)}))};
+    for(const name of ['core','migrations']){write('evidence/system/'+name+'.tap',tap);write('evidence/system/'+name+'.stderr.txt','')}
+
     const bytes=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.from('unit fixture only')]);
     for(const file of screenshotNames)write(`evidence/ui/${file}`,bytes);
     const ui={schemaVersion:1,synthetic:true,passed:true,pageErrors:[],checks:{creationKeyRace:{requests:4,distinctKeys:2,createdSources:2,auditRows:2,lostResponseReplayed:true}},source:{commit,workingTreeDirty:false,files:Object.fromEntries(uiSources.map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},screenshots:screenshotNames.map(file=>({file,sha256:hash(bytes)}))};
     const retrieval={schemaVersion:2,dataset:dataset.dataset,fillerCount:200,synthetic:true,passed:true,totalCases:19,passedCases:19,source:{gitCommit:commit,workingTreeDirty:false,...Object.fromEntries(Object.entries(evaluationSources).map(([key,file])=>[key,hash(fs.readFileSync(path.join(root,file)))]))},cases:cases.map((c,i)=>({...c,user:c.user||'owner',project:c.project||1,expectedStatus:c.status||200,actualStatus:c.status||200,expected:structuredClone(expected[i]),actual:structuredClone(expected[i]),passed:true,paged:{status:c.status||200,factsCount:expected[i].length}})),contextScale:{},candidateScale:{},sourceScale:{}};
-    const save=()=>{json('evidence/ui/report.json',ui);json('evidence/retrieval-report.json',retrieval)};save();
-    const options={root,commit,uiReportPath:path.join(root,'evidence/ui/report.json'),retrievalReportPath:path.join(root,'evidence/retrieval-report.json')};
-    return fn({root,write,json,ui,retrieval,save,options});
+    const save=()=>{json('evidence/ui/report.json',ui);json('evidence/retrieval-report.json',retrieval);json('evidence/system/report.json',system)};save();
+    const options={root,commit,systemReportPath:path.join(root,'evidence/system/report.json'),uiReportPath:path.join(root,'evidence/ui/report.json'),retrievalReportPath:path.join(root,'evidence/retrieval-report.json')};
+    return fn({root,write,json,ui,retrieval,system,save,options});
   }finally{fs.rmSync(root,{recursive:true,force:true})}
 }
 test('consistent fixture evidence passes with complete required coverage',()=>fixture(({options})=>assert.equal(verifyEvidence(options).ui.screenshots.length,20)));
@@ -59,16 +68,19 @@ test('package verification detects changed documents and extra files',()=>fixtur
   write('docs/submission-report.md','edited document');assert.throws(()=>verifyPackage(root),/Package file changed/);
   write('unexpected.txt','extra');assert.throws(()=>verifyPackage(root),/file set changed/);
 }));
-test('complete package build excludes ignored files, verifies offline, and rejects dirty or stale inputs',()=>fixture(({root,write,json,ui,retrieval})=>{
+test('complete package build excludes ignored files, verifies offline, and rejects dirty or stale inputs',()=>fixture(({root,write,json,ui,retrieval,system})=>{
   const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
   write('.gitignore','artifacts/\nevidence/\n.env\n');
   for(const file of ['docs/submission-report.md','docs/demo-script.md'])write(file,'unit fixture document');
   write('scripts/package-evidence.js',fs.readFileSync(path.join(__dirname,'../scripts/package-evidence.js')));
   write('.env','unit fixture excluded content');
   git('init','--quiet');git('add','.');git('-c','user.name=Evidence unit fixture','-c','user.email=fixture@example.invalid','commit','--quiet','-m','Synthetic unit fixture');
-  const commit=git('rev-parse','HEAD');ui.source.commit=commit;retrieval.source.gitCommit=commit;
+  const commit=git('rev-parse','HEAD');system.source.commit=commit;ui.source.commit=commit;retrieval.source.gitCommit=commit;
   for(const screenshot of screenshotNames)write(`artifacts/ui/unit/${screenshot}`,fs.readFileSync(path.join(root,'evidence/ui',screenshot)));
   json('artifacts/ui/unit/report.json',ui);json('artifacts/retrieval-report.json',retrieval);
+  json('artifacts/system/unit/report.json',system);
+  for(const name of ['core.tap','core.stderr.txt','migrations.tap','migrations.stderr.txt'])write('artifacts/system/unit/'+name,fs.readFileSync(path.join(root,'evidence/system',name)));
+  const previousSystem=process.env.SYSTEM_REPORT_PATH;delete process.env.SYSTEM_REPORT_PATH;
   const previous=process.env.UI_REPORT_PATH;delete process.env.UI_REPORT_PATH;
   try{
     const output=buildPackage(root),manifest=verifyPackage(output);
@@ -78,7 +90,7 @@ test('complete package build excludes ignored files, verifies offline, and rejec
     write('server.js','unit fixture server.js');ui.source.commit='f'.repeat(40);json('artifacts/ui/unit/report.json',ui);
     assert.throws(()=>buildPackage(root),/another commit/);
     assert.equal(fs.readdirSync(path.join(root,'artifacts/submission')).length,1,'failed build must not publish another package');
-  }finally{if(previous===undefined)delete process.env.UI_REPORT_PATH;else process.env.UI_REPORT_PATH=previous}
+  }finally{if(previousSystem===undefined)delete process.env.SYSTEM_REPORT_PATH;else process.env.SYSTEM_REPORT_PATH=previousSystem;if(previous===undefined)delete process.env.UI_REPORT_PATH;else process.env.UI_REPORT_PATH=previous}
 }));
 
 test('true pass flags cannot hide inconsistent actual or rewritten expected values',()=>fixture(({retrieval,save,options})=>{
@@ -88,4 +100,17 @@ test('true pass flags cannot hide inconsistent actual or rewritten expected valu
 test('paged counts and browser race evidence must agree with asserted outcomes',()=>fixture(({ui,retrieval,save,options})=>{
   retrieval.cases[0].paged.factsCount=99;save();assert.throws(()=>verifyEvidence(options),/Paged result count differs/);
   retrieval.cases[0].paged.factsCount=1;ui.checks.creationKeyRace.createdSources=3;save();assert.throws(()=>verifyEvidence(options),/browser creation race evidence/);
+}));
+
+test('raw database evidence rejects inconsistent summaries and unconfirmed cleanup',()=>fixture(({system,save,options})=>{
+  system.suites[0].summary.pass=99;save();assert.throws(()=>verifyEvidence(options),/differs from raw TAP/);
+  system.suites[0].summary.pass=1;system.cleanup.temporaryDatabaseDropped=false;save();assert.throws(()=>verifyEvidence(options),/cleanup/);
+}));
+
+test('database evidence rejects stale commits, changed raw output and skipped tests',()=>fixture(({system,write,save,options})=>{
+  system.source.commit='b'.repeat(40);save();assert.throws(()=>verifyEvidence(options),/another commit/);
+  system.source.commit=options.commit;
+  const skipped='TAP version 13\nok 1 - fixture # SKIP\n# tests 1\n# pass 0\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n';
+  write('evidence/system/core.tap',skipped);save();assert.throws(()=>verifyEvidence(options));
+  system.suites[0].stdoutSha256=hash(skipped);system.suites[0].summary=parseTap(skipped);save();assert.throws(()=>verifyEvidence(options));
 }));
