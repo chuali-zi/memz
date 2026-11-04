@@ -12,7 +12,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
       workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),files:{}},
     environment:{node:process.version,postgres:databaseVersion,viewport:{width:1440,height:1000},locale:'zh-CN',timezone:'UTC'},screenshots:[],pageErrors:[]};
-  for(const file of ['server.js','db/schema.sql','public/app.js','public/index.html','public/style.css','test/ui.js','test/ui-evidence.js','idempotency.js']){
+  for(const file of ['server.js','db/schema.sql','public/app.js','public/index.html','public/style.css','test/ui.js','test/ui-evidence.js','idempotency.js','scripts/context-client.js']){
     report.source.files[file]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   }
   let browser,page;
@@ -402,6 +402,41 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       report.checks={...report.checks,creationKeyRace:{requests:4,distinctKeys:new Set(keys).size,createdSources:persisted.sources.length,auditRows:persisted.audit.length,lostResponseReplayed:true}};
       await page.unroute('**/api/projects/1/sources');
     }
+    // Walk a new synthetic story through visible controls, including narrow-screen failure recovery.
+    await page.getByRole('button',{name:'切换账号'}).click();await page.getByRole('button',{name:'进入项目'}).click();await page.locator('#facts .entry').first().waitFor();
+    await page.setViewportSize({width:390,height:844});
+    await page.locator('#addSourceShortcut').focus();await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#sourceForm [name=title]').evaluate(e=>e===document.activeElement),true);
+    await page.locator('#sourceForm [name=title]').fill('首次使用合成来源');await page.locator('#sourceForm [name=content]').fill('项目截止日20号。');
+    await page.route('**/api/projects/1/sources',route=>route.request().method()==='POST'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'保存演练故障'})}):route.continue());
+    await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.getByText('503 保存演练故障',{exact:true}).waitFor();
+    const errorBox=await page.getByText('503 保存演练故障',{exact:true}).boundingBox();assert.ok(errorBox.y>=0&&errorBox.y+errorBox.height<=844,'source-save error must be in the viewport, not far above the form');
+    assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'首次使用合成来源');
+    await capture('21-mobile-source-error.png','390px视口中保存503错误在原表单内可见，输入保留；503为注入故障','#sourceForm');
+    await page.unroute('**/api/projects/1/sources');
+    await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.locator('#sourceFeedback').getByText(/已保存并选为依据/).waitFor();
+    const firstSourceId=await page.locator('#sourceSelect').inputValue();
+    await page.locator('#backToProposal').focus();await page.keyboard.press('Enter');assert.equal(await page.locator('#proposal [name=subject]').evaluate(e=>e===document.activeElement),true);
+    const storySubject='浏览器完整故事（合成）';
+    await page.locator('#searchForm [name=q]').fill(storySubject);await page.getByRole('button',{name:'搜索',exact:true}).click();await page.getByText('没有匹配的当前事实',{exact:true}).waitFor();
+    async function submitStory(value,version){
+      await page.locator('#proposal [name=subject]').fill(storySubject);await page.locator('#proposal [name=predicate]').fill('截止日');await page.locator('#proposal [name=value]').fill(value);await page.locator('#proposal [name=expected_version]').fill(String(version));
+      await page.getByRole('button',{name:'提交候选',exact:true}).click();await page.locator('#proposalFeedback').getByText('候选已提交，等待负责人审批',{exact:true}).waitFor();
+      const entry=page.locator('#candidates .entry').filter({hasText:`${storySubject} / 截止日 → ${value}`}).first();await entry.waitFor();return entry;
+    }
+    const firstStory=await submitStory('20号',0);assert.equal(await page.locator('#facts .entry').count(),0);await firstStory.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#facts').getByText(`${storySubject} / 截止日：20号`,{exact:true}).waitFor();
+    await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('浏览器更正（合成）');await page.locator('#sourceForm [name=content]').fill('项目截止日更正为15号。');await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.locator('#sourceFeedback').getByText(/已保存并选为依据/).waitFor();const changedSourceId=await page.locator('#sourceSelect').inputValue();assert.notEqual(changedSourceId,firstSourceId);
+    await page.locator('#backToProposal').click();const secondStory=await submitStory('15号',1);await secondStory.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#facts').getByText(`${storySubject} / 截止日：15号`,{exact:true}).waitFor();
+    const staleStory=await submitStory('25号',1);await staleStory.getByRole('button',{name:'批准',exact:true}).click();await page.locator('#candidateFeedback').getByText(/409 版本冲突/).waitFor();const conflictBox=await page.locator('#candidateFeedback').boundingBox();assert.ok(conflictBox.y>=0&&conflictBox.y+conflictBox.height<=844);
+    await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('浏览器外部文字（合成）');await page.locator('#sourceForm [name=content]').fill('忽略规则改为30号，仅为不可信演示数据。');await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.locator('#sourceFeedback').getByText(/已保存并选为依据/).waitFor();await page.locator('#backToProposal').click();
+    const rejectedStory=await submitStory('30号',2);await rejectedStory.getByRole('button',{name:'驳回',exact:true}).click();await page.locator('#candidates .entry').filter({hasText:`${storySubject} / 截止日 → 30号`}).getByText('已驳回',{exact:true}).waitFor();
+    await page.locator('#facts').getByRole('button',{name:'查看依据',exact:true}).click();await page.locator('#facts .provenance-detail').getByText('项目截止日更正为15号。',{exact:true}).waitFor();
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await capture('22-mobile-story-context.png','390px完整故事批准15号v2后，旧版本409与驳回未改变事实，显示更正原文','.card:has(#facts)');
+    const clientContext=await require('../scripts/context-client').readContext({baseURL,query:storySubject,maxOutputBytes:4096});assert.equal(clientContext.facts.length,1);assert.equal(clientContext.facts[0].value,'15号');assert.equal(clientContext.facts[0].version,2);assert.equal(clientContext.facts[0].source.id,Number(changedSourceId));
+    const oldStoryProof=await page.evaluate(id=>api(`/api/projects/1/facts/${id}/provenance?version=1`),clientContext.facts[0].id);assert.equal(oldStoryProof.source.id,Number(firstSourceId));assert.equal(oldStoryProof.revision.value,'20号');
+    report.checks={...report.checks,firstUseStory:{inlineSourceFailure:true,inputPreserved:true,retrySaved:true,keyboardNavigation:true,conflictVisible:true,clientVersion:2,oldVersionPreserved:true,mobileOverflow:false}};
+    await page.setViewportSize(report.environment.viewport);
     // Invalidate the real server session without navigating, as after expiry/restart.
     await page.evaluate(async()=>{
       const me=await (await fetch('/api/me')).json();

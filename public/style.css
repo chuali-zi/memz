@@ -11,3 +11,5 @@ button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,input:focus-v
 #sourceSelection{overflow-wrap:anywhere}
 
 .provenance-detail p{white-space:pre-wrap}.provenance-detail{margin-top:10px;padding:12px;background:#f3f6f3;border-radius:8px}
+
+.action-feedback:empty{display:none}.action-feedback:not(:empty){padding:12px;border-left:4px solid #a66b19;border-radius:6px;background:#fff1d6;color:#644300;font-size:14px;overflow-wrap:anywhere}.action-feedback:focus-visible,a:focus-visible{outline:3px solid #a66b19;outline-offset:3px}a{color:#1f6a5c;text-underline-offset:3px}

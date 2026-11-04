@@ -13,7 +13,7 @@ async function createRecord(path,body){
     throw error;
   }
 }
-function message(s){$('#notice').textContent=s}function rows(id,items,render){const root=$(id);root.replaceChildren();if(!items.length)root.append(el('p','暂无记录','hint'));for(const item of items){const d=el('div',undefined,'entry');render(d,item);root.append(d)}}
+function message(s,target='#notice'){$(target).textContent=s}function rows(id,items,render){const root=$(id);root.replaceChildren();if(!items.length)root.append(el('p','暂无记录','hint'));for(const item of items){const d=el('div',undefined,'entry');render(d,item);root.append(d)}}
 async function switchAccount(){
   try{await api('/api/logout',{method:'POST'})}
   catch(error){if(error.status!==401)throw error}
@@ -23,7 +23,7 @@ async function switchAccount(){
 let projectGeneration=0;
 async function loadProjects(){
   const generation=++projectGeneration;
-  projectId=null;data=null;selectedSource=null;sourcePage=[];
+  projectId=null;data=null;selectedSource=null;sourcePage=[];for(const id of ['#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);
   const select=$('#project');select.replaceChildren();
   for(const button of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))button.disabled=true;
   message('正在加载项目…');
@@ -126,7 +126,7 @@ function renderCandidate(d,c,role,p){
         if(e.status===409&&p===projectId)await load();
         throw e;
       }finally{for(const button of actions.querySelectorAll('button'))button.disabled=false}
-    });actions.append(b);
+    },'#candidateFeedback');actions.append(b);
   }
   d.append(actions);
 }
@@ -215,10 +215,10 @@ async function load(){
   await Promise.all([facts,history,candidates,sources]);
 }
 function renderContext(){rows('#audit',data.audit,(d,a)=>d.append(el('strong',a.action),el('div',`${a.detail} · 用户 ${a.actor_id} · ${new Date(a.created_at).toLocaleString()}`,'meta')))}
-async function perform(fn){try{await fn()}catch(e){message(e.message)}}
+async function perform(fn,feedback=null){const p=projectId;if(feedback){message('');message('',feedback)}try{await fn()}catch(e){if(!feedback||p===projectId){message(e.message,feedback||'#notice');if(feedback)$(feedback).focus()}}}
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
 $('#loginForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const f=new FormData(e.target);const x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=x.csrf;message('');$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));const b=el('button','切换账号');b.onclick=()=>perform(switchAccount);$('#identity').append(b);await loadProjects()})};
-$('#project').onchange=e=>{projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
+$('#project').onchange=e=>{for(const id of ['#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
 $('#factsPrevious').onclick=()=>perform(()=>loadFacts({index:factState.index-1,focus:true}));
 $('#factsNext').onclick=()=>perform(()=>loadFacts({index:factState.index+1,focus:true}));
 $('#refreshWorkspace').onclick=()=>perform(load);
@@ -234,8 +234,8 @@ $('#sourceSearchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadSources({
 $('#sourcesPrevious').onclick=()=>perform(()=>loadSources({index:sourceState.index-1,focus:true}));
 $('#sourcesNext').onclick=()=>perform(()=>loadSources({index:sourceState.index+1,focus:true}));
 $('#refreshSources').onclick=()=>perform(()=>loadSources({reset:true}));
-$('#proposal').onsubmit=e=>{e.preventDefault();perform(async()=>{await createRecord(`/api/projects/${projectId}/candidates`,Object.fromEntries(new FormData(e.target)));message('候选已提交，等待负责人审批');await load()})};
-$('#sourceForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const p=projectId,source=await createRecord(`/api/projects/${p}/sources`,Object.fromEntries(new FormData(e.target)));if(p!==projectId)return;selectSource(source);e.target.reset();message(`来源 #${source.id} 已保存并选为依据`);await load()})};
+$('#proposal').onsubmit=e=>{e.preventDefault();perform(async()=>{await createRecord(`/api/projects/${projectId}/candidates`,Object.fromEntries(new FormData(e.target)));message('候选已提交，等待负责人审批','#proposalFeedback');await load()},'#proposalFeedback')};
+$('#sourceForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const p=projectId,source=await createRecord(`/api/projects/${p}/sources`,Object.fromEntries(new FormData(e.target)));if(p!==projectId)return;selectSource(source);e.target.reset();message(`来源 #${source.id} 已保存并选为依据`,'#sourceFeedback');await load()},'#sourceFeedback')};
 async function simulated(value,fragment){
   const p=projectId,page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(fragment)}&limit=1`);
   if(!page.sources.length)throw new Error('当前项目缺少此模拟场景的来源');
@@ -243,3 +243,6 @@ async function simulated(value,fragment){
   if(p===projectId){message('模拟客户端已提交候选，尚未改变当前事实');await load()}
 }
 $('#stale').onclick=()=>perform(()=>simulated('25号','会议纪要'));$('#injection').onclick=()=>perform(()=>simulated('30号','外部文档'));
+
+$('#addSourceShortcut').onclick=e=>{e.preventDefault();$('#sourceForm').closest('details').open=true;$('#sourceForm [name=title]').focus()};
+$('#backToProposal').onclick=e=>{e.preventDefault();$('#proposal [name=subject]').focus()};

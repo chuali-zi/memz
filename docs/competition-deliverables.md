@@ -22,7 +22,7 @@
 | 功能模型图说明 | design.md 的功能流程图及说明 | submission-report.md已含模型图及说明；最终图号按模板调整 |
 | 数据库设计 | design.md ER 关系与约束；schema.sql；保留数据迁移 | 已补data-dictionary.md字段/约束/权限/索引说明；六章草稿已引用；原文和模板复核待完成 |
 | 系统分析设计 | design.md 架构、事务、权限和一致性设计 | 已补api-sequences.md接口、读取/审批时序及限制；六章草稿与需求验收映射已补，最终模板排版待完成 |
-| 系统实施 | 可运行页面、server.js、SQL、README 启动步骤；UI 脚本 | 已补demo-evidence.md并由CI归档二十张截图；已有key-implementation.md真实代码与设计解释，evidence:package已绑定同提交20图和报告，最终选图与图号仍需人工确认 |
+| 系统实施 | 可运行页面、server.js、SQL、README 启动步骤；UI 脚本 | 已补demo-evidence.md并由CI归档二十二张截图；已有key-implementation.md真实代码与设计解释，evidence:package已绑定同提交22图和报告，最终选图与图号仍需人工确认 |
 | 系统测试评价 | PostgreSQL 集成测试、9 组迁移测试（含新旧库幂等并发验证）、19 个合成检索用例、CI 报告、UI 脚本 | 六章草稿列出验证方法与边界；材料包保留实际报告，CI终态独立核验 |
 
 测试报告只证明列出的用例，不证明生产安全、真实用户效果、语义检索能力或比赛成绩。CI 的 `ui-evidence` artifact保存真实浏览器截图与校验报告，`retrieval-evaluation`保存合成检索报告；最终文档应选用同一提交的证据并按要求排版。
@@ -30,7 +30,7 @@
 ## 后续优先级
 
 1. **复核六章材料草稿**：[submission-report.md](submission-report.md)已组织通知要求，仍需官方模板、原文和最终排版复核。
-2. **固定同提交证据**：[材料打包](evidence-package.md)校验源码/20图/19例报告并生成离线包；[演示步骤](demo-script.md)覆盖完整业务链。人工确认图意和整次CI终态。
+2. **固定同提交证据**：[材料打包](evidence-package.md)校验源码/22图/19例报告并生成离线包；[演示步骤](demo-script.md)覆盖完整业务链。人工确认图意和整次CI终态。
 3. **按实际缺口推进**：四类列表已分页，保留已有回归；后续优化应有数据或演示问题支撑，不为增加功能而扩大范围。
 4. **提交前人工复核**：对照原通知及任何模板核对材料、截止时间和提交渠道；报名及外部提交另行获得明确操作指令。
 
