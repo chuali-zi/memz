@@ -47,7 +47,7 @@ CI上传整个新生成目录为 `ui-evidence` artifact。报告不保存会话c
 
 分页测试中的慢响应通过拦截真实响应延迟释放；503为测试专用故障注入，并发更新使用真实HTTP创建与审批。上述测试不更改现有演示库。页面时间一致性边界见[分页说明](bounded-retrieval.md)。
 
-历史独立分页增加13-history-last-page.png与14-mobile-history.png：真实临时库58条修订，第三页8条仍包含20号v1及15号v2。独立流程共30张截图；历史故障注入与延迟响应也有自动断言，参见[历史分页验收](history-pagination.md)。
+历史独立分页增加13-history-last-page.png与14-mobile-history.png：真实临时库58条修订，第三页8条仍包含20号v1及15号v2。独立流程共31张截图；历史故障注入与延迟响应也有自动断言，参见[历史分页验收](history-pagination.md)。
 
 候选分页新增15–17图：60条候选的第三页、真实并发处理后已驳回状态、移动端空筛选。审批保留筛选、409刷新及旧响应/503场景有自动断言。详见[候选分页证据](candidate-pagination.md)。
 
@@ -92,3 +92,5 @@ CI上传整个新生成目录为 `ui-evidence` artifact。报告不保存会话c
 27-candidate-source-review.png记录候选待审时就地核对原文。截图前注入一次来源读取503，再重试真实接口；核对来源ID和正文，并确认此时当前事实仍为空，预览未批准候选。
 
 28-candidate-version-comparison.png展示真实并发批准后的审核对照：20号提议基于v0，另一请求批准21号v1后刷新核对，显示当前值、来源和不一致提示；随后旧候选审批409，没有覆盖当前事实。此处没有用伪造响应模拟版本变化。
+
+审计分页新增31-audit-last-page.png：合成操作超过100条后，浏览器翻至初始化记录；report.checks.auditPagination记录实际行数、页数和断网后刷新恢复。参见[审计分页](audit-pagination.md)。

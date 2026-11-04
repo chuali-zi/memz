@@ -88,7 +88,7 @@ UNIQUE(project_id,id) 供 revisions 引用。数据库 RLS 要求提出者与事
 | detail | text | 是 | 可读说明文本，没有结构化候选外键 |
 | created_at | timestamptz | 是/now() | 记录创建时间 |
 
-应用角色无 UPDATE/DELETE 权限；插入要求 owner/member 且 actor_id 与事务身份一致。审计与业务写入同事务，回滚时一起撤销。接口仅返回最近100条，不代表数据库只保存100条。
+应用角色无 UPDATE/DELETE 权限；插入要求 owner/member 且 actor_id 与事务身份一致。审计与业务写入同事务，回滚时一起撤销。旧聚合接口默认返回最近100条；[审计分页接口](audit-pagination.md)可按ID向前读取完整已提交历史，每页默认25条、最多100条。数据库并非只保存100条。
 
 ## 权限、索引及取舍
 

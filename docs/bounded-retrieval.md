@@ -4,7 +4,7 @@
 
 `limit` 默认 50、范围 1–100；`after` 默认 0、范围 0–2147483647，表示排除该 ID 及以前的事实。两者只接受单个十进制整数字符串。关键词只接受单个字符串，截取前 200 个 UTF-16 代码单元，保持原字面量子串匹配。参数错误返回 400，未登录 401，非成员 403。查询多取一行判断后续页；`next_after=null` 表示结束，否则下次传回该值。改变项目或关键词必须重置游标。
 
-原 `/data` 默认响应保持不变。可选 `include_facts=false` 跳过事实查询并省略 `facts` 字段；`true` 与缺省相同，其他值或重复参数400。页面将四个include_*设为false读取审计，并行读取事实、[历史](history-pagination.md)、[候选](candidate-pagination.md)和[来源](source-pagination.md)第一页。搜索/事实翻页仅调用 `/facts`；各请求不是共同快照，页面明确提示这一边界。
+原 `/data` 默认响应保持不变。可选 `include_facts=false` 跳过事实查询并省略 `facts` 字段；`true` 与缺省相同，其他值或重复参数400。页面将五个include_*设为false读取角色，并行读取事实、[历史](history-pagination.md)、[候选](candidate-pagination.md)、[来源](source-pagination.md)和[审计](audit-pagination.md)第一页。搜索/事实翻页仅调用 `/facts`；各请求不是共同快照，页面明确提示这一边界。
 
 ## 实际测量
 

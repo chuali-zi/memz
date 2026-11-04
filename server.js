@@ -43,7 +43,7 @@ function str(x,max=500){if(typeof x!=='string'||!x.trim()||x.length>max)throw fa
 async function role(c,p,allowed){const r=(await c.query('SELECT role FROM memberships WHERE project_id=$1 AND user_id=nullif(current_setting(\'app.user_id\',true),\'\')::int',[p])).rows[0];if(!r||!allowed.includes(r.role))throw fail(403,'无权访问此项目或执行此操作');return r.role}
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 app.get('/api/projects',route(async(req,res)=>res.json(await tx(req.user.id,async c=>(await c.query('SELECT p.id,p.name,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=$1 ORDER BY p.id',[req.user.id])).rows))));
-async function readProject(user,p,q,{includeFacts=true,includeHistory=true,includeCandidates=true,includeSources=true}={}){return tx(user,async c=>{const r=await role(c,p,['owner','member','viewer']);const facts=includeFacts?(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id WHERE f.project_id=$1 AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0 ORDER BY f.id`,[p,q])).rows:[];const sources=includeSources?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 ORDER BY id',[p])).rows:[];const candidates=includeCandidates?(await c.query('SELECT c.*,s.title source FROM candidates c JOIN sources s ON s.id=c.source_id WHERE c.project_id=$1 ORDER BY c.id DESC',[p])).rows:[];const history=includeHistory?(await c.query('SELECT f.subject,f.predicate,r.version,r.value,s.title source,r.created_at FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id WHERE r.project_id=$1 ORDER BY r.id DESC',[p])).rows:[];const audit=(await c.query('SELECT * FROM audit WHERE project_id=$1 ORDER BY id DESC LIMIT 100',[p])).rows;return {sourceTextIsUntrusted:true,role:r,...(includeFacts?{facts}:{}),...(includeSources?{sources}:{}),...(includeCandidates?{candidates}:{}),...(includeHistory?{history}:{}),audit}},{snapshot:true})}
+async function readProject(user,p,q,{includeFacts=true,includeHistory=true,includeCandidates=true,includeSources=true,includeAudit=true}={}){return tx(user,async c=>{const r=await role(c,p,['owner','member','viewer']);const facts=includeFacts?(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id WHERE f.project_id=$1 AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0 ORDER BY f.id`,[p,q])).rows:[];const sources=includeSources?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 ORDER BY id',[p])).rows:[];const candidates=includeCandidates?(await c.query('SELECT c.*,s.title source FROM candidates c JOIN sources s ON s.id=c.source_id WHERE c.project_id=$1 ORDER BY c.id DESC',[p])).rows:[];const history=includeHistory?(await c.query('SELECT f.subject,f.predicate,r.version,r.value,s.title source,r.created_at FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id WHERE r.project_id=$1 ORDER BY r.id DESC',[p])).rows:[];const audit=includeAudit?(await c.query('SELECT * FROM audit WHERE project_id=$1 ORDER BY id DESC LIMIT 100',[p])).rows:[];return {sourceTextIsUntrusted:true,role:r,...(includeFacts?{facts}:{}),...(includeSources?{sources}:{}),...(includeCandidates?{candidates}:{}),...(includeHistory?{history}:{}),...(includeAudit?{audit}:{})}},{snapshot:true})}
 async function readFactsPage(user,p,q,{limit=50,after=0}={}){
   return tx(user,async c=>{
     const r=await role(c,p,['owner','member','viewer']);
@@ -111,6 +111,17 @@ async function readCandidatesPage(user,p,{limit=25,before=null,status='all'}={})
     return {role:r,candidates,next_before:more?candidates[candidates.length-1].id:null};
   },{snapshot:true});
 }
+app.get('/api/projects/:p/audit',route(async(req,res)=>{
+  const p=num(req.params.p),limit=req.query.limit===undefined?25:integer(req.query.limit,1,'分页大小无效');
+  if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');
+  const before=req.query.before===undefined?null:integer(req.query.before,1,'游标无效');
+  res.json(await tx(req.user.id,async c=>{
+    const r=await role(c,p,['owner','member','viewer']);
+    const rows=(await c.query('SELECT * FROM audit WHERE project_id=$1 AND ($2::int IS NULL OR id<$2) ORDER BY id DESC LIMIT $3',[p,before,limit+1])).rows;
+    const audit=rows.slice(0,limit);
+    return {sourceTextIsUntrusted:true,role:r,audit,next_before:rows.length>limit?audit[audit.length-1].id:null};
+  },{snapshot:true}));
+}));
 app.get('/api/projects/:p/candidates',route(async(req,res)=>{
   const p=num(req.params.p),limit=req.query.limit===undefined?25:integer(req.query.limit,1,'分页大小无效');
   if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');
@@ -136,7 +147,7 @@ app.get('/api/projects/:p/sources',route(async(req,res)=>{
   if(req.query.q!==undefined&&typeof req.query.q!=='string')throw fail(400,'来源标题关键词必须是单个字符串');
   res.json(await readSourcesPage(req.user.id,p,queryText(req.query.q||'',150),{limit,after}));
 }));
-app.get('/api/projects/:p/data',route(async(req,res)=>{for(const key of ['include_facts','include_history','include_candidates','include_sources'])if(req.query[key]!==undefined&&!['true','false'].includes(req.query[key]))throw fail(400,`${key} 必须是 true 或 false`);const p=num(req.params.p),q=typeof req.query.q==='string'?queryText(req.query.q,200):'';res.json(await readProject(req.user.id,p,q,{includeFacts:req.query.include_facts!=='false',includeHistory:req.query.include_history!=='false',includeCandidates:req.query.include_candidates!=='false',includeSources:req.query.include_sources!=='false'}))}));
+app.get('/api/projects/:p/data',route(async(req,res)=>{for(const key of ['include_facts','include_history','include_candidates','include_sources','include_audit'])if(req.query[key]!==undefined&&!['true','false'].includes(req.query[key]))throw fail(400,`${key} 必须是 true 或 false`);const p=num(req.params.p),q=typeof req.query.q==='string'?queryText(req.query.q,200):'';res.json(await readProject(req.user.id,p,q,{includeFacts:req.query.include_facts!=='false',includeHistory:req.query.include_history!=='false',includeCandidates:req.query.include_candidates!=='false',includeSources:req.query.include_sources!=='false',includeAudit:req.query.include_audit!=='false'}))}));
 app.post('/api/projects/:p/sources',requireJsonObject,route(async(req,res)=>{
   const p=num(req.params.p),title=str(req.body.title,150),content=str(req.body.content,4000),key=requestKey(req);
   res.json(await tx(req.user.id,async c=>{

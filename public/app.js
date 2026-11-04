@@ -115,6 +115,32 @@ async function loadHistory({reset=false,index=historyState.index,focus=false}={}
     $('#history').setAttribute('aria-busy','false');$('#historyPrevious').disabled=true;$('#historyNext').disabled=true;
   }
 }
+let auditGeneration=0,auditState={cursors:[null],index:0,next:null};
+function auditControls(busy=false){
+  $('#audit').setAttribute('aria-busy',String(busy));
+  $('#auditPrevious').disabled=busy||auditState.index===0;
+  $('#auditNext').disabled=busy||auditState.next===null;
+}
+async function loadAudit({reset=false,index=auditState.index,focus=false}={}){
+  if(projectId===null)return;
+  if(reset){auditState={cursors:[null],index:0,next:null};index=0}
+  const generation=++auditGeneration,p=projectId,before=auditState.cursors[index];
+  auditControls(true);$('#audit').replaceChildren();$('#auditStatus').textContent='正在加载操作审计…';
+  try{
+    const page=await api(`/api/projects/${p}/audit?limit=25${before===null?'':`&before=${before}`}`);
+    if(generation!==auditGeneration||p!==projectId)return;
+    auditState.index=index;auditState.next=page.next_before;
+    auditState.cursors=auditState.cursors.slice(0,index+1);
+    if(page.next_before!==null)auditState.cursors.push(page.next_before);
+    rows('#audit',page.audit,(d,a)=>d.append(el('strong',a.action),el('span',`#${a.id}`,'badge'),el('div',`${a.detail} · 用户 ${a.actor_id} · ${new Date(a.created_at).toLocaleString()}`,'meta')));
+    $('#auditStatus').textContent=page.audit.length?`审计第 ${index+1} 页 · ${page.audit.length} 条${page.next_before===null?' · 已到末页':''}`:'暂无操作审计';
+    auditControls();if(focus)$('#auditTitle').focus();
+  }catch(e){
+    if(generation!==auditGeneration||p!==projectId)return;
+    $('#auditStatus').textContent=`审计加载失败：${e.message}。请刷新审计重试。`;
+    $('#audit').setAttribute('aria-busy','false');$('#auditPrevious').disabled=true;$('#auditNext').disabled=true;
+  }
+}
 let candidateGeneration=0,candidateState={status:'all',cursors:[null],index:0,next:null};
 function candidateControls(busy=false){
   $('#candidates').setAttribute('aria-busy',String(busy));
@@ -254,17 +280,15 @@ async function load(){
   data=null;
   for(const id of ['#sources','#candidates','#history','#audit'])$(id).replaceChildren();
   for(const b of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))b.disabled=true;
-  const facts=loadFacts({reset:true}),history=loadHistory({reset:true}),candidates=loadCandidates({reset:true}),sources=loadSources({reset:true});
+  const facts=loadFacts({reset:true}),history=loadHistory({reset:true}),candidates=loadCandidates({reset:true}),sources=loadSources({reset:true}),audit=loadAudit({reset:true});
   try{
-    const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false`);
+    const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false`);
     if(generation!==contextGeneration||p!==projectId)return;
     data=result;
     writeControls();
-    renderContext();
   }catch(e){if(generation===contextGeneration&&p===projectId)message(`工作台加载失败：${e.message}。请刷新重试。`)}
-  await Promise.all([facts,history,candidates,sources]);
+  await Promise.all([facts,history,candidates,sources,audit]);
 }
-function renderContext(){rows('#audit',data.audit,(d,a)=>d.append(el('strong',a.action),el('div',`${a.detail} · 用户 ${a.actor_id} · ${new Date(a.created_at).toLocaleString()}`,'meta')))}
 async function perform(fn,feedback=null){const p=projectId;if(feedback){message('');message('',feedback)}try{await fn()}catch(e){if(!feedback||p===projectId){message(e.message,feedback||'#notice');if(feedback)$(feedback).focus()}}}
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
 $('#loginForm').onsubmit=e=>{e.preventDefault();perform(async()=>{const f=new FormData(e.target);const x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=x.csrf;message('');$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));const b=el('button','切换账号');b.onclick=()=>perform(switchAccount);$('#identity').append(b);await loadProjects()})};
@@ -275,6 +299,9 @@ $('#refreshWorkspace').onclick=()=>perform(load);
 $('#historyPrevious').onclick=()=>perform(()=>loadHistory({index:historyState.index-1,focus:true}));
 $('#historyNext').onclick=()=>perform(()=>loadHistory({index:historyState.index+1,focus:true}));
 $('#refreshHistory').onclick=()=>perform(()=>loadHistory({reset:true}));
+$('#auditPrevious').onclick=()=>perform(()=>loadAudit({index:auditState.index-1,focus:true}));
+$('#auditNext').onclick=()=>perform(()=>loadAudit({index:auditState.index+1,focus:true}));
+$('#refreshAudit').onclick=()=>perform(()=>loadAudit({reset:true}));
 $('#candidateFilter').onchange=()=>perform(()=>loadCandidates({reset:true}));
 $('#candidatesPrevious').onclick=()=>perform(()=>loadCandidates({index:candidateState.index-1,focus:true}));
 $('#candidatesNext').onclick=()=>perform(()=>loadCandidates({index:candidateState.index+1,focus:true}));

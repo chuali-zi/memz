@@ -224,3 +224,18 @@ test('concurrent source inserts do not invalidate paging or source references ou
   const revision=await tx(1,async c=>(await c.query('SELECT r.source_id,s.content FROM revisions r JOIN sources s ON s.id=r.source_id WHERE r.candidate_id=$1',[candidate.id])).rows[0]);
   assert.deepEqual(revision,{source_id:source.id,content:'可追溯正文'});
 });
+
+ test('audit history remains reachable beyond legacy 100 rows with isolated stable cursors',async()=>{
+  const read=async(query='',user='owner',project=1)=>{const r=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/${project}/audit${query}`,{headers:{cookie:cookies[user]}});return {status:r.status,body:await r.json()}};
+  const expectedRows=await tx(1,async c=>(await c.query('SELECT * FROM audit WHERE project_id=1 ORDER BY id DESC')).rows);
+  assert.ok(expectedRows.length>100);
+  const first=await read('?limit=25');assert.equal(first.status,200);
+  await tx(1,c=>c.query("INSERT INTO audit(project_id,actor_id,action,detail) VALUES(1,1,'test','合成并发审计')"));
+  const ids=first.body.audit.map(a=>a.id);let before=first.body.next_before;
+  while(before!==null){const page=await read(`?limit=25&before=${before}`,'viewer');assert.equal(page.status,200);assert.ok(page.body.audit.length<=25);ids.push(...page.body.audit.map(a=>a.id));before=page.body.next_before;}
+  assert.deepEqual(ids,expectedRows.map(a=>a.id));
+  assert.equal((await read('','other')).status,403);assert.equal((await read('','owner',2)).status,403);
+  for(const q of ['?limit=0','?limit=101','?before=0','?before=x','?before=1&before=2'])assert.equal((await read(q)).status,400);
+  const aggregate=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/1/data`,{headers:{cookie:cookies.owner}}).then(r=>r.json());assert.equal(aggregate.audit.length,100);
+  const omitted=await fetch(`http://127.0.0.1:${server.address().port}/api/projects/1/data?include_audit=false`,{headers:{cookie:cookies.owner}}).then(r=>r.json());assert.equal(Object.hasOwn(omitted,'audit'),false);
+ });

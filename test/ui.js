@@ -184,7 +184,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       assert.equal(await page.locator('#facts .entry').count(),0);
       assert.equal(await page.locator('#factsNext').isDisabled(),true);
       await page.unroute('**/api/projects/1/facts?**');
-      const contextRequest=page.waitForRequest(r=>r.url().endsWith('/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false'));
+      const contextRequest=page.waitForRequest(r=>r.url().endsWith('/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false'));
       await page.getByRole('button',{name:'刷新工作台',exact:true}).click();await contextRequest;
       await page.locator('#facts').getByText('分页演示54 / 状态：合成分页事实',{exact:true}).waitFor();
       await capture('11-search-recovered.png','注入503后刷新恢复真实检索；聚合请求显式排除事实','.card:has(#facts)');
@@ -574,6 +574,27 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.getByRole('button',{name:'进入项目'}).click();
     await page.locator('#facts .entry').first().waitFor();
     report.checks={...report.checks,sessionRecovery:{invalidatedSession:true,returnedToLogin:true,reloginSucceeded:true}};
+    await page.evaluate(async()=>{
+      const existing=await api('/api/projects/1/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false');
+      for(let i=existing.audit.length;i<110;i++)await api('/api/projects/1/sources',{method:'POST',body:JSON.stringify({title:`审计翻页合成来源${i}`,content:'仅供隔离浏览器审计分页验证'})});
+    });
+    await page.locator('#refreshAudit').click();
+    await page.locator('#auditStatus').getByText(/审计第 1 页/).waitFor();
+    const auditIds=[];let auditPages=0;
+    do{
+      auditIds.push(...await page.locator('#audit .entry .badge').allTextContents());auditPages++;
+      if(await page.locator('#auditNext').isDisabled())break;
+      await page.locator('#auditNext').click();await page.locator('#auditStatus').getByText(new RegExp(`审计第 ${auditPages+1} 页`)).waitFor();
+      assert.ok(auditPages<50);
+    }while(true);
+    assert.ok(auditIds.length>100);assert.equal(new Set(auditIds).size,auditIds.length);
+    await page.locator('#audit').getByText('初始化合成事实 v1',{exact:false}).waitFor();
+    await capture('31-audit-last-page.png','合成演示审计超过100条后仍可翻至初始化记录','section:has(> #auditTitle)');
+    await page.route('**/api/projects/*/audit?*',route=>route.abort());
+    await page.locator('#auditPrevious').click();await page.locator('#auditStatus').getByText(/审计加载失败/).waitFor();
+    assert.equal(await page.locator('#audit .entry').count(),0);assert.ok(await page.locator('#auditNext').isDisabled());
+    await page.unroute('**/api/projects/*/audit?*');await page.locator('#refreshAudit').click();await page.locator('#auditStatus').getByText(/审计第 1 页/).waitFor();
+    report.checks.auditPagination={rows:auditIds.length,pages:auditPages,oldestReachable:true,failureRecovered:true};
     assert.deepEqual(report.pageErrors,[],'浏览器不能出现未捕获脚本错误');
     report.passed=true;
   }catch(e){
