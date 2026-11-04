@@ -18,11 +18,11 @@
 
 | 通知要求 | 现有证据 | 尚需完成 |
 | --- | --- | --- |
-| 需求分析 | README 演示目标；design.md 的角色、审批和检索需求 | 整理完整角色场景、范围边界与验收条件 |
+| 需求分析 | README 演示目标；design.md 的角色、审批和检索需求 | 已有requirements-acceptance.md需求/验收/证据对应；最终章节组织待完成 |
 | 功能模型图说明 | design.md 的功能流程图及说明 | 按最终文档格式编号，并与需求逐项对应 |
 | 数据库设计 | design.md ER 关系与约束；schema.sql；保留数据迁移 | 已补data-dictionary.md字段/约束/权限/索引说明；最终文档排版与原文复核待完成 |
-| 系统分析设计 | design.md 架构、事务、权限和一致性设计 | 已补api-sequences.md接口、读取/审批时序及限制；补需求验收映射 |
-| 系统实施 | 可运行页面、server.js、SQL、README 启动步骤；UI 脚本 | 已补demo-evidence.md并由CI归档八张截图；仍需挑选代码片段写解释 |
+| 系统分析设计 | design.md 架构、事务、权限和一致性设计 | 已补api-sequences.md接口、读取/审批时序及限制；需求验收映射已补，最终章节排版待完成 |
+| 系统实施 | 可运行页面、server.js、SQL、README 启动步骤；UI 脚本 | 已补demo-evidence.md并由CI归档八张截图；已有key-implementation.md真实代码与设计解释，最终图文编排待完成 |
 | 系统测试评价 | PostgreSQL 集成测试、7 组迁移测试、19 个合成检索用例、CI 报告、UI 脚本 | 将结果整理为测试条件/步骤/预期/实际表，配截图并解释限制 |
 
 测试报告只证明列出的用例，不证明生产安全、真实用户效果、语义检索能力或比赛成绩。CI 的 `ui-evidence` artifact保存真实浏览器截图与校验报告，`retrieval-evaluation`保存合成检索报告；最终文档应选用同一提交的证据并按要求排版。

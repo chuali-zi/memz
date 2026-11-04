@@ -70,6 +70,8 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 已按本机核实的原通知整理[交付对照与后续优先级](docs/competition-deliverables.md)，列明六项文档要求、现有证据和缺口。当前仍是演示原型，不表示已经报名或提交。
 
+材料编写还可参考[需求—验收—证据表](docs/requirements-acceptance.md)和[关键实现说明](docs/key-implementation.md)，两者区分已验证行为与实际限制。
+
 ## 设计与限制
 
 详见 [数据模型与取舍](docs/design.md)、[数据字典](docs/data-dictionary.md)与[接口及时序](docs/api-sequences.md)。数据库用事务局部身份设置和 RLS 限制项目范围；应用连接为非 owner、非超级用户、无 BYPASSRLS。会话是服务端随机不透明 cookie，浏览器身份不来自请求中的 user_id 或角色；状态更改要求 CSRF token。来源内容以文本呈现，搜索是参数化的中文子串关键词匹配，**不是语义搜索**。

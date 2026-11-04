@@ -6,7 +6,7 @@
 
 | 方法与路径 | 输入 | 成功结果 | 权限与主要失败 |
 | --- | --- | --- | --- |
-| POST /api/login | username, password | name, csrf；设置sid cookie | 公开合成账号；错误凭据401；不匹配的Origin返回403纯文本 |
+| POST /api/login | username, password | name, csrf；设置sid cookie | 公开合成账号；错误凭据401；不匹配的Origin返回403 JSON |
 | GET /api/me | cookie | name, csrf | 未登录/过期401 |
 | POST /api/logout | cookie、CSRF；无请求体也可 | ok:true；清除会话/cookie | 未登录401；CSRF错误403 |
 | GET /api/projects | cookie | id/name/role 数组 | 仅当前用户所属项目 |
@@ -16,7 +16,7 @@
 | POST /api/projects/:p/candidates/:id/approve | 路径参数；无需请求体 | status:approved,version | owner；候选不存在404；已处理/版本冲突409 |
 | POST /api/projects/:p/candidates/:id/reject | 路径参数；无需请求体 | status:rejected | owner；不存在404；已处理409 |
 
-决策路径除approve/reject外返回400。ID接受正整数或十进制数字字符串；expected_version接受0至2147483647的整数或数字字符串。字符串必填、非空，trim后使用，长度在trim前校验；上限见数据字典。错误通常为 `{error:说明}`，但登录Origin拒绝例外；未知路由也未统一JSON错误格式。缺少JSON对象/非JSON写请求的处理尚未统一，部分情况可能500，不把它描述为已完成的输入合同。
+决策路径除approve/reject外返回400。ID接受正整数或十进制数字字符串；expected_version接受0至2147483647的整数或数字字符串。字符串必填、非空，trim后使用，长度在trim前校验；上限见数据字典。所有已处理API错误返回 `{error:说明}`，包括登录Origin拒绝和已认证未知API路由404。登录、来源、候选要求Content-Type为application/json（允许charset参数）：缺少或不支持的类型415；类型正确但空请求体、数组、标量或坏JSON400；超过16KiB为413；不支持的字符集/编码415。合法空对象仍由字段/凭据校验判定。审批、驳回和退出保持支持无请求体。解析错误使用固定消息，不反射输入原文，且保留安全响应头。解析器先于认证运行，坏JSON可能先被拒绝；其他业务写请求先经过会话与CSRF门禁。断开的传输连接不保证还能收到错误正文。
 
 q是单个字符串时截取前200个 UTF-16 code units，否则当空串。检索不trim q；空串匹配全部当前事实。仅过滤facts的主体、属性和值，其他返回数组不按q过滤。facts按ID升序；候选/历史按ID降序；审计按ID降序最多100条；没有分页。
 
@@ -91,4 +91,4 @@ sequenceDiagram
 
 ## 当前范围与后续缺口
 
-这是本机演示API：内存会话、无真实用户注册、无重试幂等请求键、无列表分页、无通用结构化审计查询。网络层重试已成功的审批会得到409，不重复生成修订；客户端需重新读取状态判断。不要把这些限制写成已实现功能。优先补统一错误响应和请求体校验，再根据测量优化响应规模。
+这是本机演示API：内存会话、无真实用户注册、无重试幂等请求键、无列表分页、无通用结构化审计查询。网络层重试已成功的审批会得到409，不重复生成修订；客户端需重新读取状态判断。不要把这些限制写成已实现功能。已补JSON对象及错误响应校验；后续应根据受控测量优化响应规模，并评估创建请求幂等性。
