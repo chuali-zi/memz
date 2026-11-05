@@ -1,0 +1,1 @@
+run_id,config_sha256,system,scope,dataset_revision,corpus_sha256,status,error_code,documents,raw_bytes,storage_bytes,parse_ms,extract_ms,embed_ms,write_ms,approval_wait_ms,maintenance_ms,queue_ms,index_ready_wall_ms,index_llm_input_tokens,index_llm_output_tokens,index_embedding_tokens,index_attempts,index_failures,index_cost_currency,currency,price_version,human_minutes

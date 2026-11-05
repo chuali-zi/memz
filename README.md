@@ -74,6 +74,8 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 运行 `npm run eval:retrieval` 可生成 19 个正确性用例与逐例 HTTP 延迟报告；需显式设置测试管理员连接，详见[数据集、运行步骤与测量限制](docs/retrieval-evaluation.md)。CI 自动保存 `retrieval-evaluation` 报告，不使用虚构成绩或跨环境性能阈值。
 
+长期记忆公开基准的来源清单、离线加载脚本和后续公平比较方案见 [benchmark 准备](benchmarks/memory/README.md)。仓库不包含第三方数据或源码；目前没有真实模型的质量、加速或 token 节省结论。
+
 ## 演示（约 7 分钟）
 
 完整合成故事可运行 `MEMZ_DEMO_BASE_URL=http://127.0.0.1:3000 node scripts/demo-story.js --markdown`：在显式选定的本地演示库新增唯一主体记录，展示实际批准、冲突、历史依据和客户端上下文；不会删除已有数据。执行范围与失败处理见[演示脚本](docs/demo-script.md)。

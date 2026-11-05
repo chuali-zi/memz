@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "observed_date_utc": "2026-11-05",
+  "note": "Source references and review scope only. Original local archives and third-party source trees are deliberately not included. No runtime dependency on the original research workspace.",
+  "repositories": [
+    {
+      "name": "LongMemEval",
+      "origin": "https://github.com/xiaowu0162/LongMemEval.git",
+      "commit": "9e0b455f4ef0e2ab8f2e582289761153549043fc",
+      "official_tree_url": "https://github.com/xiaowu0162/LongMemEval/tree/9e0b455f4ef0e2ab8f2e582289761153549043fc",
+      "license": "MIT",
+      "distribution_status": "reference_only; no upstream source code vendored",
+      "reviewed_scope": [
+        "src",
+        "README.md",
+        "LICENSE",
+        "requirements-lite.txt"
+      ],
+      "observed_materialized_bytes_in_original_research": 150122
+    },
+    {
+      "name": "LongMemEval-V2",
+      "origin": "https://github.com/xiaowu0162/LongMemEval-V2.git",
+      "commit": "2cc8c540bdb87fe6761629b585e727e1c4704520",
+      "official_tree_url": "https://github.com/xiaowu0162/LongMemEval-V2/tree/2cc8c540bdb87fe6761629b585e727e1c4704520",
+      "license": "Apache-2.0",
+      "distribution_status": "reference_only; no upstream source code vendored",
+      "reviewed_scope": [
+        "full public code checkout"
+      ],
+      "observed_materialized_bytes_in_original_research": 649178
+    },
+    {
+      "name": "MemoryAgentBench",
+      "origin": "https://github.com/HUST-AI-HYZ/MemoryAgentBench.git",
+      "commit": "538026089d1a8a8eff05121d0db89b388f360eba",
+      "official_tree_url": "https://github.com/HUST-AI-HYZ/MemoryAgentBench/tree/538026089d1a8a8eff05121d0db89b388f360eba",
+      "license": "MIT (source datasets retain their own terms)",
+      "distribution_status": "reference_only; no upstream source code vendored",
+      "reviewed_scope": [
+        "methods",
+        "configs",
+        "README.md",
+        "LICENSE",
+        "requirements.txt",
+        "main.py",
+        "utils.py",
+        "config",
+        "eval",
+        "metrics.py",
+        "/agent.py",
+        "/conversation_creator.py",
+        "/initialization.py",
+        "/utils/",
+        "/llm_based_eval/",
+        "/bash_files/"
+      ],
+      "observed_materialized_bytes_in_original_research": 1013428
+    },
+    {
+      "name": "OpenViking",
+      "origin": "https://github.com/volcengine/OpenViking.git",
+      "commit": "739e17f9172b9f595bfe4cc95293ec52d4686120",
+      "official_tree_url": "https://github.com/volcengine/OpenViking/tree/739e17f9172b9f595bfe4cc95293ec52d4686120",
+      "license": "AGPL-3.0 (core; inspect per-directory licenses)",
+      "distribution_status": "reference_only; no upstream source code vendored",
+      "reviewed_scope": [
+        "benchmark",
+        "docs/en",
+        "docs/zh",
+        "README.md",
+        "LICENSE",
+        "pyproject.toml",
+        "/openviking/retrieve/",
+        "/openviking/session/",
+        "/sdk/python/"
+      ],
+      "observed_materialized_bytes_in_original_research": 9677069
+    },
+    {
+      "name": "locomo",
+      "origin": "https://github.com/snap-research/locomo.git",
+      "commit": "3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376",
+      "official_tree_url": "https://github.com/snap-research/locomo/tree/3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376",
+      "license": "CC-BY-NC-4.0",
+      "distribution_status": "reference_only; no upstream source code vendored",
+      "reviewed_scope": [
+        "task_eval",
+        "scripts",
+        "data",
+        "README.MD",
+        "LICENSE.txt",
+        "requirements.txt"
+      ],
+      "observed_materialized_bytes_in_original_research": 6084298
+    }
+  ]
+}

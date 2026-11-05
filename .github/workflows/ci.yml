@@ -1,6 +1,18 @@
 name: PostgreSQL integration
 on: [push, pull_request]
 jobs:
+  memory-preparation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check offline memory benchmark preparation
+        run: |
+          python -m unittest discover -s benchmarks/memory/tests -p 'test_*.py' -v
+          python -m py_compile benchmarks/memory/scripts/*.py benchmarks/memory/tests/*.py
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15

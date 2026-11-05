@@ -1,0 +1,1 @@
+run_id,system,scope,question_id,stage,attempt,request_id,model_snapshot,start_utc,end_utc,elapsed_ms,status,error_code,input_tokens,output_tokens,cached_input_tokens,reasoning_output_tokens,embedding_tokens,provider_usage_known,cache_hit,cost_currency,currency,price_version
