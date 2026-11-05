@@ -96,11 +96,11 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 这是单机演示：固定公开账号、内存 session（重启失效，未做集群/速率限制）、HTTP 本机运行、没有真实智能体/文档导入/真实语料或语义检索评测。该 RLS 设计信任应用服务设置事务身份；已获得应用数据库凭据的人可以自己设置身份，不能抵御此类攻击。生产部署还需真实身份认证、密钥管理、会话存储、TLS、权限复核与安全审计。数据库账号密码只供本地演示。
 
-仅取当前事实可使用兼容新增的[游标分页接口](docs/bounded-retrieval.md)，默认 50、最多 100 条；页面已接入50条分页；原聚合接口默认完整响应仍兼容。历史也采用[独立分页](docs/history-pagination.md)，每页25条；[候选分页与状态筛选](docs/candidate-pagination.md)每页25条，[来源也按标题检索与分页](docs/source-pagination.md)，已选依据跨页保留。四类列表可独立读取，整页刷新用于重新核对。
+仅取当前事实可使用兼容新增的[游标分页接口](docs/bounded-retrieval.md)，默认 50、最多 100 条；页面已接入50条分页；原聚合接口默认完整响应仍兼容。历史也采用[独立分页](docs/history-pagination.md)，每页25条；[候选分页与状态筛选](docs/candidate-pagination.md)每页25条，[来源也按标题检索与分页](docs/source-pagination.md)，已选依据跨页保留。[审计分页](docs/audit-pagination.md)每页25条，可查看100条之后的早期操作。五类列表可独立读取，整页刷新用于重新核对。
 
 ## 比赛材料与证据包
 
-[六项初赛材料草稿](docs/submission-report.md)和[可重复演示步骤](docs/demo-script.md)按已知要求整理。先在同一干净提交生成数据库系统、检索与UI报告，再运行 `npm run evidence:package`，离线校验并输出源码、文档、30图、原始报告及SHA-256清单。解包后可运行 `node scripts/package-evidence.js verify .`。CI另归档competition-evidence；包的存在不等于整次CI已成功。操作条件与真实性限制见[材料包说明](docs/evidence-package.md)。
+[六项初赛材料草稿](docs/submission-report.md)和[可重复演示步骤](docs/demo-script.md)按已知要求整理。先在同一干净提交生成数据库系统、检索与UI报告，再运行 `npm run evidence:package`，离线校验并输出源码、文档、31图、原始报告及SHA-256清单。解包后可运行 `node scripts/package-evidence.js verify .`。CI另归档competition-evidence；包的存在不等于整次CI已成功。操作条件与真实性限制见[材料包说明](docs/evidence-package.md)。
 
 数据库约束与迁移的原始TAP取证、清理记录及材料包对应关系见[数据库测试证据](docs/database-evidence.md)。
 
