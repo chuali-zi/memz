@@ -1,0 +1,2708 @@
+{
+  "schema_version": 1,
+  "observed_date_utc": "2026-11-06",
+  "priority": "optimization_first_full_model_benchmarks_deferred",
+  "model_calls": 0,
+  "context_experiment": {
+    "status": "passed",
+    "synthetic": true,
+    "startedAt": "2026-11-06T06:05:55.112Z",
+    "finishedAt": "2026-11-06T06:06:10.939Z",
+    "source": {
+      "commit": "148622bc84a82289beaab80f95da455fb44822d2",
+      "workingTreeDirty": true,
+      "files": {
+        "server.js": "849ec22c7ff6484ad9f7c858460f903164a49351a9337af7d617e9cbc8199327",
+        "scripts/context-client.js": "ad28b3835d309479d0d1aa5349f1ac3e6ea94f208d8159ab8642393bb6d34705",
+        "db/schema.sql": "6dc7b3f3a10f868aa6b1d3f0ba2792c8b615224e6e56a75afa926b81eeb64d0f",
+        "evaluation/context-optimization.js": "24d3a2e6f96c8b80f3860fd8a25255780e37d3a1048b3299efbe1797437a175e"
+      }
+    },
+    "environment": {
+      "node": "v24.19.0",
+      "platform": "linux",
+      "arch": "x64",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "postgres": "16.15 (Debian 16.15-1.pgdg13+2)"
+    },
+    "protocol": {
+      "warmups": 2,
+      "repeats": 20,
+      "concurrency": 1,
+      "armOrder": "deterministic round-robin rotation by repetition; no tuning",
+      "factCountPerScenario": 25,
+      "budgetUnit": "utf8-json-bytes-including-final-newline",
+      "timing": "login + facts + immutable provenance + serialization validation + logout; response bodies measured by clone in every arm",
+      "scope": "local HTTP/context assembly only; excludes model prefill, generation and judge",
+      "modelCalls": 0,
+      "modelInputTokens": null,
+      "modelOutputTokens": null,
+      "modelCost": null,
+      "answerQuality": null
+    },
+    "summary": [
+      {
+        "scenario": "shared_full",
+        "arm": "individual_inline",
+        "n": 20,
+        "latencyP50Ms": 91.85443799999985,
+        "latencyP95Ms": 114.24199099999987,
+        "requests": 28,
+        "responseBytes": 241603,
+        "contextBytes": 238558,
+        "facts": 25,
+        "sourceCopies": 25
+      },
+      {
+        "scenario": "shared_full",
+        "arm": "individual_deduplicated",
+        "n": 20,
+        "latencyP50Ms": 85.94924499999979,
+        "latencyP95Ms": 96.81111599999986,
+        "requests": 28,
+        "responseBytes": 241603,
+        "contextBytes": 16098,
+        "facts": 25,
+        "sourceCopies": 1
+      },
+      {
+        "scenario": "shared_full",
+        "arm": "batch_inline",
+        "n": 20,
+        "latencyP50Ms": 15.779127000000699,
+        "latencyP95Ms": 19.751478000000134,
+        "requests": 4,
+        "responseBytes": 241689,
+        "contextBytes": 238558,
+        "facts": 25,
+        "sourceCopies": 25
+      },
+      {
+        "scenario": "shared_full",
+        "arm": "batch_deduplicated",
+        "n": 20,
+        "latencyP50Ms": 15.594119999999975,
+        "latencyP95Ms": 19.192297999999937,
+        "requests": 4,
+        "responseBytes": 241689,
+        "contextBytes": 16098,
+        "facts": 25,
+        "sourceCopies": 1
+      },
+      {
+        "scenario": "unique_full",
+        "arm": "individual_inline",
+        "n": 20,
+        "latencyP50Ms": 83.22983699999986,
+        "latencyP95Ms": 92.5696740000003,
+        "requests": 28,
+        "responseBytes": 127404,
+        "contextBytes": 124319,
+        "facts": 25,
+        "sourceCopies": 25
+      },
+      {
+        "scenario": "unique_full",
+        "arm": "individual_deduplicated",
+        "n": 20,
+        "latencyP50Ms": 84.05212300000039,
+        "latencyP95Ms": 98.14888500000052,
+        "requests": 28,
+        "responseBytes": 127404,
+        "contextBytes": 124384,
+        "facts": 25,
+        "sourceCopies": 25
+      },
+      {
+        "scenario": "unique_full",
+        "arm": "batch_inline",
+        "n": 20,
+        "latencyP50Ms": 14.742028000000573,
+        "latencyP95Ms": 29.058688999999504,
+        "requests": 4,
+        "responseBytes": 127490,
+        "contextBytes": 124319,
+        "facts": 25,
+        "sourceCopies": 25
+      },
+      {
+        "scenario": "unique_full",
+        "arm": "batch_deduplicated",
+        "n": 20,
+        "latencyP50Ms": 14.74290800000017,
+        "latencyP95Ms": 21.434267000000546,
+        "requests": 4,
+        "responseBytes": 127490,
+        "contextBytes": 124384,
+        "facts": 25,
+        "sourceCopies": 25
+      },
+      {
+        "scenario": "shared_budget",
+        "arm": "individual_inline",
+        "n": 20,
+        "latencyP50Ms": 84.05456200000117,
+        "latencyP95Ms": 93.1879829999998,
+        "requests": 28,
+        "responseBytes": 241603,
+        "contextBytes": 9939,
+        "facts": 1,
+        "sourceCopies": 1
+      },
+      {
+        "scenario": "shared_budget",
+        "arm": "individual_deduplicated",
+        "n": 20,
+        "latencyP50Ms": 78.06382800000029,
+        "latencyP95Ms": 86.58839099999932,
+        "requests": 28,
+        "responseBytes": 241603,
+        "contextBytes": 15935,
+        "facts": 24,
+        "sourceCopies": 1
+      },
+      {
+        "scenario": "shared_budget",
+        "arm": "batch_inline",
+        "n": 20,
+        "latencyP50Ms": 16.257650999999896,
+        "latencyP95Ms": 17.836623999999574,
+        "requests": 4,
+        "responseBytes": 241689,
+        "contextBytes": 9939,
+        "facts": 1,
+        "sourceCopies": 1
+      },
+      {
+        "scenario": "shared_budget",
+        "arm": "batch_deduplicated",
+        "n": 20,
+        "latencyP50Ms": 11.873771000000488,
+        "latencyP95Ms": 13.317122000000381,
+        "requests": 4,
+        "responseBytes": 241689,
+        "contextBytes": 15935,
+        "facts": 24,
+        "sourceCopies": 1
+      }
+    ],
+    "checks": {
+      "currentApprovedVersionIgnoresOldRejectedPending": true,
+      "sameFullFactsAndExactSources": true,
+      "budgetPrefixAndContinuation": true,
+      "deterministicContextHashes": true
+    },
+    "cleanup": {
+      "temporaryDatabaseDropped": true
+    },
+    "raw_report_sha256": "dac7ba1c613ecf6947c534ffd6b93d0ca3946937f0daae75e61867300a88b828",
+    "ingestion": {
+      "databaseBytesBefore": 8485911,
+      "databaseBytesAfter": 8485911,
+      "measurement": "Application-role source writes and candidate+approval transactions; schema initialization excluded; database size is page-allocation proxy, not per-index marginal storage.",
+      "sourceWrites": {
+        "count": 28,
+        "total_ms": 44.1373320000001,
+        "median_ms": 1.1765809999999988,
+        "statuses": null
+      },
+      "candidateAndApproval": {
+        "count": 51,
+        "total_ms": 221.09188599999996,
+        "median_ms": 3.84509300000002,
+        "statuses": null
+      },
+      "maintenance": {
+        "count": 4,
+        "total_ms": 8.45558699999998,
+        "median_ms": 2.093399999999974,
+        "statuses": [
+          "approve",
+          "reject",
+          "pending",
+          "conflict"
+        ]
+      }
+    }
+  },
+  "offline_retrieval": [
+    {
+      "budget_bytes": 2048,
+      "config_sha256": "12a63ef5bcc1593443f99ec0d4a2e8c5d05033d35677b4019db19fec264b2935",
+      "scorer_sha256": "9700a5ab3be8eef07e5a9a403eaef7c8bbc667d36591409b8ce5f43ff48e8dad",
+      "gold_sha256": "20e441395ed95880da0d008d3ed29610f27407887fee8d6e27e8992c3b7398d8",
+      "raw_summary_sha256": "ab08e0d3557d7b704109580e2f04b0b50b15aa7646bf074dcd0ab8e2c109044b",
+      "retrieval_trace_sha256": "89db31d72bf9621dae4a3f329281501a33752b9995ffc6ec8f74cc75bc05bda2",
+      "index": {
+        "scope_count": 10,
+        "build_ms": {
+          "count": 10,
+          "mean": 7.1622026000000005,
+          "p50": 6.806561,
+          "p95": 11.056728049999995,
+          "p99": 12.61777121
+        },
+        "total_build_ms": 71.622026,
+        "total_size_proxy_bytes": 1334371,
+        "size_proxy_definition": "canonical JSON postings/lengths/average, not RSS"
+      },
+      "cohorts": {
+        "all": {
+          "methods": {
+            "no_memory": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 1986,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.0010366797583081571,
+                "p50": 0.000731,
+                "p95": 0.001192,
+                "p99": 0.001752
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 123987.86455186304,
+                "p50": 130958.0,
+                "p95": 144029.0,
+                "p99": 144029.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.23951758207452165,
+                "p50": 0.2157725,
+                "p95": 0.34075099999999997,
+                "p99": 0.4311801500000001
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.9974772956609486,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9942315504466076,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.9954591321897074,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9925546130552858,
+                    0.9980566470894776
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9969967805487483,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.993940658429218,
+                    0.9992214539254458
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 2029.3479355488419,
+                "p50": 2029.0,
+                "p95": 2047.0,
+                "p99": 2047.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.35496621601208456,
+                "p50": 0.361858,
+                "p95": 0.438713,
+                "p99": 0.5805618500000005
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.008072653884964682,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.004214796826472008,
+                    0.012789494587668628
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.006559031281533804,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0034041753531674056,
+                    0.010265277523058546
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.00718970736629667,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0037313432835820895,
+                    0.011255346943453265
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 2019.4607250755287,
+                "p50": 2026.0,
+                "p95": 2047.0,
+                "p99": 2048.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.649766944612286,
+                "p50": 0.635014,
+                "p95": 0.885778,
+                "p99": 1.0178604000000029
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.5711402623612513,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.5478116822958097,
+                    0.5894490673458158
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.4924318869828456,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.47661442129720794,
+                    0.5075261966432187
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.5268420678574525,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.5090428677129781,
+                    0.5418126102587465
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.5196523604911558,
+            "denominator_queries": 1982,
+            "scope_count": 10,
+            "eligible_scope_count": 10,
+            "ci95_scope_cluster_bootstrap": [
+              0.4995010315030859,
+              0.5364898487767441
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        },
+        "dev": {
+          "methods": {
+            "no_memory": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 481,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.001726141372141372,
+                "p50": 0.000731,
+                "p95": 0.001212,
+                "p99": 0.002133
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 137534.26195426195,
+                "p50": 144029.0,
+                "p95": 144029.0,
+                "p99": 144029.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.2763533118503118,
+                "p50": 0.283898,
+                "p95": 0.370134,
+                "p99": 0.45966439999999986
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 1.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    1.0,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.997920997920998,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9958677685950413,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9997029997029998,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9994096812278631,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 2015.0873180873182,
+                "p50": 2029.0,
+                "p95": 2029.0,
+                "p99": 2029.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.39575462993762994,
+                "p50": 0.380399,
+                "p95": 0.466066,
+                "p99": 0.7782215999999998
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.002079002079002079,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.004132231404958678
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.002079002079002079,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.004132231404958678
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.002079002079002079,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.004132231404958678
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 2020.968814968815,
+                "p50": 2028.0,
+                "p95": 2047.0,
+                "p99": 2048.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.6732439916839916,
+                "p50": 0.678268,
+                "p95": 0.909529,
+                "p99": 1.0206019999999998
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.5883575883575883,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.5826446280991735,
+                    0.5941422594142259
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.498960498960499,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.48535564853556484,
+                    0.512396694214876
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.5398475398475399,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.5355648535564853,
+                    0.544077134986226
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.5377685377685378,
+            "denominator_queries": 481,
+            "scope_count": 2,
+            "eligible_scope_count": 2,
+            "ci95_scope_cluster_bootstrap": [
+              0.5355648535564853,
+              0.5399449035812673
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        },
+        "test": {
+          "methods": {
+            "no_memory": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 1505,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.0008163269102990033,
+                "p50": 0.000731,
+                "p95": 0.001182,
+                "p99": 0.001631800000000001
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 119658.41794019933,
+                "p50": 123155.0,
+                "p95": 143251.0,
+                "p99": 143251.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.22774483388704317,
+                "p50": 0.209708,
+                "p95": 0.3213367999999999,
+                "p99": 0.4075293200000002
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.9966688874083944,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9923769923769924,
+                    0.9993925674134768
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.9946702198534311,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9912225705329154,
+                    0.9978708303761533
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9961295644173725,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9921606341434982,
+                    0.9988823731539251
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 2033.9056478405316,
+                "p50": 2041.0,
+                "p95": 2047.0,
+                "p99": 2047.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.34193018471760794,
+                "p50": 0.342364,
+                "p95": 0.43294099999999996,
+                "p99": 0.5390720800000001
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.009993337774816789,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.005372569056699185,
+                    0.015256588072122053
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.007994670219853431,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0042811495334431115,
+                    0.011739266698071116
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.00882744836775483,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.004592633583712085,
+                    0.01318300611542091
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 2018.9787375415283,
+                "p50": 2025.0,
+                "p95": 2047.0,
+                "p99": 2048.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.6422636491694352,
+                "p50": 0.621865,
+                "p95": 0.8778481999999999,
+                "p99": 1.0054521600000002
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.5656229180546303,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.5385069680428585,
+                    0.5895989974937343
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.49033977348434377,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.4715127701375246,
+                    0.5092799796777986
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.5226744249345796,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.5015225532101503,
+                    0.5419062556663723
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.5138469765668248,
+            "denominator_queries": 1501,
+            "scope_count": 8,
+            "eligible_scope_count": 8,
+            "ci95_scope_cluster_bootstrap": [
+              0.4902409061509418,
+              0.5323016205922766
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        }
+      },
+      "bootstrap": {
+        "unit": "scope",
+        "samples": 2000,
+        "seed": 42,
+        "estimand": "query-weighted mean; resample scopes with replacement",
+        "confidence": 0.95,
+        "method": "percentile",
+        "warning": "Few scopes; descriptive exploratory CIs, not evidence of answer-quality noninferiority"
+      },
+      "evidence_policy": "distinct original literal references; unresolved count as misses; no repair; empty evidence is N/A; resolved_* uses only resolvable references and has separate denominators",
+      "quality_scope": "retrieval_diagnostic_not_answer_quality"
+    },
+    {
+      "budget_bytes": 8192,
+      "config_sha256": "cf43854029f975cc3cb3cdc904963c43aa6fd8131d10d11e8225024c61e2456d",
+      "scorer_sha256": "9700a5ab3be8eef07e5a9a403eaef7c8bbc667d36591409b8ce5f43ff48e8dad",
+      "gold_sha256": "20e441395ed95880da0d008d3ed29610f27407887fee8d6e27e8992c3b7398d8",
+      "raw_summary_sha256": "8a40185c86438da35ae99f234b2f4dffa8c39bc618f2a9e3c859170d5819c88f",
+      "retrieval_trace_sha256": "504088c8b17e5a534bfe3349e5ea94a81b9b5ea31736eaf70c233a32a2e714ff",
+      "index": {
+        "scope_count": 10,
+        "build_ms": {
+          "count": 10,
+          "mean": 6.3031153,
+          "p50": 6.2128475000000005,
+          "p95": 8.746657599999995,
+          "p99": 9.96547792
+        },
+        "total_build_ms": 63.031153,
+        "total_size_proxy_bytes": 1334371,
+        "size_proxy_definition": "canonical JSON postings/lengths/average, not RSS"
+      },
+      "cohorts": {
+        "all": {
+          "methods": {
+            "no_memory": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 1986,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.0010786722054380664,
+                "p50": 0.000751,
+                "p95": 0.00114875,
+                "p99": 0.0015760000000000019
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 123987.86455186304,
+                "p50": 130958.0,
+                "p95": 144029.0,
+                "p99": 144029.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.24027736002014097,
+                "p50": 0.2170995,
+                "p95": 0.34309975,
+                "p99": 0.3927834500000002
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.9974772956609486,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9942315504466076,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.9954591321897074,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9925546130552858,
+                    0.9980566470894776
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9969967805487483,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.993940658429218,
+                    0.9992214539254458
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 8155.853977844914,
+                "p50": 8164.0,
+                "p95": 8190.0,
+                "p99": 8190.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.3677601329305136,
+                "p50": 0.376694,
+                "p95": 0.449166,
+                "p99": 0.6046312000000011
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.07769929364278506,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.060070369437389574,
+                    0.0956567627393259
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.060544904137235116,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.04592085979482169,
+                    0.07561825689559863
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.06700049247051212,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.051878690815950174,
+                    0.08277541359272127
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 8162.513595166163,
+                "p50": 8169.0,
+                "p95": 8191.0,
+                "p99": 8192.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.662047270896274,
+                "p50": 0.655985,
+                "p95": 0.8852625000000001,
+                "p99": 1.0319054000000023
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.7280524722502523,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.7065159086834769,
+                    0.7482909930158975
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.6286579212916246,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.61071790971448,
+                    0.6466521369017412
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.6740679358117103,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.657909486826759,
+                    0.6900342457706962
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.6070674433411981,
+            "denominator_queries": 1982,
+            "scope_count": 10,
+            "eligible_scope_count": 10,
+            "ci95_scope_cluster_bootstrap": [
+              0.5850114797768332,
+              0.6300058687586501
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        },
+        "dev": {
+          "methods": {
+            "no_memory": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 481,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.0018413804573804572,
+                "p50": 0.000772,
+                "p95": 0.001262,
+                "p99": 0.0016661999999999998
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 137534.26195426195,
+                "p50": 144029.0,
+                "p95": 144029.0,
+                "p99": 144029.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.28054337837837834,
+                "p50": 0.284739,
+                "p95": 0.373801,
+                "p99": 0.4074053999999999
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 1.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    1.0,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.997920997920998,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9958677685950413,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9997029997029998,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9994096812278631,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 8151.683991683992,
+                "p50": 8181.0,
+                "p95": 8181.0,
+                "p99": 8181.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.4125990997920998,
+                "p50": 0.39429,
+                "p95": 0.502049,
+                "p99": 0.6711111999999994
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.05197505197505198,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.03765690376569038,
+                    0.06611570247933884
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0395010395010395,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.029288702928870293,
+                    0.049586776859504134
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.04417879417879418,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.03417015341701534,
+                    0.054063360881542705
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 8164.573804573804,
+                "p50": 8172.0,
+                "p95": 8192.0,
+                "p99": 8192.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.7005103014553015,
+                "p50": 0.699329,
+                "p95": 0.913565,
+                "p99": 1.134226999999998
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.7484407484407485,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.7280334728033473,
+                    0.768595041322314
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.6403326403326404,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.6192468619246861,
+                    0.6611570247933884
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.6875754875754877,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.6677126917712692,
+                    0.7071920503738686
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.6433966933966935,
+            "denominator_queries": 481,
+            "scope_count": 2,
+            "eligible_scope_count": 2,
+            "ci95_scope_cluster_bootstrap": [
+              0.6335425383542539,
+              0.6531286894923258
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        },
+        "test": {
+          "methods": {
+            "no_memory": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 1505,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.0008349096345514951,
+                "p50": 0.000741,
+                "p95": 0.0011217999999999998,
+                "p99": 0.001530800000000001
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 119658.41794019933,
+                "p50": 123155.0,
+                "p95": 143251.0,
+                "p99": 143251.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.22740828704318938,
+                "p50": 0.21117,
+                "p95": 0.31502979999999997,
+                "p99": 0.3603859200000002
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.9966688874083944,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9923769923769924,
+                    0.9993925674134768
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.9946702198534311,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9912225705329154,
+                    0.9978708303761533
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9961295644173725,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9921606341434982,
+                    0.9988823731539251
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 8157.186710963455,
+                "p50": 8164.0,
+                "p95": 8190.0,
+                "p99": 8190.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.35342953953488376,
+                "p50": 0.35355,
+                "p95": 0.43485399999999996,
+                "p99": 0.5807178000000003
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.08594270486342438,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.06750436905628385,
+                    0.10324913270763439
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.06728847435043304,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.05185704274702172,
+                    0.08228828562396938
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.07431377486779148,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.05844656904856784,
+                    0.08978675722780806
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 8161.855149501661,
+                "p50": 8169.0,
+                "p95": 8191.0,
+                "p99": 8192.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.6497544352159468,
+                "p50": 0.638409,
+                "p95": 0.867242,
+                "p99": 1.0030562000000003
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.7215189873417721,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.6993288590604027,
+                    0.7461155209812131
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.6249167221852099,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.6054010266068918,
+                    0.6468305926974237
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.6697393999033979,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.652235827148135,
+                    0.6876817042606516
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.5954256250356065,
+            "denominator_queries": 1501,
+            "scope_count": 8,
+            "eligible_scope_count": 8,
+            "ci95_scope_cluster_bootstrap": [
+              0.576714919005463,
+              0.6204728017285186
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        }
+      },
+      "bootstrap": {
+        "unit": "scope",
+        "samples": 2000,
+        "seed": 42,
+        "estimand": "query-weighted mean; resample scopes with replacement",
+        "confidence": 0.95,
+        "method": "percentile",
+        "warning": "Few scopes; descriptive exploratory CIs, not evidence of answer-quality noninferiority"
+      },
+      "evidence_policy": "distinct original literal references; unresolved count as misses; no repair; empty evidence is N/A; resolved_* uses only resolvable references and has separate denominators",
+      "quality_scope": "retrieval_diagnostic_not_answer_quality"
+    },
+    {
+      "budget_bytes": 32768,
+      "config_sha256": "d1d5b959d294d8f2ef41af01b949e85fb715702c1f4c3a0a4395bc879f893422",
+      "scorer_sha256": "9700a5ab3be8eef07e5a9a403eaef7c8bbc667d36591409b8ce5f43ff48e8dad",
+      "gold_sha256": "20e441395ed95880da0d008d3ed29610f27407887fee8d6e27e8992c3b7398d8",
+      "raw_summary_sha256": "fa1c08375784678e96da7176a6160b1020fb9866ed482262cdcde6b4bea32a09",
+      "retrieval_trace_sha256": "464bd102fd1b62ff9b7c1db21fada38bd071dbe683220918c9ce043cf9995819",
+      "index": {
+        "scope_count": 10,
+        "build_ms": {
+          "count": 10,
+          "mean": 6.8197179000000006,
+          "p50": 6.5697875,
+          "p95": 10.114691799999996,
+          "p99": 11.73067996
+        },
+        "total_build_ms": 68.197179,
+        "total_size_proxy_bytes": 1334371,
+        "size_proxy_definition": "canonical JSON postings/lengths/average, not RSS"
+      },
+      "cohorts": {
+        "all": {
+          "methods": {
+            "no_memory": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 1986,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.0012992567975830815,
+                "p50": 0.000952,
+                "p95": 0.001412,
+                "p99": 0.001954350000000001
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 123987.86455186304,
+                "p50": 130958.0,
+                "p95": 144029.0,
+                "p99": 144029.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.24793670241691843,
+                "p50": 0.2307945,
+                "p95": 0.35546875,
+                "p99": 0.45261170000000056
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.9974772956609486,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9942315504466076,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.9954591321897074,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9925546130552858,
+                    0.9980566470894776
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9969967805487483,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.993940658429218,
+                    0.9992214539254458
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 32751.904330312187,
+                "p50": 32753.0,
+                "p95": 32767.0,
+                "p99": 32767.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.409227861530715,
+                "p50": 0.4013255,
+                "p95": 0.53282975,
+                "p99": 0.6551597000000005
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.30726538849646823,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.27979447100434274,
+                    0.34083241585404217
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.24268415741675076,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.21828659531008868,
+                    0.27394004524192456
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.2704642237722858,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.24585670557591424,
+                    0.30063230427010257
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 1986,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 9,
+              "evidence_references": 2814,
+              "resolved_references": 2805,
+              "context_bytes": {
+                "count": 1986,
+                "mean": 32708.965256797583,
+                "p50": 32743.0,
+                "p95": 32767.0,
+                "p99": 32768.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1986,
+                "mean": 0.725672139979859,
+                "p50": 0.705218,
+                "p95": 0.99608575,
+                "p99": 1.1742246500000006
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.8461150353178607,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.8324482072559404,
+                    0.8613585418444815
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.7376387487386479,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.7255492021868019,
+                    0.7553573344573881
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.7930140545508579,
+                  "denominator_queries": 1982,
+                  "scope_count": 10,
+                  "eligible_scope_count": 10,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.7820139296215347,
+                    0.8083889973622144
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.5225498307785721,
+            "denominator_queries": 1982,
+            "scope_count": 10,
+            "eligible_scope_count": 10,
+            "ci95_scope_cluster_bootstrap": [
+              0.49744738452134285,
+              0.5465253025359121
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        },
+        "dev": {
+          "methods": {
+            "no_memory": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 481,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.0020708523908523906,
+                "p50": 0.001011,
+                "p95": 0.001492,
+                "p99": 0.0022511999999999884
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 137534.26195426195,
+                "p50": 144029.0,
+                "p95": 144029.0,
+                "p99": 144029.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.2835937214137214,
+                "p50": 0.288325,
+                "p95": 0.388291,
+                "p99": 0.4700174
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 1.0,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    1.0,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.997920997920998,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9958677685950413,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9997029997029998,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9994096812278631,
+                    1.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 32765.490644490645,
+                "p50": 32764.0,
+                "p95": 32767.0,
+                "p99": 32767.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.4533121185031185,
+                "p50": 0.42825,
+                "p95": 0.559143,
+                "p99": 0.7069461999999995
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.24532224532224534,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.23140495867768596,
+                    0.2594142259414226
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.1891891891891892,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.17768595041322313,
+                    0.200836820083682
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.2127215127215127,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.19952774498229042,
+                    0.22608089260808925
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 481,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 0,
+              "unresolved_evidence_queries": 1,
+              "evidence_references": 687,
+              "resolved_references": 686,
+              "context_bytes": {
+                "count": 481,
+                "mean": 32737.008316008316,
+                "p50": 32745.0,
+                "p95": 32767.0,
+                "p99": 32768.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 481,
+                "mean": 0.7670795717255717,
+                "p50": 0.761721,
+                "p95": 1.049515,
+                "p99": 1.1745641999999998
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.8627858627858628,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.8553719008264463,
+                    0.8702928870292888
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.7276507276507277,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.7231404958677686,
+                    0.7322175732217573
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.7950994950994952,
+                  "denominator_queries": 481,
+                  "scope_count": 2,
+                  "eligible_scope_count": 2,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.787987012987013,
+                    0.8023012552301255
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.5823779823779824,
+            "denominator_queries": 481,
+            "scope_count": 2,
+            "eligible_scope_count": 2,
+            "ci95_scope_cluster_bootstrap": [
+              0.5762203626220362,
+              0.5884592680047226
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        },
+        "test": {
+          "methods": {
+            "no_memory": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 1505,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.0010526538205980066,
+                "p50": 0.000941,
+                "p95": 0.0013899999999999995,
+                "p99": 0.0019384000000000033
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.0,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.0,
+                    0.0
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_full": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 119658.41794019933,
+                "p50": 123155.0,
+                "p95": 143251.0,
+                "p99": 143251.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.23654067176079735,
+                "p50": 0.218121,
+                "p95": 0.33664979999999994,
+                "p99": 0.43679196000000003
+              },
+              "raw_no_budget_unfair": true,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.9966688874083944,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9923769923769924,
+                    0.9993925674134768
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.9946702198534311,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9912225705329154,
+                    0.9978708303761533
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.9961295644173725,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.9921606341434982,
+                    0.9988823731539251
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "raw_budget_recency": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 32747.562126245848,
+                "p50": 32749.0,
+                "p95": 32763.0,
+                "p99": 32763.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.39513847441860467,
+                "p50": 0.389273,
+                "p95": 0.5126666,
+                "p99": 0.599174
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.3271152564956695,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.30255115965600216,
+                    0.3607938575822133
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.2598267821452365,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.23880597014925373,
+                    0.2923481207210972
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.2889680505647054,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.2701945133506362,
+                    0.32008101242307946
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            },
+            "bm25_raw": {
+              "queries": 1505,
+              "errors": 0,
+              "empty_retrievals": 0,
+              "no_evidence_queries": 4,
+              "unresolved_evidence_queries": 8,
+              "evidence_references": 2127,
+              "resolved_references": 2119,
+              "context_bytes": {
+                "count": 1505,
+                "mean": 32700.00265780731,
+                "p50": 32742.0,
+                "p95": 32767.0,
+                "p99": 32768.0
+              },
+              "retrieval_assembly_ms_observed": {
+                "count": 1505,
+                "mean": 0.7124382697674418,
+                "p50": 0.687121,
+                "p95": 0.9657891999999999,
+                "p99": 1.15649152
+              },
+              "raw_no_budget_unfair": false,
+              "metrics": {
+                "evidence_any_hit": {
+                  "mean": 0.8407728181212525,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.8270303781773094,
+                    0.8590038314176245
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_all_hit": {
+                  "mean": 0.7408394403730846,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.7259670862371402,
+                    0.7648006325443503
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                },
+                "evidence_recall": {
+                  "mean": 0.7923457688054252,
+                  "denominator_queries": 1501,
+                  "scope_count": 8,
+                  "eligible_scope_count": 8,
+                  "ci95_scope_cluster_bootstrap": [
+                    0.7791712517355248,
+                    0.8127770009205386
+                  ],
+                  "valid_bootstrap_draws": 2000,
+                  "ci_warning": "few_scopes_exploratory"
+                }
+              }
+            }
+          },
+          "paired_bm25_minus_recency_recall": {
+            "mean": 0.5033777182407198,
+            "denominator_queries": 1501,
+            "scope_count": 8,
+            "eligible_scope_count": 8,
+            "ci95_scope_cluster_bootstrap": [
+              0.48628305165461416,
+              0.5195904332846614
+            ],
+            "valid_bootstrap_draws": 2000,
+            "ci_warning": "few_scopes_exploratory"
+          }
+        }
+      },
+      "bootstrap": {
+        "unit": "scope",
+        "samples": 2000,
+        "seed": 42,
+        "estimand": "query-weighted mean; resample scopes with replacement",
+        "confidence": 0.95,
+        "method": "percentile",
+        "warning": "Few scopes; descriptive exploratory CIs, not evidence of answer-quality noninferiority"
+      },
+      "evidence_policy": "distinct original literal references; unresolved count as misses; no repair; empty evidence is N/A; resolved_* uses only resolvable references and has separate denominators",
+      "quality_scope": "retrieval_diagnostic_not_answer_quality"
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "observed_date_utc": "2026-11-06",
+  "memz_analysis_baseline": "148622bc84a82289beaab80f95da455fb44822d2",
+  "purpose": "Supplementary primary-source research record; does not replace sources.lock.json or record new benchmark results.",
+  "restrictions_observed": {
+    "third_party_source_vendored": false,
+    "benchmark_data_downloaded": false,
+    "paid_model_calls": false,
+    "upstream_runners_executed": false,
+    "deployments": false
+  },
+  "repositories": [
+    {
+      "repository": "volcengine/OpenViking",
+      "commit": "739e17f9172b9f595bfe4cc95293ec52d4686120",
+      "commit_date_utc": "2026-11-05T08:34:56Z",
+      "license": "AGPL-3.0; other directories have their own licenses",
+      "scope": [
+        "README.md",
+        "LICENSE",
+        "docs/en/concepts/03-context-layers.md",
+        "docs/en/concepts/07-retrieval.md",
+        "docs/en/concepts/08-session.md",
+        "benchmark/README.md",
+        "openviking/retrieve/hierarchical_retriever.py",
+        "openviking/retrieve/memory_lifecycle.py",
+        "openviking/retrieve/context_assembler/budget.py",
+        "openviking/retrieve/context_assembler/pipeline.py",
+        "openviking/retrieve/context_assembler/render.py",
+        "openviking/retrieve/context_assembler/ledger.py",
+        "openviking/retrieve/context_assembler/tiers.py",
+        "openviking/utils/token_estimation.py",
+        "openviking/session/memory/core.py",
+        "openviking/session/memory/extract_loop.py",
+        "openviking/session/memory/memory_updater.py",
+        "openviking/session/memory/session_extract_context_provider.py"
+      ],
+      "note": "Existing pinned version reread. Main head dfb9eb888c3f6fe52ba86d9c033b1cc55e38936f observed 2026-11-06; not substituted for the reviewed pin.",
+      "official_tree_url": "https://github.com/volcengine/OpenViking/tree/739e17f9172b9f595bfe4cc95293ec52d4686120",
+      "license_url": "https://github.com/volcengine/OpenViking/blob/739e17f9172b9f595bfe4cc95293ec52d4686120/LICENSE",
+      "review_method": "GitHub connector read-only fetch; no source vendoring",
+      "execution_status": "not_run"
+    },
+    {
+      "repository": "letta-ai/letta",
+      "commit": "8816d3a8516893bfdc0fa14bfb1235226012e295",
+      "commit_date_utc": "2026-10-18T22:28:01Z",
+      "license": "Apache-2.0",
+      "scope": [
+        "README.md",
+        "LICENSE"
+      ],
+      "note": "README migration notice only; retired V1 server not audited.",
+      "official_tree_url": "https://github.com/letta-ai/letta/tree/8816d3a8516893bfdc0fa14bfb1235226012e295",
+      "license_url": "https://github.com/letta-ai/letta/blob/8816d3a8516893bfdc0fa14bfb1235226012e295/LICENSE",
+      "review_method": "GitHub connector read-only fetch; no source vendoring",
+      "execution_status": "not_run"
+    },
+    {
+      "repository": "agiresearch/A-mem",
+      "commit": "ceffb860f0712bbae97b184d440df62bc910ca8d",
+      "commit_date_utc": "2025-12-12T21:15:29Z",
+      "license": "MIT",
+      "scope": [
+        "README.md",
+        "LICENSE",
+        "agentic_memory/memory_system.py"
+      ],
+      "note": "Library is not the separate paper evaluation repository; static code inspection, no execution.",
+      "official_tree_url": "https://github.com/agiresearch/A-mem/tree/ceffb860f0712bbae97b184d440df62bc910ca8d",
+      "license_url": "https://github.com/agiresearch/A-mem/blob/ceffb860f0712bbae97b184d440df62bc910ca8d/LICENSE",
+      "review_method": "GitHub connector read-only fetch; no source vendoring",
+      "execution_status": "not_run"
+    },
+    {
+      "repository": "mem0ai/mem0",
+      "commit": "ed1f10fc87080f0b67f99be370817504888462ab",
+      "commit_date_utc": "2026-11-04T10:55:26Z",
+      "license": "Apache-2.0",
+      "scope": [
+        "README.md",
+        "LICENSE",
+        "mem0/memory/main.py"
+      ],
+      "note": "Current additive extraction and search inspected; managed-platform scores are not OSS reproduction evidence.",
+      "official_tree_url": "https://github.com/mem0ai/mem0/tree/ed1f10fc87080f0b67f99be370817504888462ab",
+      "license_url": "https://github.com/mem0ai/mem0/blob/ed1f10fc87080f0b67f99be370817504888462ab/LICENSE",
+      "review_method": "GitHub connector read-only fetch; no source vendoring",
+      "execution_status": "not_run"
+    },
+    {
+      "repository": "getzep/graphiti",
+      "commit": "747b480ec6b12ecb718f1e2bc588b20ee36ea9c2",
+      "commit_date_utc": "2026-11-06T04:49:50Z",
+      "license": "Apache-2.0",
+      "scope": [
+        "README.md",
+        "LICENSE",
+        "graphiti_core/edges.py"
+      ],
+      "note": "Current EntityEdge fields and README inspected; not an end-to-end graph ingestion audit.",
+      "official_tree_url": "https://github.com/getzep/graphiti/tree/747b480ec6b12ecb718f1e2bc588b20ee36ea9c2",
+      "license_url": "https://github.com/getzep/graphiti/blob/747b480ec6b12ecb718f1e2bc588b20ee36ea9c2/LICENSE",
+      "review_method": "GitHub connector read-only fetch; no source vendoring",
+      "execution_status": "not_run"
+    },
+    {
+      "repository": "letta-ai/letta-code",
+      "commit": "67f3bbc867fcce4e6f4849dcb6cbd3ab179c190d",
+      "commit_date_utc": "2026-11-06T02:51:02Z",
+      "license": "Apache-2.0",
+      "scope": [
+        "README.md",
+        "LICENSE"
+      ],
+      "note": "Current runtime entry point verified; feature descriptions are README claims, not full runtime audit.",
+      "official_tree_url": "https://github.com/letta-ai/letta-code/tree/67f3bbc867fcce4e6f4849dcb6cbd3ab179c190d",
+      "license_url": "https://github.com/letta-ai/letta-code/blob/67f3bbc867fcce4e6f4849dcb6cbd3ab179c190d/LICENSE",
+      "review_method": "GitHub connector read-only fetch; no source vendoring",
+      "execution_status": "not_run"
+    }
+  ],
+  "papers": [
+    {
+      "title": "VikingMem: A Memory Base Management System for Stateful LLM-based Applications",
+      "version": "2605.29640v3",
+      "version_date": "2026-06-12",
+      "document_license": "CC-BY-NC-SA-4.0",
+      "url": "https://arxiv.org/html/2605.29640v3",
+      "abstract_url": "https://arxiv.org/abs/2605.29640v3",
+      "reviewed_scope": "Sections 2-3 mechanisms; paper/OSS boundary. No reproduction.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "Directory-Aware Query and Maintenance in Vector Databases",
+      "version": "2606.16903v1",
+      "version_date": "2026-06-15",
+      "document_license": "arXiv perpetual non-exclusive distribution license",
+      "url": "https://arxiv.org/html/2606.16903v1",
+      "abstract_url": "https://arxiv.org/abs/2606.16903v1",
+      "reviewed_scope": "DSQ/DSM, TrieHI, OpenViking integration; scope resolution distinguished from current ranker.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "VikingRAG: Accurate and Token-efficient Retrieval-augmented Generation over Structured Documents",
+      "version": "2609.11390v1",
+      "version_date": "2026-09-10",
+      "document_license": "arXiv perpetual non-exclusive distribution license",
+      "url": "https://arxiv.org/html/2609.11390v1",
+      "abstract_url": "https://arxiv.org/abs/2609.11390v1",
+      "reviewed_scope": "Evidence-gap retrieval, experience edges, adaptive escalation; resource RAG, not session memory.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "MemGPT: Towards LLMs as Operating Systems",
+      "version": "2310.08560v2",
+      "version_date": "2024-02-12",
+      "document_license": "CC-BY-4.0",
+      "url": "https://arxiv.org/html/2310.08560v2",
+      "abstract_url": "https://arxiv.org/abs/2310.08560v2",
+      "reviewed_scope": "Main/external context and control flow; not assumed identical to current Letta Code.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "A-MEM: Agentic Memory for LLM Agents",
+      "version": "2502.12110v11",
+      "version_date": "2025-10-08",
+      "document_license": "arXiv perpetual non-exclusive distribution license",
+      "url": "https://arxiv.org/html/2502.12110v11",
+      "abstract_url": "https://arxiv.org/abs/2502.12110v11",
+      "reviewed_scope": "Note construction, links, evolution; separate evaluation and library repositories.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory",
+      "version": "2504.19413v1",
+      "version_date": "2025-04-28",
+      "document_license": "arXiv perpetual non-exclusive distribution license",
+      "url": "https://arxiv.org/html/2504.19413v1",
+      "abstract_url": "https://arxiv.org/abs/2504.19413v1",
+      "reviewed_scope": "2025 extract-update mechanism; distinguished from 2026 additive SDK and managed platform.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "Zep: A Temporal Knowledge Graph Architecture for Agent Memory",
+      "version": "2501.13956v1",
+      "version_date": "2025-01-20",
+      "document_license": "CC-BY-NC-SA-4.0",
+      "url": "https://arxiv.org/html/2501.13956v1",
+      "abstract_url": "https://arxiv.org/abs/2501.13956v1",
+      "reviewed_scope": "Episodes, entity/fact construction, bi-temporal edge invalidation.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "When Retrieval Is Not Enough: Obsolete Facts in Agent Memory",
+      "version": "2610.36308v1",
+      "version_date": "2026-10-26",
+      "document_license": "arXiv perpetual non-exclusive distribution license",
+      "url": "https://arxiv.org/html/2610.36308v1",
+      "abstract_url": "https://arxiv.org/abs/2610.36308v1",
+      "reviewed_scope": "MAB single-hop FactConsolidation, equal-size intervention, gold-assisted post-hoc audit and within-cohort limitations.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    },
+    {
+      "title": "LongMemEval-V2: Evaluating Long-Term Agent Memory Toward Experienced Colleagues",
+      "version": "2605.12493v1",
+      "version_date": "2026-05-12",
+      "document_license": "CC-BY-4.0",
+      "url": "https://arxiv.org/html/2605.12493v1",
+      "abstract_url": "https://arxiv.org/abs/2605.12493v1",
+      "reviewed_scope": "Ability definitions, context-gathering interface, accuracy/latency tradeoff and premise awareness.",
+      "review_method": "web browsing of original arXiv abstract and HTML",
+      "execution_status": "not_reproduced"
+    }
+  ],
+  "licensing_note": "Repository root licenses and paper document licenses are different. Dataset licenses remain governed by the existing manifest; no new dataset license or acquisition is asserted. This record is attribution and inspection evidence, not legal advice or redistribution permission."
+}

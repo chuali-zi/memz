@@ -56,6 +56,39 @@ async function readFactsPage(user,p,q,{limit=50,after=0}={}){
     return {role:r,facts,next_after:more?facts[facts.length-1].id:null};
   },{snapshot:true});
 }
+function provenanceRecord(row,access){
+  return {sourceTextIsUntrusted:true,role:access,fact:{id:row.fact_id,subject:row.subject,predicate:row.predicate},
+    revision:{id:row.revision_id,version:row.version,value:row.value,created_at:row.created_at,approved_by:row.approved_by},
+    source:{id:row.source_id,title:row.title,content:row.content},
+    candidate:{id:row.candidate_id,expected_version:row.expected_version,proposed_by:row.proposed_by}};
+}
+// Read-only POST: explicit version pairs avoid URL limits, but retain session CSRF checks.
+app.post('/api/projects/:p/facts/provenance',requireJsonObject,route(async(req,res)=>{
+  const p=num(req.params.p),refs=req.body.facts;
+  if(Object.keys(req.body).some(key=>key!=='facts')||!Array.isArray(refs)||refs.length<1||refs.length>25)throw fail(400,'依据批次必须包含 1 到 25 个版本引用');
+  const seen=new Set();
+  for(const ref of refs){
+    if(!ref||typeof ref!=='object'||Array.isArray(ref)||Object.keys(ref).length!==2||!Object.hasOwn(ref,'id')||!Object.hasOwn(ref,'version')||typeof ref.id!=='number'||typeof ref.version!=='number')throw fail(400,'版本引用必须包含数字 id 和 version');
+    num(ref.id);integer(ref.version,1,'版本无效');
+    const key=`${ref.id}:${ref.version}`;
+    if(seen.has(key))throw fail(400,'版本引用不能重复');
+    seen.add(key);
+  }
+  res.json(await tx(req.user.id,async c=>{
+    const access=await role(c,p,['owner','member','viewer']);
+    const rows=(await c.query(`SELECT f.id AS fact_id,f.subject,f.predicate,
+      r.id AS revision_id,r.version,r.value,r.created_at,r.approved_by,
+      s.id AS source_id,s.title,s.content,c.id AS candidate_id,c.expected_version,c.proposed_by
+      FROM unnest($2::int[],$3::int[]) WITH ORDINALITY AS requested(id,version,ordinal)
+      JOIN facts f ON f.id=requested.id AND f.project_id=$1
+      JOIN revisions r ON r.fact_id=f.id AND r.project_id=f.project_id AND r.version=requested.version
+      JOIN sources s ON s.id=r.source_id AND s.project_id=r.project_id
+      JOIN candidates c ON c.id=r.candidate_id AND c.project_id=r.project_id
+      ORDER BY requested.ordinal`,[p,refs.map(ref=>ref.id),refs.map(ref=>ref.version)])).rows;
+    if(rows.length!==refs.length)throw fail(404,'事实或修订不存在');
+    return {sourceTextIsUntrusted:true,role:access,provenance:rows.map(row=>provenanceRecord(row,access))};
+  },{snapshot:true}));
+}));
 app.get('/api/projects/:p/facts/:id/provenance',route(async(req,res)=>{
   const p=num(req.params.p),id=num(req.params.id);
   const version=req.query.version===undefined?null:integer(req.query.version,1,'版本无效');
@@ -70,10 +103,7 @@ app.get('/api/projects/:p/facts/:id/provenance',route(async(req,res)=>{
       WHERE f.project_id=$1 AND f.id=$2
         AND (($3::int IS NULL AND r.id=f.current_revision_id) OR r.version=$3)`,[p,id,version])).rows[0];
     if(!row)throw fail(404,'事实或修订不存在');
-    return {sourceTextIsUntrusted:true,role:access,fact:{id:row.fact_id,subject:row.subject,predicate:row.predicate},
-      revision:{id:row.revision_id,version:row.version,value:row.value,created_at:row.created_at,approved_by:row.approved_by},
-      source:{id:row.source_id,title:row.title,content:row.content},
-      candidate:{id:row.candidate_id,expected_version:row.expected_version,proposed_by:row.proposed_by}};
+    return provenanceRecord(row,access);
   },{snapshot:true}));
 }));
 app.get('/api/projects/:p/facts',route(async(req,res)=>{

@@ -52,6 +52,15 @@ jobs:
           name: retrieval-evaluation
           path: artifacts/retrieval-report.json
           if-no-files-found: ignore
+      - run: npm run eval:context
+        env:
+          CONTEXT_EVALUATION_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: context-optimization
+          path: artifacts/context-optimization.json
+          if-no-files-found: error
       - run: npm run eval:plans
         env:
           PLAN_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz

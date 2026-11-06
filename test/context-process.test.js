@@ -57,3 +57,12 @@ test('stdio accepts a continuation cursor and rejects invalid cursors before HTT
   const end=await invoke('{"after":2147483647}');assert.equal(end.code,0);assert.deepEqual(JSON.parse(end.stdout).facts,[]);assert.equal(JSON.parse(end.stdout).nextAfter,null);
   const before=requests,invalid=await invoke('{"after":-1}');assert.equal(invalid.code,1);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/INVALID_AFTER/);assert.equal(requests,before);
 });
+
+test('stdio and environment independently select batch and deduplicated context',async()=>{
+  const request={projectId:1,query:'项目',limit:1,provenanceMode:'batch',sourceMode:'deduplicated'};
+  const selected=await invoke(JSON.stringify(request));assert.equal(selected.code,0,selected.stderr);
+  const context=JSON.parse(selected.stdout);assert.equal(context.schemaVersion,2);assert.equal(context.sourceTextIsUntrusted,true);assert.equal(context.sources.length,1);assert.equal(context.facts[0].sourceId,context.sources[0].id);assert.equal(context.facts[0].source,undefined);
+  const env=await invoke('{"projectId":1,"query":"项目","limit":1}',{env:{MEMZ_PROVENANCE_MODE:'batch',MEMZ_SOURCE_MODE:'deduplicated'}});assert.equal(env.code,0,env.stderr);assert.deepEqual(JSON.parse(env.stdout),context);
+  const overridden=await invoke('{"projectId":1,"query":"项目","limit":1,"provenanceMode":"individual","sourceMode":"inline"}',{env:{MEMZ_PROVENANCE_MODE:'batch',MEMZ_SOURCE_MODE:'deduplicated'}});assert.equal(overridden.code,0,overridden.stderr);assert.equal(JSON.parse(overridden.stdout).schemaVersion,1);
+  for(const input of ['{"provenanceMode":"parallel"}','{"sourceMode":null}']){const before=requests,result=await invoke(input);assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_(PROVENANCE|SOURCE)_MODE/);assert.equal(requests,before)}
+});

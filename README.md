@@ -74,7 +74,7 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 运行 `npm run eval:retrieval` 可生成 19 个正确性用例与逐例 HTTP 延迟报告；需显式设置测试管理员连接，详见[数据集、运行步骤与测量限制](docs/retrieval-evaluation.md)。CI 自动保存 `retrieval-evaluation` 报告，不使用虚构成绩或跨环境性能阈值。
 
-长期记忆公开基准的来源清单、离线加载脚本和后续公平比较方案见 [benchmark 准备](benchmarks/memory/README.md)。仓库不包含第三方数据或源码；目前没有真实模型的质量、加速或 token 节省结论。
+长期记忆公开基准的研究、固定数据清单、离线检索实验及后续公平比较方案见 [memory benchmarks](benchmarks/memory/README.md)。新增可选[批量溯源与来源去重](docs/context-optimization.md)，用 `npm run eval:context` 在独立临时库对比四种组合，记录请求数、输出字节、读取延迟和写入维护开销；需要显式 `CONTEXT_EVALUATION_DATABASE_URL`。仓库不包含第三方数据或源码；字节、检索证据命中与合成 HTTP 实验不代表真实模型的质量、加速或 token 节省结论。
 
 ## 演示（约 7 分钟）
 

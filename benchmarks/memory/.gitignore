@@ -12,6 +12,7 @@ __pycache__/
 *.tar
 *.tar.gz
 *.zip
-# Results here contain templates only. Actual runs should use reports/.
+# Raw traces stay in reports/. Explicitly reviewed aggregate summaries may be tracked.
 results/*
 !results/*.template.csv
+!results/optimization-2026-11-06.json
