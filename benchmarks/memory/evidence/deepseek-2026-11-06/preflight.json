@@ -1,0 +1,26 @@
+{
+  "latencySeconds": 1.120034808000014,
+  "model": "deepseek-flash",
+  "id": "5745106e-5005-4fc8-aa76-b38d66938909",
+  "usage": {
+    "prompt_tokens": 37,
+    "completion_tokens": 6,
+    "total_tokens": 43,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 37
+  },
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"ready\":\ntrue}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ]
+}

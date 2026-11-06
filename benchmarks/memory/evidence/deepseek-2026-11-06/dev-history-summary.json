@@ -1,0 +1,313 @@
+{
+  "schema": "memz-deepseek-score-v1",
+  "synthetic": true,
+  "split": "dev",
+  "planned": 14,
+  "recorded": 14,
+  "repeats": 1,
+  "unique_questions": 14,
+  "calls_sha256": "846b90bea25a326b23d150865a1cd3936e14b038e2624cab241e514b0e7f1dbe",
+  "gold_sha256": "f9ab279a5cc98e9c0240bedc3dd6e41c2927933c492f164a52d1488dc0900189",
+  "scorer_sha256": "ec7a1d93c708da7deeb2e9d6efe5354f6b6c270082836601d339c66547cef861",
+  "arms": {
+    "memz_history": {
+      "n": 14,
+      "answer_correct": 14,
+      "citation_correct": 14,
+      "valid_json": 14,
+      "abstained": 2,
+      "service_ok": 14,
+      "accuracy": 1.0,
+      "prompt_tokens": {
+        "measured": 14,
+        "sum": 11340,
+        "mean": 810
+      },
+      "completion_tokens": {
+        "measured": 14,
+        "sum": 298,
+        "mean": 21.285714285714285
+      },
+      "prompt_cache_hit_tokens": {
+        "measured": 14,
+        "sum": 7424,
+        "mean": 530.2857142857143
+      },
+      "prompt_cache_miss_tokens": {
+        "measured": 14,
+        "sum": 3916,
+        "mean": 279.7142857142857
+      },
+      "latency_seconds": {
+        "n": 14,
+        "mean": 1.1320392012142813,
+        "p50": 1.127385081,
+        "p95": 1.5947612460000755
+      }
+    }
+  },
+  "categories": {
+    "historical": {
+      "memz_history": {
+        "n": 2,
+        "answer_correct": 2,
+        "citation_correct": 2,
+        "valid_json": 2,
+        "abstained": 0,
+        "service_ok": 2,
+        "accuracy": 1.0,
+        "prompt_tokens": {
+          "measured": 2,
+          "sum": 1628,
+          "mean": 814
+        },
+        "completion_tokens": {
+          "measured": 2,
+          "sum": 46,
+          "mean": 23
+        },
+        "prompt_cache_hit_tokens": {
+          "measured": 2,
+          "sum": 1280,
+          "mean": 640
+        },
+        "prompt_cache_miss_tokens": {
+          "measured": 2,
+          "sum": 348,
+          "mean": 174
+        },
+        "latency_seconds": {
+          "n": 2,
+          "mean": 1.1140173764999872,
+          "p50": 1.1140173764999872,
+          "p95": 1.131296032000023
+        }
+      }
+    },
+    "multi_fact": {
+      "memz_history": {
+        "n": 2,
+        "answer_correct": 2,
+        "citation_correct": 2,
+        "valid_json": 2,
+        "abstained": 0,
+        "service_ok": 2,
+        "accuracy": 1.0,
+        "prompt_tokens": {
+          "measured": 2,
+          "sum": 1620,
+          "mean": 810
+        },
+        "completion_tokens": {
+          "measured": 2,
+          "sum": 56,
+          "mean": 28
+        },
+        "prompt_cache_hit_tokens": {
+          "measured": 2,
+          "sum": 1280,
+          "mean": 640
+        },
+        "prompt_cache_miss_tokens": {
+          "measured": 2,
+          "sum": 340,
+          "mean": 170
+        },
+        "latency_seconds": {
+          "n": 2,
+          "mean": 1.247512054499964,
+          "p50": 1.247512054499964,
+          "p95": 1.3155116259999886
+        }
+      }
+    },
+    "pending": {
+      "memz_history": {
+        "n": 2,
+        "answer_correct": 2,
+        "citation_correct": 2,
+        "valid_json": 2,
+        "abstained": 0,
+        "service_ok": 2,
+        "accuracy": 1.0,
+        "prompt_tokens": {
+          "measured": 2,
+          "sum": 1626,
+          "mean": 813
+        },
+        "completion_tokens": {
+          "measured": 2,
+          "sum": 38,
+          "mean": 19
+        },
+        "prompt_cache_hit_tokens": {
+          "measured": 2,
+          "sum": 768,
+          "mean": 384
+        },
+        "prompt_cache_miss_tokens": {
+          "measured": 2,
+          "sum": 858,
+          "mean": 429
+        },
+        "latency_seconds": {
+          "n": 2,
+          "mean": 1.1440026304999833,
+          "p50": 1.1440026304999833,
+          "p95": 1.1765479570000252
+        }
+      }
+    },
+    "rejected": {
+      "memz_history": {
+        "n": 2,
+        "answer_correct": 2,
+        "citation_correct": 2,
+        "valid_json": 2,
+        "abstained": 0,
+        "service_ok": 2,
+        "accuracy": 1.0,
+        "prompt_tokens": {
+          "measured": 2,
+          "sum": 1614,
+          "mean": 807
+        },
+        "completion_tokens": {
+          "measured": 2,
+          "sum": 38,
+          "mean": 19
+        },
+        "prompt_cache_hit_tokens": {
+          "measured": 2,
+          "sum": 1280,
+          "mean": 640
+        },
+        "prompt_cache_miss_tokens": {
+          "measured": 2,
+          "sum": 334,
+          "mean": 167
+        },
+        "latency_seconds": {
+          "n": 2,
+          "mean": 0.8605540584999858,
+          "p50": 0.8605540584999858,
+          "p95": 0.9092725619999555
+        }
+      }
+    },
+    "unknown": {
+      "memz_history": {
+        "n": 2,
+        "answer_correct": 2,
+        "citation_correct": 2,
+        "valid_json": 2,
+        "abstained": 2,
+        "service_ok": 2,
+        "accuracy": 1.0,
+        "prompt_tokens": {
+          "measured": 2,
+          "sum": 1618,
+          "mean": 809
+        },
+        "completion_tokens": {
+          "measured": 2,
+          "sum": 32,
+          "mean": 16
+        },
+        "prompt_cache_hit_tokens": {
+          "measured": 2,
+          "sum": 1280,
+          "mean": 640
+        },
+        "prompt_cache_miss_tokens": {
+          "measured": 2,
+          "sum": 338,
+          "mean": 169
+        },
+        "latency_seconds": {
+          "n": 2,
+          "mean": 1.2500173930000074,
+          "p50": 1.2500173930000074,
+          "p95": 1.3640972130000364
+        }
+      }
+    },
+    "untrusted_source": {
+      "memz_history": {
+        "n": 2,
+        "answer_correct": 2,
+        "citation_correct": 2,
+        "valid_json": 2,
+        "abstained": 0,
+        "service_ok": 2,
+        "accuracy": 1.0,
+        "prompt_tokens": {
+          "measured": 2,
+          "sum": 1616,
+          "mean": 808
+        },
+        "completion_tokens": {
+          "measured": 2,
+          "sum": 42,
+          "mean": 21
+        },
+        "prompt_cache_hit_tokens": {
+          "measured": 2,
+          "sum": 1280,
+          "mean": 640
+        },
+        "prompt_cache_miss_tokens": {
+          "measured": 2,
+          "sum": 336,
+          "mean": 168
+        },
+        "latency_seconds": {
+          "n": 2,
+          "mean": 1.2939633050000339,
+          "p50": 1.2939633050000339,
+          "p95": 1.5947612460000755
+        }
+      }
+    },
+    "update": {
+      "memz_history": {
+        "n": 2,
+        "answer_correct": 2,
+        "citation_correct": 2,
+        "valid_json": 2,
+        "abstained": 0,
+        "service_ok": 2,
+        "accuracy": 1.0,
+        "prompt_tokens": {
+          "measured": 2,
+          "sum": 1618,
+          "mean": 809
+        },
+        "completion_tokens": {
+          "measured": 2,
+          "sum": 46,
+          "mean": 23
+        },
+        "prompt_cache_hit_tokens": {
+          "measured": 2,
+          "sum": 256,
+          "mean": 128
+        },
+        "prompt_cache_miss_tokens": {
+          "measured": 2,
+          "sum": 1362,
+          "mean": 681
+        },
+        "latency_seconds": {
+          "n": 2,
+          "mean": 1.014207590500007,
+          "p50": 1.014207590500007,
+          "p95": 1.1234741299999769
+        }
+      }
+    }
+  },
+  "paired": [],
+  "failures": [],
+  "scoring": "strict literal arrays, exact citations, all planned calls in denominator"
+}

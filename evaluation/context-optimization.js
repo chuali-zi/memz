@@ -8,7 +8,7 @@ const {Client}=require('pg');
 const {readContext}=require('../scripts/context-client');
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 const percentile=(values,p)=>[...values].sort((a,b)=>a-b)[Math.ceil(values.length*p)-1];
-const arms=['individual','batch'].flatMap(provenanceMode=>['inline','deduplicated'].map(sourceMode=>({name:`${provenanceMode}_${sourceMode}`,provenanceMode,sourceMode})));
+const arms=['individual','batch','snapshot'].flatMap(provenanceMode=>['inline','deduplicated'].map(sourceMode=>({name:`${provenanceMode}_${sourceMode}`,provenanceMode,sourceMode})));
 const scenarios=[{name:'shared_full',query:'实验共享'}, {name:'unique_full',query:'实验独立'}, {name:'shared_budget',query:'实验共享',maxOutputBytes:16000}];
 const repeats=20,warmups=2;
 const expand=context=>context.facts.map(fact=>{
@@ -24,10 +24,10 @@ async function main(){
   assert.ok(!fs.existsSync(output),'Choose a fresh CONTEXT_EVALUATION_OUTPUT; reports are not overwritten.');
   const report={schemaVersion:1,status:'running',synthetic:true,startedAt:new Date().toISOString(),
     source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),
-      files:Object.fromEntries(['server.js','scripts/context-client.js','db/schema.sql','evaluation/context-optimization.js'].map(f=>[f,hash(fs.readFileSync(f))]))},
+      files:Object.fromEntries(['server.js','scripts/context-client.js','scripts/context-snapshot.js','scripts/search-query.js','db/schema.sql','evaluation/context-optimization.js'].map(f=>[f,hash(fs.readFileSync(f))]))},
     environment:{node:process.version,platform:process.platform,arch:process.arch,cpu:os.cpus()[0]?.model,postgres:null},
     protocol:{warmups,repeats,concurrency:1,armOrder:'deterministic round-robin rotation by repetition; no tuning',factCountPerScenario:25,budgetUnit:'utf8-json-bytes-including-final-newline',
-      timing:'login + facts + immutable provenance + serialization validation + logout; response bodies measured by clone in every arm',
+      timing:'login + current facts and immutable provenance (snapshot combines the data reads) + serialization validation + logout; response bodies measured by clone in every arm',
       scope:'local HTTP/context assembly only; excludes model prefill, generation and judge',modelCalls:0,modelInputTokens:null,modelOutputTokens:null,modelCost:null,answerQuality:null},
     ingestion:{sourceWrites:[],candidateAndApproval:[],maintenance:[]},runs:[],summary:[],checks:{},cleanup:{temporaryDatabaseDropped:false}};
   const admin=new Client({connectionString:adminURL}),db=`memz_context_eval_${crypto.randomBytes(8).toString('hex')}`;

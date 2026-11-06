@@ -1,0 +1,637 @@
+TAP version 13
+# Subtest: late 200 from old key cannot erase newer uncertain creation key
+ok 1 - late 200 from old key cannot erase newer uncertain creation key
+  ---
+  duration_ms: 3.753147
+  type: 'test'
+  ...
+# Subtest: late 400 from old key cannot erase newer uncertain creation key
+ok 2 - late 400 from old key cannot erase newer uncertain creation key
+  ---
+  duration_ms: 0.858559
+  type: 'test'
+  ...
+# Subtest: the current key still clears on success or definitive client rejection
+ok 3 - the current key still clears on success or definitive client rejection
+  ---
+  duration_ms: 2.912175
+  type: 'test'
+  ...
+# Subtest: account switching recovers expired sessions without hiding server or network errors
+ok 4 - account switching recovers expired sessions without hiding server or network errors
+  ---
+  duration_ms: 4.013411
+  type: 'test'
+  ...
+# Subtest: application survives a terminated idle database connection and reuses its session
+ok 5 - application survives a terminated idle database connection and reuses its session
+  ---
+  duration_ms: 278.57813
+  type: 'test'
+  ...
+# Subtest: context client rejects unsafe or silently truncated configuration before login
+ok 6 - context client rejects unsafe or silently truncated configuration before login
+  ---
+  duration_ms: 2.81
+  type: 'test'
+  ...
+# Subtest: context client reports transport timeout without exposing supplied credentials
+ok 7 - context client reports transport timeout without exposing supplied credentials
+  ---
+  duration_ms: 0.64077
+  type: 'test'
+  ...
+# Subtest: context client rejects malformed success and attempts logout after a failed read
+ok 8 - context client rejects malformed success and attempts logout after a failed read
+  ---
+  duration_ms: 30.171808
+  type: 'test'
+  ...
+# Subtest: context client bounds chunked HTTP response bytes before accepting context
+ok 9 - context client bounds chunked HTTP response bytes before accepting context
+  ---
+  duration_ms: 45.258552
+  type: 'test'
+  ...
+# Subtest: whole-read deadline stops further reads but still attempts logout
+ok 10 - whole-read deadline stops further reads but still attempts logout
+  ---
+  duration_ms: 156.99747
+  type: 'test'
+  ...
+# Subtest: output budget counts UTF-8, JSON escaping and final newline at the exact boundary
+ok 11 - output budget counts UTF-8, JSON escaping and final newline at the exact boundary
+  ---
+  duration_ms: 2.389826
+  type: 'test'
+  ...
+# Subtest: continuation rejects a response that repeats or goes behind its cursor and logs out
+ok 12 - continuation rejects a response that repeats or goes behind its cursor and logs out
+  ---
+  duration_ms: 0.696254
+  type: 'test'
+  ...
+# Subtest: optimization switches are strict and validated before login
+ok 13 - optimization switches are strict and validated before login
+  ---
+  duration_ms: 2.016951
+  type: 'test'
+  ...
+# Subtest: batch chunks version references at 25 and preserves every legacy output field
+ok 14 - batch chunks version references at 25 and preserves every legacy output field
+  ---
+  duration_ms: 49.789637
+  type: 'test'
+  ...
+# Subtest: deduplication is independently selectable and reconstructs inline facts without losing provenance
+ok 15 - deduplication is independently selectable and reconstructs inline facts without losing provenance
+  ---
+  duration_ms: 8.736015
+  type: 'test'
+  ...
+# Subtest: batch count, ordering, version and audit references are checked; errors still log out
+ok 16 - batch count, ordering, version and audit references are checked; errors still log out
+  ---
+  duration_ms: 3.853049
+  type: 'test'
+  ...
+# Subtest: conflicting text for a shared source ID fails instead of silently replacing evidence
+ok 17 - conflicting text for a shared source ID fails instead of silently replacing evidence
+  ---
+  duration_ms: 1.580932
+  type: 'test'
+  ...
+# Subtest: deduplicated exact budget includes only the sources required by the retained prefix
+ok 18 - deduplicated exact budget includes only the sources required by the retained prefix
+  ---
+  duration_ms: 2.579001
+  type: 'test'
+  ...
+# Subtest: empty batch context makes no provenance request and retains empty sources schema
+ok 19 - empty batch context makes no provenance request and retains empty sources schema
+  ---
+  duration_ms: 0.617874
+  type: 'test'
+  ...
+# Subtest: stdio child reads real authenticated context as one JSON result
+ok 20 - stdio child reads real authenticated context as one JSON result
+  ---
+  duration_ms: 182.339376
+  type: 'test'
+  ...
+# Subtest: stdio request cannot override credentials or transport and invalid input causes no request
+ok 21 - stdio request cannot override credentials or transport and invalid input causes no request
+  ---
+  duration_ms: 206.243641
+  type: 'test'
+  ...
+# Subtest: stdio child returns no partial context for unauthorized project
+ok 22 - stdio child returns no partial context for unauthorized project
+  ---
+  duration_ms: 133.610954
+  type: 'test'
+  ...
+# Subtest: stdio child terminates if its parent never ends the request
+ok 23 - stdio child terminates if its parent never ends the request
+  ---
+  duration_ms: 5038.631166
+  type: 'test'
+  ...
+# Subtest: stdio rejects a NUL query before opening a session
+ok 24 - stdio rejects a NUL query before opening a session
+  ---
+  duration_ms: 29.63538
+  type: 'test'
+  ...
+# Subtest: stdio rejects escaped unpaired Unicode surrogates without a session
+ok 25 - stdio rejects escaped unpaired Unicode surrogates without a session
+  ---
+  duration_ms: 70.643883
+  type: 'test'
+  ...
+# Subtest: stdio applies optional final output budget and returns no partial JSON when too small
+ok 26 - stdio applies optional final output budget and returns no partial JSON when too small
+  ---
+  duration_ms: 383.303495
+  type: 'test'
+  ...
+# Subtest: stdio accepts a continuation cursor and rejects invalid cursors before HTTP
+ok 27 - stdio accepts a continuation cursor and rejects invalid cursors before HTTP
+  ---
+  duration_ms: 399.222646
+  type: 'test'
+  ...
+# Subtest: stdio and environment independently select batch and deduplicated context
+ok 28 - stdio and environment independently select batch and deduplicated context
+  ---
+  duration_ms: 451.831448
+  type: 'test'
+  ...
+# Subtest: stdio and environment opt into lexical matching and reject invalid search before HTTP
+ok 29 - stdio and environment opt into lexical matching and reject invalid search before HTTP
+  ---
+  duration_ms: 514.950296
+  type: 'test'
+  ...
+# Subtest: stdio and environment opt into a bounded snapshot without changing default output
+ok 30 - stdio and environment opt into a bounded snapshot without changing default output
+  ---
+  duration_ms: 527.504511
+  type: 'test'
+  ...
+# Subtest: snapshot reads one context response and preserves all fact/provenance fields in both source layouts
+ok 31 - snapshot reads one context response and preserves all fact/provenance fields in both source layouts
+  ---
+  duration_ms: 42.195159
+  type: 'test'
+  ...
+# Subtest: snapshot limits are explicit and never silently split a page
+ok 32 - snapshot limits are explicit and never silently split a page
+  ---
+  duration_ms: 5.449493
+  type: 'test'
+  ...
+# Subtest: maximally escaped valid fields with 25 distinct full sources fit the default wire byte cap
+ok 33 - maximally escaped valid fields with 25 distinct full sources fit the default wire byte cap
+  ---
+  duration_ms: 7.708311
+  type: 'test'
+  ...
+# Subtest: snapshot rejects incomplete, redundant, misbound or unrecognized receipts before output omission
+ok 34 - snapshot rejects incomplete, redundant, misbound or unrecognized receipts before output omission
+  ---
+  duration_ms: 15.369309
+  type: 'test'
+  ...
+# Subtest: snapshot validates its all_terms receipt and request cursor without falling back
+ok 35 - snapshot validates its all_terms receipt and request cursor without falling back
+  ---
+  duration_ms: 3.204988
+  type: 'test'
+  ...
+# Subtest: snapshot HTTP failures, response limits and logout failures produce no success or alternate reads
+ok 36 - snapshot HTTP failures, response limits and logout failures produce no success or alternate reads
+  ---
+  duration_ms: 7.99915
+  type: 'test'
+  ...
+# Subtest: snapshot budget includes receipt and consistency while retaining whole prefix sources
+ok 37 - snapshot budget includes receipt and consistency while retaining whole prefix sources
+  ---
+  duration_ms: 3.970576
+  type: 'test'
+  ...
+# Subtest: empty snapshot returns empty dictionaries and preserves continuation semantics
+ok 38 - empty snapshot returns empty dictionaries and preserves continuation semantics
+  ---
+  duration_ms: 0.597433
+  type: 'test'
+  ...
+# Subtest: rehearsal requires an explicit local demo URL before creating records
+ok 39 - rehearsal requires an explicit local demo URL before creating records
+  ---
+  duration_ms: 1.462292
+  type: 'test'
+  ...
+# Subtest: rehearsal extraction requires one record and preserves the raw result
+ok 40 - rehearsal extraction requires one record and preserves the raw result
+  ---
+  duration_ms: 2.745483
+  type: 'test'
+  ...
+# Subtest: consistent fixture evidence passes with complete required coverage
+ok 41 - consistent fixture evidence passes with complete required coverage
+  ---
+  duration_ms: 16.668385
+  type: 'test'
+  ...
+# Subtest: another commit or uncommitted run is rejected
+ok 42 - another commit or uncommitted run is rejected
+  ---
+  duration_ms: 10.982163
+  type: 'test'
+  ...
+# Subtest: failed run, browser exception, or missing retrieval scenario is rejected
+ok 43 - failed run, browser exception, or missing retrieval scenario is rejected
+  ---
+  duration_ms: 12.354018
+  type: 'test'
+  ...
+# Subtest: missing, duplicate and unsafe screenshot entries are rejected
+ok 44 - missing, duplicate and unsafe screenshot entries are rejected
+  ---
+  duration_ms: 6.941149
+  type: 'test'
+  ...
+# Subtest: changed or removed image bytes and symlinks are rejected
+ok 45 - changed or removed image bytes and symlinks are rejected
+  ---
+  duration_ms: 7.365151
+  type: 'test'
+  ...
+# Subtest: changed code and duplicated retrieval cases are rejected
+ok 46 - changed code and duplicated retrieval cases are rejected
+  ---
+  duration_ms: 7.128163
+  type: 'test'
+  ...
+# Subtest: package verification detects changed documents and extra files
+ok 47 - package verification detects changed documents and extra files
+  ---
+  duration_ms: 10.539483
+  type: 'test'
+  ...
+# Subtest: complete package build excludes ignored files, verifies offline, and rejects dirty or stale inputs
+ok 48 - complete package build excludes ignored files, verifies offline, and rejects dirty or stale inputs
+  ---
+  duration_ms: 145.341438
+  type: 'test'
+  ...
+# Subtest: true pass flags cannot hide inconsistent actual or rewritten expected values
+ok 49 - true pass flags cannot hide inconsistent actual or rewritten expected values
+  ---
+  duration_ms: 9.805583
+  type: 'test'
+  ...
+# Subtest: paged counts and browser race evidence must agree with asserted outcomes
+ok 50 - paged counts and browser race evidence must agree with asserted outcomes
+  ---
+  duration_ms: 7.585305
+  type: 'test'
+  ...
+# Subtest: raw database evidence rejects inconsistent summaries and unconfirmed cleanup
+ok 51 - raw database evidence rejects inconsistent summaries and unconfirmed cleanup
+  ---
+  duration_ms: 10.771795
+  type: 'test'
+  ...
+# Subtest: database evidence rejects stale commits, changed raw output and skipped tests
+ok 52 - database evidence rejects stale commits, changed raw output and skipped tests
+  ---
+  duration_ms: 12.921917
+  type: 'test'
+  ...
+# Subtest: a screenshot without its recorded meaning is rejected
+ok 53 - a screenshot without its recorded meaning is rejected
+  ---
+  duration_ms: 6.319659
+  type: 'test'
+  ...
+# Subtest: missing or mismatched external worker evidence is rejected
+ok 54 - missing or mismatched external worker evidence is rejected
+  ---
+  duration_ms: 5.54627
+  type: 'test'
+  ...
+# Subtest: history context binds multiple versions of the same fact and preserves full sources and cursor
+ok 55 - history context binds multiple versions of the same fact and preserves full sources and cursor
+  ---
+  duration_ms: 34.082296
+  type: 'test'
+  ...
+# Subtest: history protocol rejects swapped versions, audit/source corruption and malformed paging, then logs out
+ok 56 - history protocol rejects swapped versions, audit/source corruption and malformed paging, then logs out
+  ---
+  duration_ms: 8.097899
+  type: 'test'
+  ...
+# Subtest: history rejects bad configuration before login and enforces both byte budgets
+ok 57 - history rejects bad configuration before login and enforces both byte budgets
+  ---
+  duration_ms: 1.928277
+  type: 'test'
+  ...
+# Subtest: history reports bounded timeout and authorization failures without raw errors or fallback
+ok 58 - history reports bounded timeout and authorization failures without raw errors or fallback
+  ---
+  duration_ms: 22.525754
+  type: 'test'
+  ...
+# Synthetic snapshot transport comparison: {"synthetic":true,"unit":"http-response-body-bytes","measurements":[{"provenanceMode":"individual","requests":6,"responseBodyBytes":28396,"facts":3,"sources":1},{"provenanceMode":"batch","requests":4,"responseBodyBytes":28460,"facts":3,"sources":1},{"provenanceMode":"snapshot","requests":3,"responseBodyBytes":10932,"facts":3,"sources":1}]}
+# Request failed: Error
+# Request failed: Error
+# Request failed: Error
+# Request failed: Error
+# Synthetic reviewer rehearsal result: {"schemaVersion":1,"synthetic":true,"subject":"合成演示-bfb80eab-0ff3-4d8d-96fe-c1e5076b08f0","startedAt":"2026-11-06T15:38:40.547Z","finishedAt":"2026-11-06T15:38:40.713Z","steps":[{"name":"待审不进入上下文","candidateId":209,"currentFacts":0},{"name":"首次批准","factId":80,"value":"20号","version":1,"sourceId":24},{"name":"更正进入当前上下文","candidateId":210,"value":"15号","version":2,"sourceId":25},{"name":"旧版本请求不能覆盖","candidateId":211,"status":409,"currentVersion":2},{"name":"外部提议驳回后不进入上下文","candidateId":212,"currentValue":"15号"},{"name":"旧依据仍可回查","factId":80,"version":1,"value":"20号","sourceId":24},{"name":"权限边界","viewerWriteStatus":403,"otherProjectReadStatus":403}],"comparison":{"baseline":"synthetic-last-received-proposal","messages":[{"candidateId":209,"value":"20号","sourceId":24,"expectedVersion":0},{"candidateId":210,"value":"15号","sourceId":25,"expectedVersion":1},{"candidateId":211,"value":"25号","sourceId":24,"expectedVersion":1},{"candidateId":212,"value":"30号","sourceId":26,"expectedVersion":2}],"rows":[{"stage":"20号提议待审","latestReceived":{"candidateId":209,"value":"20号","sourceId":24,"expectedVersion":0},"current":null},{"stage":"批准20号","latestReceived":{"candidateId":209,"value":"20号","sourceId":24,"expectedVersion":0},"current":{"value":"20号","version":1,"factId":80,"sourceId":24}},{"stage":"批准更正为15号","latestReceived":{"candidateId":210,"value":"15号","sourceId":25,"expectedVersion":1},"current":{"value":"15号","version":2,"factId":80,"sourceId":25}},{"stage":"25号旧版本审批返回409","latestReceived":{"candidateId":211,"value":"25号","sourceId":24,"expectedVersion":1},"current":{"value":"15号","version":2,"factId":80,"sourceId":25}},{"stage":"30号外部提议被驳回","latestReceived":{"candidateId":212,"value":"30号","sourceId":26,"expectedVersion":2},"current":{"value":"15号","version":2,"factId":80,"sourceId":25}}]},"context":{"schemaVersion":1,"projectId":1,"query":"合成演示-bfb80eab-0ff3-4d8d-96fe-c1e5076b08f0","limit":25,"truncated":false,"nextAfter":null,"sourceTextIsUntrusted":true,"consistency":"One current-facts page; immutable provenance pinned to each returned version. Not necessarily current at completion.","facts":[{"id":80,"subject":"合成演示-bfb80eab-0ff3-4d8d-96fe-c1e5076b08f0","predicate":"截止日","value":"15号","version":2,"revisionId":198,"source":{"id":25,"title":"负责人更正（合成）","content":"本次项目截止日更正为15号。"},"candidateId":210,"proposedBy":2,"approvedBy":1}],"outputBudget":{"maxBytes":4096,"unit":"utf8-json-bytes","omittedFacts":0}},"provenanceV1":{"factId":80,"version":1,"value":"20号","source":{"id":24,"title":"会议纪要（合成）","content":"本次项目截止日为20号。"}},"limits":["Fixed public demo accounts; no model calls","Approval establishes current application state, not external truth","Each read is a separate snapshot; no cross-page snapshot","Synthetic records remain in the selected demo database"]}
+# Synthetic trust boundary result: {"synthetic":true,"modelInvoked":false,"sourceId":29,"candidateId":216,"rawHttpMarked":true,"mcpMarked":true,"exampleMarked":true,"sourcePreserved":true,"businessStateUnchanged":true,"noBusinessWriteRequests":true}
+# Synthetic MCP recovery result: {"synthetic":true,"killedAfterCommit":true,"restartedFromSavedIntent":true,"candidateId":217,"sourceId":30,"singleProposalAudit":true,"pendingUntilOwnerApproval":true,"deniedWritesUnchanged":true,"provenance503NoPartialContext":true,"retryVersion":1}
+# Subtest: 真实 PostgreSQL：权限、事务、并发、输入和检索
+ok 59 - 真实 PostgreSQL：权限、事务、并发、输入和检索
+  ---
+  duration_ms: 12698.29392
+  type: 'test'
+  ...
+# Subtest: generated host configurations launch real stdio processes outside the repository with minimal environment
+ok 60 - generated host configurations launch real stdio processes outside the repository with minimal environment
+  ---
+  duration_ms: 383.204089
+  type: 'test'
+  ...
+# Subtest: config generator refuses unknown host and extra arguments without partial JSON
+ok 61 - config generator refuses unknown host and extra arguments without partial JSON
+  ---
+  duration_ms: 55.766444
+  type: 'test'
+  ...
+# Subtest: read-only MCP example rejects invalid input and credential-bearing destinations without output leaks
+ok 62 - read-only MCP example rejects invalid input and credential-bearing destinations without output leaks
+  ---
+  duration_ms: 551.780817
+  type: 'test'
+  ...
+# Subtest: real local HTTP failure through MCP exposes only a fixed error code
+ok 63 - real local HTTP failure through MCP exposes only a fixed error code
+  ---
+  duration_ms: 385.39999
+  type: 'test'
+  ...
+# Subtest: MCP configuration fixes local project scope and defaults to read-only
+ok 64 - MCP configuration fixes local project scope and defaults to read-only
+  ---
+  duration_ms: 1.304513
+  type: 'test'
+  ...
+# Subtest: real stdio handshake, read-only discovery, unknown tools and scope injection rejection
+ok 65 - real stdio handshake, read-only discovery, unknown tools and scope injection rejection
+  ---
+  duration_ms: 191.120149
+  type: 'test'
+  ...
+# Subtest: stdio closes on malformed, oversized and invalid UTF-8 without echoing inputs
+ok 66 - stdio closes on malformed, oversized and invalid UTF-8 without echoing inputs
+  ---
+  duration_ms: 457.800567
+  type: 'test'
+  ...
+# Subtest: unsupported handshake version negotiates the documented compatibility version
+ok 67 - unsupported handshake version negotiates the documented compatibility version
+  ---
+  duration_ms: 155.908714
+  type: 'test'
+  ...
+# Subtest: SDK stdio buffer limit closes a live stream across chunks before EOF
+ok 68 - SDK stdio buffer limit closes a live stream across chunks before EOF
+  ---
+  duration_ms: 389.414318
+  type: 'test'
+  ...
+# Subtest: proposal client rejects invalid input and nonlocal targets before login
+ok 69 - proposal client rejects invalid input and nonlocal targets before login
+  ---
+  duration_ms: 1.763358
+  type: 'test'
+  ...
+# Subtest: proposal client bounds replies, never automatically retries writes, and separates logout failure
+ok 70 - proposal client bounds replies, never automatically retries writes, and separates logout failure
+  ---
+  duration_ms: 29.453915
+  type: 'test'
+  ...
+# Subtest: reader projection preserves exact facts, revisions, source text and trust/continuation boundaries
+ok 71 - reader projection preserves exact facts, revisions, source text and trust/continuation boundaries
+  ---
+  duration_ms: 1.607331
+  type: 'test'
+  ...
+# Subtest: inline and dictionary input produce identical reader context; shared evidence occurs once
+ok 72 - inline and dictionary input produce identical reader context; shared evidence occurs once
+  ---
+  duration_ms: 0.246072
+  type: 'test'
+  ...
+# Subtest: malformed, conflicting, missing or surplus evidence is rejected
+ok 73 - malformed, conflicting, missing or surplus evidence is rejected
+  ---
+  duration_ms: 1.320817
+  type: 'test'
+  ...
+# (node:13901) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: two complete demo runs preserve earlier records in a fresh isolated database
+ok 74 - two complete demo runs preserve earlier records in a fresh isolated database
+  ---
+  duration_ms: 5844.782638
+  type: 'test'
+  ...
+# Controlled cleanup failure: own open connection produced 55006 and a named-target error; database retained until connections close
+# Synthetic repeated rehearsal: {"rounds":[{"round":1,"subject":"合成演示-4b8fdbc9-39ec-4d4d-b227-56d0e9a426fb","factId":2,"value":"15号","version":2,"sourceId":6,"oldSourceId":5,"additions":{"projects":0,"memberships":0,"sources":3,"candidates":4,"facts":1,"revisions":2,"audit":10,"idempotency_requests":7}},{"round":2,"subject":"合成演示-28a08087-3059-4729-ac39-746c7c7ae84f","factId":3,"value":"15号","version":2,"sourceId":9,"oldSourceId":8,"additions":{"projects":0,"memberships":0,"sources":3,"candidates":4,"facts":1,"revisions":2,"audit":10,"idempotency_requests":7}}],"seedRowsPreserved":true,"firstRoundRowsPreserved":true}
+# Repeated rehearsal temporary database cleanup: confirmed
+# Subtest: JSON object endpoints reject absent and unsupported Content-Type consistently
+ok 75 - JSON object endpoints reject absent and unsupported Content-Type consistently
+  ---
+  duration_ms: 78.587265
+  type: 'test'
+  ...
+# Subtest: missing, malformed, scalar and array JSON are rejected without reflecting input
+ok 76 - missing, malformed, scalar and array JSON are rejected without reflecting input
+  ---
+  duration_ms: 30.270262
+  type: 'test'
+  ...
+# Subtest: JSON byte limit accepts 16 KiB and rejects larger or inflated bodies
+ok 77 - JSON byte limit accepts 16 KiB and rejects larger or inflated bodies
+  ---
+  duration_ms: 7.237349
+  type: 'test'
+  ...
+# Subtest: unsupported charset and encoding return safe JSON errors
+ok 78 - unsupported charset and encoding return safe JSON errors
+  ---
+  duration_ms: 3.608759
+  type: 'test'
+  ...
+# Subtest: authentication and CSRF gates still reject unauthenticated or forged writes
+ok 79 - authentication and CSRF gates still reject unauthenticated or forged writes
+  ---
+  duration_ms: 5.717219
+  type: 'test'
+  ...
+# Subtest: login Origin rejection and authenticated API misses use JSON errors
+ok 80 - login Origin rejection and authenticated API misses use JSON errors
+  ---
+  duration_ms: 2.762709
+  type: 'test'
+  ...
+# Subtest: valid JSON charset, field errors and bodyless logout retain existing behavior
+ok 81 - valid JSON charset, field errors and bodyless logout retain existing behavior
+  ---
+  duration_ms: 5.133316
+  type: 'test'
+  ...
+# Subtest: login requires a string username without array coercion or object conversion
+ok 82 - login requires a string username without array coercion or object conversion
+  ---
+  duration_ms: 5.859705
+  type: 'test'
+  ...
+# Subtest: local demo rejects a foreign Host even when login Origin matches that Host
+ok 83 - local demo rejects a foreign Host even when login Origin matches that Host
+  ---
+  duration_ms: 4.591967
+  type: 'test'
+  ...
+# Subtest: foreign Host cannot read assets or bypass checks with forwarded headers or a session
+ok 84 - foreign Host cannot read assets or bypass checks with forwarded headers or a session
+  ---
+  duration_ms: 8.091641
+  type: 'test'
+  ...
+# Subtest: literal loopback Hosts retain public demo login, CSRF and logout behavior
+ok 85 - literal loopback Hosts retain public demo login, CSRF and logout behavior
+  ---
+  duration_ms: 9.437647
+  type: 'test'
+  ...
+# Subtest: custom backup restores revisions, idempotency, RLS and future writes in isolated databases
+ok 86 - custom backup restores revisions, idempotency, RLS and future writes in isolated databases
+  ---
+  duration_ms: 1181.913405
+  type: 'test'
+  ...
+# Synthetic custom archive: 35650 bytes; sha256=fea9e196cdd51faf10a38776ffed7eef800bb4b9cdd557cc78e6239aa51d81bd; corrupt archive rejected; restored data and continuation verified
+# Both random recovery databases and child services cleaned up
+# Subtest: all_terms preserves literal terms and deduplicates exact strings in first-seen order
+ok 87 - all_terms preserves literal terms and deduplicates exact strings in first-seen order
+  ---
+  duration_ms: 1.326447
+  type: 'test'
+  ...
+# Subtest: all_terms validates original length, term count and Unicode without truncation
+ok 88 - all_terms validates original length, term count and Unicode without truncation
+  ---
+  duration_ms: 0.725358
+  type: 'test'
+  ...
+# Subtest: client rejects invalid search configuration before login
+ok 89 - client rejects invalid search configuration before login
+  ---
+  duration_ms: 1.479078
+  type: 'test'
+  ...
+# Subtest: client requires exact matching receipt and fails closed against a server ignoring match
+ok 90 - client requires exact matching receipt and fails closed against a server ignoring match
+  ---
+  duration_ms: 31.195412
+  type: 'test'
+  ...
+# Subtest: client preserves a validated search receipt independent of object key order
+ok 91 - client preserves a validated search receipt independent of object key order
+  ---
+  duration_ms: 1.127516
+  type: 'test'
+  ...
+# Subtest: opt-in receipt is included in exact UTF-8 output budget accounting
+ok 92 - opt-in receipt is included in exact UTF-8 output budget accounting
+  ---
+  duration_ms: 1.267707
+  type: 'test'
+  ...
+# Subtest: read-only setup check reports missing migration before a legacy database can support keyed writes
+ok 93 - read-only setup check reports missing migration before a legacy database can support keyed writes
+  ---
+  duration_ms: 443.62895
+  type: 'test'
+  ...
+# Subtest: setup diagnostic rejects administrator and disabled RLS, and prints no connection secrets
+ok 94 - setup diagnostic rejects administrator and disabled RLS, and prints no connection secrets
+  ---
+  duration_ms: 267.834894
+  type: 'test'
+  ...
+# Subtest: setup checker rejects nonlocal parsed connection targets without contacting them
+ok 95 - setup checker rejects nonlocal parsed connection targets without contacting them
+  ---
+  duration_ms: 0.699768
+  type: 'test'
+  ...
+# Subtest: source creation rejects malformed and oversized intents before login
+ok 96 - source creation rejects malformed and oversized intents before login
+  ---
+  duration_ms: 1.881767
+  type: 'test'
+  ...
+# Subtest: source receipt must bind the exact project and normalized content
+ok 97 - source receipt must bind the exact project and normalized content
+  ---
+  duration_ms: 28.833089
+  type: 'test'
+  ...
+# Subtest: CLI startup advertises its configured port and serves an authenticated database request
+ok 98 - CLI startup advertises its configured port and serves an authenticated database request
+  ---
+  duration_ms: 233.677531
+  type: 'test'
+  ...
+# Subtest: TAP evidence preserves exact successful counts
+ok 99 - TAP evidence preserves exact successful counts
+  ---
+  duration_ms: 1.768745
+  type: 'test'
+  ...
+# Subtest: TAP failure and skip counts remain explicit
+ok 100 - TAP failure and skip counts remain explicit
+  ---
+  duration_ms: 0.23809
+  type: 'test'
+  ...
+# Subtest: TAP missing or duplicate summaries cannot appear successful
+ok 101 - TAP missing or duplicate summaries cannot appear successful
+  ---
+  duration_ms: 1.197912
+  type: 'test'
+  ...
+# Subtest: TAP contradictions, empty tests and not-ok with a success summary are rejected
+ok 102 - TAP contradictions, empty tests and not-ok with a success summary are rejected
+  ---
+  duration_ms: 0.457242
+  type: 'test'
+  ...
+1..102
+# tests 102
+# suites 0
+# pass 102
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 13433.946095

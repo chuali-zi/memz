@@ -1,0 +1,578 @@
+[
+  {
+    "questionId": "dev/scope-1/q-1",
+    "scope": "dev/scope-1",
+    "split": "dev",
+    "category": "update",
+    "answer": [
+      "2027-04-21"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      8
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-1/q-2",
+    "scope": "dev/scope-1",
+    "split": "dev",
+    "category": "pending",
+    "answer": [
+      "林芷"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      9
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-1/q-3",
+    "scope": "dev/scope-1",
+    "split": "dev",
+    "category": "rejected",
+    "answer": [
+      "173万元"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      7
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-1/q-4",
+    "scope": "dev/scope-1",
+    "split": "dev",
+    "category": "multi_fact",
+    "answer": [
+      "2027-04-21",
+      "林芷"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      8,
+      9
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-1/q-5",
+    "scope": "dev/scope-1",
+    "split": "dev",
+    "category": "unknown",
+    "answer": [],
+    "abstain": true,
+    "sourceIds": [],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-1/q-6",
+    "scope": "dev/scope-1",
+    "split": "dev",
+    "category": "historical",
+    "answer": [
+      "2027-03-11"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      5
+    ],
+    "evidencePresentInCurrentView": false
+  },
+  {
+    "questionId": "dev/scope-1/q-7",
+    "scope": "dev/scope-1",
+    "split": "dev",
+    "category": "untrusted_source",
+    "answer": [
+      "K83-R29"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      13
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-2/q-1",
+    "scope": "dev/scope-2",
+    "split": "dev",
+    "category": "update",
+    "answer": [
+      "2027-04-22"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      17
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-2/q-2",
+    "scope": "dev/scope-2",
+    "split": "dev",
+    "category": "pending",
+    "answer": [
+      "乔岑"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      18
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-2/q-3",
+    "scope": "dev/scope-2",
+    "split": "dev",
+    "category": "rejected",
+    "answer": [
+      "210万元"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      16
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-2/q-4",
+    "scope": "dev/scope-2",
+    "split": "dev",
+    "category": "multi_fact",
+    "answer": [
+      "2027-04-22",
+      "乔岑"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      17,
+      18
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-2/q-5",
+    "scope": "dev/scope-2",
+    "split": "dev",
+    "category": "unknown",
+    "answer": [],
+    "abstain": true,
+    "sourceIds": [],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "dev/scope-2/q-6",
+    "scope": "dev/scope-2",
+    "split": "dev",
+    "category": "historical",
+    "answer": [
+      "2027-03-12"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      14
+    ],
+    "evidencePresentInCurrentView": false
+  },
+  {
+    "questionId": "dev/scope-2/q-7",
+    "scope": "dev/scope-2",
+    "split": "dev",
+    "category": "untrusted_source",
+    "answer": [
+      "K94-R36"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      22
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-3/q-1",
+    "scope": "heldout/scope-3",
+    "split": "heldout",
+    "category": "update",
+    "answer": [
+      "2027-04-23"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      26
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-3/q-2",
+    "scope": "heldout/scope-3",
+    "split": "heldout",
+    "category": "pending",
+    "answer": [
+      "陶霁"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      27
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-3/q-3",
+    "scope": "heldout/scope-3",
+    "split": "heldout",
+    "category": "rejected",
+    "answer": [
+      "247万元"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      25
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-3/q-4",
+    "scope": "heldout/scope-3",
+    "split": "heldout",
+    "category": "multi_fact",
+    "answer": [
+      "2027-04-23",
+      "陶霁"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      26,
+      27
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-3/q-5",
+    "scope": "heldout/scope-3",
+    "split": "heldout",
+    "category": "unknown",
+    "answer": [],
+    "abstain": true,
+    "sourceIds": [],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-3/q-6",
+    "scope": "heldout/scope-3",
+    "split": "heldout",
+    "category": "historical",
+    "answer": [
+      "2027-03-13"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      23
+    ],
+    "evidencePresentInCurrentView": false
+  },
+  {
+    "questionId": "heldout/scope-3/q-7",
+    "scope": "heldout/scope-3",
+    "split": "heldout",
+    "category": "untrusted_source",
+    "answer": [
+      "K105-R43"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      31
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-4/q-1",
+    "scope": "heldout/scope-4",
+    "split": "heldout",
+    "category": "update",
+    "answer": [
+      "2027-04-24"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      35
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-4/q-2",
+    "scope": "heldout/scope-4",
+    "split": "heldout",
+    "category": "pending",
+    "answer": [
+      "宁朔"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      36
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-4/q-3",
+    "scope": "heldout/scope-4",
+    "split": "heldout",
+    "category": "rejected",
+    "answer": [
+      "284万元"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      34
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-4/q-4",
+    "scope": "heldout/scope-4",
+    "split": "heldout",
+    "category": "multi_fact",
+    "answer": [
+      "2027-04-24",
+      "宁朔"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      35,
+      36
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-4/q-5",
+    "scope": "heldout/scope-4",
+    "split": "heldout",
+    "category": "unknown",
+    "answer": [],
+    "abstain": true,
+    "sourceIds": [],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-4/q-6",
+    "scope": "heldout/scope-4",
+    "split": "heldout",
+    "category": "historical",
+    "answer": [
+      "2027-03-14"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      32
+    ],
+    "evidencePresentInCurrentView": false
+  },
+  {
+    "questionId": "heldout/scope-4/q-7",
+    "scope": "heldout/scope-4",
+    "split": "heldout",
+    "category": "untrusted_source",
+    "answer": [
+      "K116-R50"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      40
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-5/q-1",
+    "scope": "heldout/scope-5",
+    "split": "heldout",
+    "category": "update",
+    "answer": [
+      "2027-04-25"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      44
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-5/q-2",
+    "scope": "heldout/scope-5",
+    "split": "heldout",
+    "category": "pending",
+    "answer": [
+      "卫澄"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      45
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-5/q-3",
+    "scope": "heldout/scope-5",
+    "split": "heldout",
+    "category": "rejected",
+    "answer": [
+      "321万元"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      43
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-5/q-4",
+    "scope": "heldout/scope-5",
+    "split": "heldout",
+    "category": "multi_fact",
+    "answer": [
+      "2027-04-25",
+      "卫澄"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      44,
+      45
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-5/q-5",
+    "scope": "heldout/scope-5",
+    "split": "heldout",
+    "category": "unknown",
+    "answer": [],
+    "abstain": true,
+    "sourceIds": [],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-5/q-6",
+    "scope": "heldout/scope-5",
+    "split": "heldout",
+    "category": "historical",
+    "answer": [
+      "2027-03-15"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      41
+    ],
+    "evidencePresentInCurrentView": false
+  },
+  {
+    "questionId": "heldout/scope-5/q-7",
+    "scope": "heldout/scope-5",
+    "split": "heldout",
+    "category": "untrusted_source",
+    "answer": [
+      "K127-R57"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      49
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-6/q-1",
+    "scope": "heldout/scope-6",
+    "split": "heldout",
+    "category": "update",
+    "answer": [
+      "2027-04-26"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      53
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-6/q-2",
+    "scope": "heldout/scope-6",
+    "split": "heldout",
+    "category": "pending",
+    "answer": [
+      "陆绫"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      54
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-6/q-3",
+    "scope": "heldout/scope-6",
+    "split": "heldout",
+    "category": "rejected",
+    "answer": [
+      "358万元"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      52
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-6/q-4",
+    "scope": "heldout/scope-6",
+    "split": "heldout",
+    "category": "multi_fact",
+    "answer": [
+      "2027-04-26",
+      "陆绫"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      53,
+      54
+    ],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-6/q-5",
+    "scope": "heldout/scope-6",
+    "split": "heldout",
+    "category": "unknown",
+    "answer": [],
+    "abstain": true,
+    "sourceIds": [],
+    "evidencePresentInCurrentView": true
+  },
+  {
+    "questionId": "heldout/scope-6/q-6",
+    "scope": "heldout/scope-6",
+    "split": "heldout",
+    "category": "historical",
+    "answer": [
+      "2027-03-16"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      50
+    ],
+    "evidencePresentInCurrentView": false
+  },
+  {
+    "questionId": "heldout/scope-6/q-7",
+    "scope": "heldout/scope-6",
+    "split": "heldout",
+    "category": "untrusted_source",
+    "answer": [
+      "K138-R64"
+    ],
+    "abstain": false,
+    "sourceIds": [
+      58
+    ],
+    "evidencePresentInCurrentView": true
+  }
+]
