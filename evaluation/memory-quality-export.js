@@ -6,6 +6,7 @@ const {performance}=require('node:perf_hooks');
 const {Client}=require('pg');
 const {readContext}=require('../scripts/context-client');
 const {renderReaderContext}=require('../scripts/reader-context');
+const {readHistoryContext}=require('../scripts/history-context');
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 async function main(){
   const adminURL=process.env.MEMORY_EVALUATION_DATABASE_URL;
@@ -15,7 +16,7 @@ async function main(){
   const report={schema:'memz-memory-quality-export-v1',synthetic:true,status:'running',
     sourceCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
     workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),
-    files:Object.fromEntries(['server.js','db/schema.sql','scripts/context-client.js','scripts/context-snapshot.js','scripts/reader-context.js','evaluation/memory-quality-export.js'].map(f=>[f,hash(fs.readFileSync(f))])),
+    files:Object.fromEntries(['server.js','db/schema.sql','scripts/context-client.js','scripts/context-snapshot.js','scripts/reader-context.js','scripts/history-context.js','evaluation/memory-quality-export.js'].map(f=>[f,hash(fs.readFileSync(f))])),
     startedAt:new Date().toISOString(),environment:{node:process.version,postgres:null},
     ingestion:{modelCalls:0,approval:'scripted owner approval of predefined synthetic facts, not model extraction or human timing',elapsedMs:null},
     scopes:[],retrieval:[],literalQuestionProbe:[],cleanup:{temporaryDatabaseDropped:false}};
@@ -84,8 +85,15 @@ async function main(){
           sourceIds:context.facts.map(f=>f.source.id)});
         const literal=await readContext({baseURL,projectId,query,provenanceMode:'snapshot'});
         report.literalQuestionProbe.push({questionId,returnedFacts:literal.facts.length});
+        const historyStart=performance.now();let historyRequests=0,historyResponseBytes=0;
+        const history=await readHistoryContext({baseURL,projectId,fetchImpl:async(...args)=>{
+          historyRequests++;const response=await fetch(...args);historyResponseBytes+=(await response.clone().arrayBuffer()).byteLength;return response;
+        }});
+        assert.equal(history.revisions.length,6);assert.equal(history.truncated,false);
+        assert.deepEqual(new Set(history.sources.map(s=>s.id)),new Set(events.filter(e=>e.status==='approved').map(e=>e.source.id)));
+        Object.assign(report.retrieval.at(-1),{historyElapsedMs:performance.now()-historyStart,historyRequests,historyResponseBytes});
         const arms={no_memory:'',full_history:JSON.stringify({scope:projectId,sourceTextIsUntrusted:true,events}),
-          memz_full:JSON.stringify(context,null,2),memz_reader:reader};
+          memz_full:JSON.stringify(context,null,2),memz_reader:reader,memz_history:JSON.stringify(history)};
         for(const [arm,contextText] of Object.entries(arms))inputs.push({id:`${questionId}/${arm}`,query,context:contextText});
         gold.push({questionId,scope,split,category,answer,abstain:answer.length===0,sourceIds,
           evidencePresentInCurrentView:sourceIds.every(id=>context.facts.some(f=>f.source.id===id))});

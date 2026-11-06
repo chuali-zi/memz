@@ -64,7 +64,8 @@ def main():
     config = json.loads((run/'config.json').read_text())
     raw = (root/'inputs.jsonl').read_bytes()
     if hashlib.sha256(raw).hexdigest() != config['input_sha256']: raise ValueError('input_hash_mismatch')
-    inputs = {r['id']: r for r in map(json.loads, raw.splitlines()) if r['id'].startswith(config['split']+'/')}
+    inputs = {r['id']: r for r in map(json.loads, raw.splitlines()) if r['id'].startswith(config['split']+'/')
+              and (not config.get('arms') or r['id'].rsplit('/',1)[1] in config['arms'])}
     gold = {r['questionId']: r for r in json.loads((root/'gold.private.json').read_text())}
     calls = {}; call_bytes = (run/'calls.jsonl').read_bytes()
     for line in call_bytes.splitlines():
@@ -90,7 +91,7 @@ def main():
         'arms': {arm: summarize([r for r in graded if r['arm']==arm]) for arm in arms},
         'categories': {category: {arm: summarize([r for r in graded if r['category']==category and r['arm']==arm])
                       for arm in arms} for category in categories},
-        'paired': [paired_cluster(graded, 'memz_reader', right) for right in ('memz_full', 'full_history', 'no_memory')],
+        'paired': [paired_cluster(graded, left, right) for left in ('memz_reader','memz_history') for right in ('memz_full', 'full_history', 'no_memory') if left in arms and right in arms],
         'failures': [r for r in graded if not r['answer_correct']], 'scoring': 'strict literal arrays, exact citations, all planned calls in denominator'}
     with Path(args.output).open('x') as out: json.dump(report, out, ensure_ascii=False, indent=2); out.write('\n')
     print(json.dumps({'split': report['split'], 'arms': report['arms'], 'paired': report['paired']}, ensure_ascii=False))

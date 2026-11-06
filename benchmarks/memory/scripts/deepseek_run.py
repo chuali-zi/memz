@@ -16,6 +16,7 @@ def main():
     p.add_argument('--split', choices=['dev', 'heldout'], required=True)
     p.add_argument('--repeats', type=int, default=1)
     p.add_argument('--model', default='deepseek-flash'); p.add_argument('--execute', action='store_true')
+    p.add_argument('--arms', nargs='+', choices=['no_memory','full_history','memz_full','memz_reader','memz_history'])
     args = p.parse_args()
     if not 1 <= args.repeats <= 3: raise ValueError('invalid_repeats')
     raw = Path(args.input).read_bytes()
@@ -23,13 +24,13 @@ def main():
     rows = [json.loads(line) for line in raw.splitlines()]
     if len({r['id'] for r in rows}) != len(rows): raise ValueError('duplicate_ids')
     for row in rows: prepare(row, args.model)
-    rows = [r for r in rows if r['id'].startswith(args.split + '/')]
+    rows = [r for r in rows if r['id'].startswith(args.split + '/') and (not args.arms or r['id'].rsplit('/',1)[1] in args.arms)]
     if not rows or len(rows) * args.repeats > 400: raise ValueError('call_budget_exceeded')
     if sum(len(prepare(r, args.model)) for r in rows) * args.repeats > 12 * 1024 * 1024:
         raise ValueError('total_input_budget_exceeded')
     directory = Path(args.output); directory.mkdir(parents=True, exist_ok=False)
     config = {'schema': 'memz-deepseek-run-v1', 'model': args.model, 'split': args.split,
-        'repeats': args.repeats, 'max_calls': len(rows) * args.repeats, 'max_output_tokens': 256,
+        'repeats': args.repeats, 'arms': sorted({r['id'].rsplit('/',1)[1] for r in rows}), 'max_calls': len(rows) * args.repeats, 'max_output_tokens': 256,
         'reserved_output_tokens': len(rows) * args.repeats * 256, 'concurrency': 2,
         'temperature': 0, 'thinking': 'disabled', 'timeout_seconds': 45, 'attempts_per_call': 1,
         'input_sha256': hashlib.sha256(raw).hexdigest(), 'system_sha256': hashlib.sha256(SYSTEM.encode()).hexdigest(),

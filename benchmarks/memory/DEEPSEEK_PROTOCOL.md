@@ -26,3 +26,11 @@
 研究依据：OpenViking固定版本的[L0/L1/L2](https://github.com/volcengine/OpenViking/blob/739e17f9172b9f595bfe4cc95293ec52d4686120/docs/en/concepts/03-context-layers.md)支持区分导航表示与完整证据；本轮独立实现确定性投影，不复制源码或引入生成摘要。[LongMemEval](https://arxiv.org/abs/2410.10813v2)将索引、检索、读取分开，覆盖更新、时间及拒答；本轮借鉴评测维度而非使用其数据/成绩。[MemGPT](https://arxiv.org/abs/2310.08560v2)启发工作上下文与持久历史分离；[A-MEM](https://arxiv.org/abs/2502.12110v11)启发未来可重建检索元数据，尚未实现图关联。
 
 这些原始摘要/文档本轮重新核查；接口参数核查于[DeepSeek官方文档](https://api-docs.deepseek.com/api/create-chat-completion)。完整原论文机制分析另见已有研究记录，不能把摘要阅读写成全篇复现。
+
+## 开发结果后的预注册修订（留出集调用前）
+
+开发集56次请求全部完成：full_history 14/14，memz_full及memz_reader均12/14，no_memory 2/14。两项Memz失败均为历史值缺失。reader平均输入646 token，原格式962 token；不据此调整问题、gold或评分器。
+
+针对这个开发集错误，新增第五组 `memz_history`：通过已有history分页接口与固定版本批量依据接口读取**同一项目的已批准修订**，包含当前及被替代的版本，保留完整原文。所有题统一使用这个组，不根据题型/gold挑证据。接口每页最多25条，显式nextBefore/truncated，不默默截断、拼接或宣称共同事务快照。它是显式历史读取能力，不是自动时间推理或自然语言路由。
+
+先只在开发集增加14次history调用验证；随后冻结五组，在留出集28题×5组×2次=280次。加原开发56次，正式实验共350次，最多预留89,600输出token，另有1次连通性请求。此前四组预注册保留；新增组的选择只依据开发集，留出集尚未调用。开发集原四组不重复付费调用；完整留出组仍按题配对轮转。此修改不扩充为真实公开基准或第三方系统对跑。
