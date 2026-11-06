@@ -153,6 +153,19 @@ class GLMAdapterTests(unittest.TestCase):
             self.assertEqual(adapter.complete(ROW)["status"], "ok")
             self.assertEqual(transport.call_args.args[2], "synthetic-fallback")
 
+    def test_user_named_glm_alias_and_proxy_placeholder_are_supported(self):
+        with patch.dict(glm.os.environ, {"GLM_API_KEY": "synthetic-proxy-placeholder"}, clear=True):
+            adapter, transport = self.adapter()
+            result = adapter.complete(ROW)
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(transport.call_args.args[2], "synthetic-proxy-placeholder")
+            self.assertNotIn("synthetic-proxy-placeholder", json.dumps(result))
+        with patch.dict(glm.os.environ, {"MEMZ_GLM_API_KEY": "preferred-synthetic",
+                                        "GLM_API_KEY": "fallback-synthetic"}, clear=True):
+            adapter, transport = self.adapter()
+            self.assertEqual(adapter.complete(ROW)["status"], "ok")
+            self.assertEqual(transport.call_args.args[2], "preferred-synthetic")
+
     def test_403_429_and_all_http_errors_stop_without_retry_or_body(self):
         for status in [403, 429, 500, 301, 307]:
             adapter, transport = self.adapter(reply={"status": status, "body": b"Authorization SECRET request body"})

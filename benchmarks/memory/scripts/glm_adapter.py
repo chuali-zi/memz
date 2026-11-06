@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from decimal import Decimal
 import hashlib
 import json
 import math
@@ -48,7 +49,7 @@ def validate_config(config):
     required = {"model", "max_calls", "max_input_bytes", "max_request_bytes",
                 "max_response_bytes", "max_total_input_bytes", "max_output_tokens",
                 "max_total_output_tokens", "timeout_seconds"}
-    optional = {"endpoint", "temperature", "top_p", "thinking", "pricing", "strict_usage"}
+    optional = {"endpoint", "temperature", "top_p", "thinking", "pricing", "strict_usage", "spend_guard"}
     if not isinstance(config, dict) or not required <= config.keys() or config.keys() - required - optional:
         raise AdapterError("invalid_config_fields")
     validate_url(config.get("endpoint", ENDPOINT))
@@ -78,6 +79,20 @@ def validate_config(config):
             value = pricing[key]
             if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1000000:
                 raise AdapterError("invalid_pricing")
+    guard = config.get("spend_guard")
+    if guard is not None:
+        if (not isinstance(guard, dict) or set(guard) != {
+                "tokenizer_id", "max_input_tokens", "max_total_input_tokens", "max_cost"}
+                or pricing is None):
+            raise AdapterError("invalid_spend_guard")
+        if (not isinstance(guard["tokenizer_id"], str)
+                or not re.fullmatch(r"[A-Za-z0-9_.:/-]{1,200}", guard["tokenizer_id"])
+                or not positive_int(guard["max_input_tokens"], 10**7)
+                or not positive_int(guard["max_total_input_tokens"], 10**11)):
+            raise AdapterError("invalid_spend_guard")
+        maximum = guard["max_cost"]
+        if type(maximum) not in (int, float) or not math.isfinite(maximum) or not 0 < maximum <= 10**6:
+            raise AdapterError("invalid_spend_guard")
     return json.loads(encode(config))
 
 
@@ -270,15 +285,52 @@ def parse_response(body, config, *, credential=None):
 class GLMAdapter:
     """Reuse one instance for an entire run so its budget and halt state persist."""
 
-    def __init__(self, config, *, execute=False, transport=None):
+    def __init__(self, config, *, execute=False, transport=None, token_counter=None):
         self.config = validate_config(config)
         self.execute = execute is True
         self.transport = transport or http_transport
         self.calls = 0
         self.input_bytes = 0
         self.reserved_output_tokens = 0
+        self.token_counter = token_counter
+        self.reserved_input_tokens = 0
+        self.reserved_cost = Decimal(0)
         self.halted = False
         self.config_sha256 = hashlib.sha256(encode(self.config)).hexdigest()
+
+    def reserve_spend(self, body):
+        """Reserve whole-prompt tokens and worst-case output before transport.
+
+        The counter is trusted, local code for the exact model chat template;
+        a matching identity is necessary but does not validate its correctness.
+        No character/byte approximation or automatic tokenizer download exists.
+        Reservations are never refunded, even for failures or short completions.
+        """
+        guard = self.config.get("spend_guard")
+        if guard is None:
+            return None
+        if (not callable(self.token_counter)
+                or getattr(self.token_counter, "tokenizer_id", None) != guard["tokenizer_id"]):
+            raise AdapterError("token_counter_unavailable")
+        count = self.token_counter(body)
+        if not positive_int(count, 10**7):
+            raise AdapterError("invalid_token_count")
+        if count > guard["max_input_tokens"]:
+            raise AdapterError("input_token_budget_exceeded")
+        if self.reserved_input_tokens + count > guard["max_total_input_tokens"]:
+            raise AdapterError("total_input_token_budget_exceeded")
+        pricing = self.config["pricing"]
+        cost = (Decimal(count) * Decimal(str(pricing["input_per_million"]))
+                + Decimal(self.config["max_output_tokens"]) * Decimal(str(pricing["output_per_million"]))) / Decimal(10**6)
+        if self.reserved_cost + cost > Decimal(str(guard["max_cost"])):
+            raise AdapterError("cost_budget_exceeded")
+        self.reserved_input_tokens += count
+        self.reserved_cost += cost
+        return {"tokenizer_id": guard["tokenizer_id"], "input_tokens": count,
+                "cumulative_input_tokens": self.reserved_input_tokens,
+                "currency": pricing["currency"], "request_cost_reservation": str(cost),
+                "cumulative_cost_reservation": str(self.reserved_cost),
+                "basis": "verified_tokenizer_and_configured_rates_required_not_invoice"}
 
     def complete(self, row):
         started = time.monotonic()
@@ -286,6 +338,7 @@ class GLMAdapter:
                   "provider_reported_model": None, "usage": None, "estimated_cost": None,
                   "usage_details": {"cached_tokens": None, "reasoning_tokens": None},
                   "provider_request_id": None, "system_fingerprint": None,
+                  "spend_reservation": None,
                   "answer": None, "finish_reason": None, "attempts": 0,
                   "config_sha256": self.config_sha256, "id": None,
                   "input_tokens": None, "request_sha256": None, "request_bytes": None}
@@ -300,6 +353,7 @@ class GLMAdapter:
                 raise AdapterError("input_budget_exceeded")
             if self.reserved_output_tokens + self.config["max_output_tokens"] > self.config["max_total_output_tokens"]:
                 raise AdapterError("output_budget_exceeded")
+            result["spend_reservation"] = self.reserve_spend(body)
             # Reservations also apply to dry runs; failures never refund reservations.
             self.calls += 1
             self.input_bytes += size
@@ -307,7 +361,8 @@ class GLMAdapter:
             if not self.execute:
                 result["status"] = "dry_run"
                 return result
-            key = os.environ.get("MEMZ_GLM_API_KEY") or os.environ.get("ZHIPUAI_API_KEY")
+            key = (os.environ.get("MEMZ_GLM_API_KEY") or os.environ.get("ZHIPUAI_API_KEY")
+                   or os.environ.get("GLM_API_KEY"))
             if not key or len(key) > 8192 or any(ord(c) < 33 or ord(c) > 126 for c in key):
                 raise AdapterError("credential_unavailable")
             result["attempts"] = 1
@@ -327,13 +382,18 @@ class GLMAdapter:
                 completion = result["usage"]["completion_tokens"]
                 if completion is not None and completion > self.config["max_output_tokens"]:
                     raise AdapterError("provider_output_budget_exceeded")
-            if self.config.get("strict_usage", False):
+            if self.config.get("strict_usage", False) or self.config.get("spend_guard") is not None:
                 usage = result["usage"]
                 if (usage is None or any(v is None for v in usage.values())
                         or usage["prompt_tokens"] + usage["completion_tokens"] != usage["total_tokens"]):
                     # Retain safe available accounting and answer for the failure
                     # denominator, but prohibit the next paid request.
                     raise AdapterError("usage_unverifiable")
+            if (result["spend_reservation"] is not None
+                    and result["input_tokens"] > result["spend_reservation"]["input_tokens"]):
+                # A mismatched tokenizer/provider invalidates the preflight
+                # estimate. Preserve the receipt, stop; billed work is irreversible.
+                raise AdapterError("provider_input_budget_exceeded")
         except AdapterError as exc:
             # Injected transports are trusted test hooks, but their exception text
             # still must not become a diagnostic.
@@ -342,7 +402,9 @@ class GLMAdapter:
                     "output_budget_exceeded", "credential_unavailable", "invalid_response", "redirect_blocked",
                     "http_error", "response_too_large", "unsupported_encoding", "endpoint_not_allowed",
                     "timeout", "transport_error", "provider_output_budget_exceeded",
-                    "credential_reflection_detected", "usage_unverifiable"}
+                    "credential_reflection_detected", "usage_unverifiable",
+                    "token_counter_unavailable", "invalid_token_count", "input_token_budget_exceeded",
+                    "total_input_token_budget_exceeded", "cost_budget_exceeded", "provider_input_budget_exceeded"}
             result.update(status="error", error=str(exc) if str(exc) in safe else "transport_error")
             self.halted = True
         except Exception:
@@ -361,7 +423,7 @@ def load_json(path, limit):
     return json.loads(data)
 
 
-def read_inputs(path, config):
+def read_inputs(path, config, *, token_counter=None):
     """Validate the complete bounded input before the first possible API call."""
     rows, seen, total = [], set(), 0
     with Path(path).open("rb") as source:
@@ -383,7 +445,7 @@ def read_inputs(path, config):
     if not rows:
         raise AdapterError("empty_input")
     # Preflight cumulative reservations with the exact same budgeting rules.
-    preview = GLMAdapter(config)
+    preview = GLMAdapter(config, token_counter=token_counter)
     for row in rows:
         result = preview.complete(row)
         if result["status"] == "error":
@@ -400,6 +462,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         config = validate_config(load_json(args.config, 65536))
+        if args.execute and config.get("spend_guard") is None:
+            raise AdapterError("spend_guard_required")
         rows = read_inputs(args.input, config)
         adapter = GLMAdapter(config, execute=args.execute)
         # Set private permissions at creation, even under a permissive umask.
@@ -415,6 +479,11 @@ def main(argv=None):
                     return 1
         print(json.dumps({"status": "complete" if args.execute else "dry_run", "rows": len(rows)}))
         return 0
+    except AdapterError as exc:
+        safe = {"spend_guard_required", "token_counter_unavailable", "cost_budget_exceeded",
+                "input_token_budget_exceeded", "total_input_token_budget_exceeded"}
+        print(json.dumps({"status": "stopped", "error": str(exc) if str(exc) in safe else "preflight_or_file_error"}))
+        return 1
     except Exception:
         # Config/input/file errors may contain sensitive data. Never print them.
         print('{"status":"stopped","error":"preflight_or_file_error"}')

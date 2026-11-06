@@ -95,7 +95,8 @@ example is a synthetic offline config; `glm-test` is not a selected live model:
 
 All nine model/budget/timeout fields shown before `temperature` are mandatory.
 Optional fields: `endpoint` (only the exact official URL), `temperature`, `top_p`,
-`thinking` (`enabled`/`disabled`), `strict_usage` (boolean, default false) and `pricing`.
+`thinking` (`enabled`/`disabled`), `strict_usage` (boolean, default false), `pricing`
+and `spend_guard`.
 `strict_usage` is a local accounting check, never sent to the provider. Enable it
 for measured runs: missing prompt/completion/total usage or an inconsistent total
 marks the row `usage_unverifiable` and halts before another request. Safe available
@@ -129,8 +130,12 @@ Without `--execute`, CLI preflights every row and cumulative budget without read
 credentials or making network requests. Output must be new; existing files are
 never overwritten. The whole bounded JSONL is validated before any execution.
 For execution, both explicit `--execute` and all limits are required, in addition
-to separate user authorization, configured credentials and permitted networking.
-Read only `MEMZ_GLM_API_KEY`, falling back to `ZHIPUAI_API_KEY`; supported injected
+to user authorization, configured API credentials and permitted networking.
+CLI execution now also requires `spend_guard` and an exact model token counter;
+no production counter is currently bundled, so the CLI refuses live execution
+before output or transport. See the reservation interface below.
+Read only `MEMZ_GLM_API_KEY`, falling back to `ZHIPUAI_API_KEY` then the user-named
+`GLM_API_KEY`; supported injected
 proxy placeholders are passed through normally. Never put keys on command lines,
 in JSON, source, reports or version control. No key-discovery scan is performed.
 
@@ -153,3 +158,74 @@ At initial implementation time the managed environment had no secret bindings an
 enforced network allowlist did not include `open.bigmodel.cn`. No network policy
 was changed. Live execution remains pending; no output here is model performance
 evidence or a completed benchmark.
+
+## Pre-request token and cost reservations
+
+`spend_guard` adds a fail-closed reservation ledger to the existing call, byte,
+output and timeout caps. It requires explicit `pricing` and exactly these fields:
+
+```json
+{
+  "tokenizer_id": "synthetic-complete-chat-v1",
+  "max_input_tokens": 60,
+  "max_total_input_tokens": 100,
+  "max_cost": 0.0005
+}
+```
+
+This is a **synthetic test configuration**, not a verified model tokenizer,
+price, or a live budget. The currency comes from `pricing.currency`.
+
+For the Python API, supply a trusted local callable as
+`GLMAdapter(config, execute=True, token_counter=counter)`. Its `tokenizer_id`
+attribute must match the configured identity; `counter(request_bytes)` must
+count the complete provider-rendered prompt for the exact model and chat
+template, including system/user content and framing. It receives no credential.
+The caller must independently verify this counter; matching a string ID is not
+proof of correctness. No arbitrary callback/import path is accepted from JSON,
+no tokenizer is downloaded, and no byte-to-token estimate is substituted.
+
+Before reading credentials or making a request, the guard checks per-call and
+cumulative input tokens and reserves:
+
+`(counted_input × input_price + max_output_tokens × output_price) / 1,000,000`.
+
+Decimal arithmetic avoids binary rounding at the budget boundary. Reservations
+are never refunded for shorter answers, failed requests or timeouts. A cap
+violation halts before transport; a missing/mismatched counter also fails before
+transport. The result's `spend_reservation` records the offline token count,
+counter identity and per-call/cumulative decimal-string cost reservations.
+Provider `input_tokens` remains a separate usage measurement.
+
+Pass the same counter to `read_inputs(path, config, token_counter=counter)` to
+preflight the **entire** input file and cumulative reservations before any call.
+The caller must reuse one execution adapter across the run. Enabling the guard
+also requires complete consistent usage; an actual prompt-token count larger
+than reserved stops the run with `provider_input_budget_exceeded`, retaining
+safe accounting. Already-billed work cannot be reversed. Wrong tokenizer,
+provider pricing/routing changes, hidden billable categories, or a provider that
+ignores limits can invalidate a currency estimate; this is not an invoice or a
+provider-side hard spending limit. Cache discounts are not assumed.
+
+Direct API users must explicitly configure this guard for paid experiments.
+The legacy unguarded Python interface remains for existing transport tests; CLI
+`--execute` refuses an absent guard, and cannot run until a verified production
+token counter is integrated. Current real calls remain zero.
+
+## Credential products and proxy placeholders
+
+`MEMZ_GLM_API_KEY`, `ZHIPUAI_API_KEY`, then `GLM_API_KEY` are accepted in
+that priority order. A variable name does not prove a credential's product,
+model access, billing mode, or balance. The user explicitly authorized use with
+the official Zhipu API. The endpoint remains the exact allowlisted official URL;
+this change does not reroute requests to a different product endpoint or treat
+an account/plan assumption as a separate execution blocker. Provider refusals
+stop the run without retry or fallback. Record unknown fee/credit accounting as
+unknown; do not infer it from the alias or a subscription. No authentication or
+inference probe has occurred because all checked aliases remain absent.
+
+Cloud network-secret placeholders are supported credentials; their appearance
+does not imply failure. Keep the inherited HTTPS proxy so the platform can
+substitute the real value at allowed destinations. Do not extract the real value,
+change the secret type or expand allowed domains to work around an issue. See
+[cloud environment documentation](https://learn.chatgpt.com/docs/environments/cloud-environments).
