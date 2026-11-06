@@ -207,10 +207,14 @@ provider pricing/routing changes, hidden billable categories, or a provider that
 ignores limits can invalidate a currency estimate; this is not an invoice or a
 provider-side hard spending limit. Cache discounts are not assumed.
 
-Direct API users must explicitly configure this guard for paid experiments.
-The legacy unguarded Python interface remains for existing transport tests; CLI
-`--execute` refuses an absent guard, and cannot run until a verified production
-token counter is integrated. Current real calls remain zero.
+Both the Python production constructor and CLI `--execute` require this guard,
+including when a custom transport is supplied. The CLI cannot run until a verified
+production token counter is integrated. Tests may explicitly set `simulation=True`
+with an injected transport; this mode uses a fixed synthetic credential, never
+reads environment credentials, and records `execution_mode="simulation"`.
+Simulation cannot use the default HTTP transport. Reuse one adapter for the whole
+run; starting another adapter must not be used to reset a failed or spent budget.
+Current real calls remain zero.
 
 ## Credential products and proxy placeholders
 

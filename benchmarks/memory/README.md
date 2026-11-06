@@ -6,6 +6,8 @@
 
 后续获授权的新云环境测试进展见 [2026-11-06 实测阻碍与安全修复](CLOUD_TEST_2026-11-06.md)：凭据未注入执行进程，Library 数据下载失败；真实模型调用仍为 0，已完成适配器安全与计量回归。
 
+现已新增 [真实 memz HTTP 适配器](MEMZ_ADAPTER.md)：历史来源导入、显式审批后冻结、产品 context 查询、同事实 flat 基线与独立 evidence 评分已经落成代码，并提供 PostgreSQL 隔离合成集成测试。首版限每 scope 一个独立项目、最多 25 个获批事实和 100 个来源；超限拒绝，不冒充跨页固定快照。这仍不是 LoCoMo／真实模型效果结论。
+
 完整方法研究见 [RESEARCH.md](RESEARCH.md)，公平实验协议见 [EVALUATION_PLAN.md](EVALUATION_PLAN.md)，原准备环境的实际验证和限制见 [VERIFICATION.md](VERIFICATION.md)。
 
 ## 分发范围与许可

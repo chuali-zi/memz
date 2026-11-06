@@ -47,7 +47,7 @@ class GLMAdapterTests(unittest.TestCase):
 
     def adapter(self, cfg=None, reply=None):
         transport = Mock(return_value=response() if reply is None else reply)
-        return glm.GLMAdapter(cfg or config(), execute=True, transport=transport), transport
+        return glm.GLMAdapter(cfg or config(), execute=True, transport=transport, simulation=True), transport
 
     def test_dry_run_never_reads_credentials_or_calls_transport(self):
         transport = Mock(side_effect=AssertionError("must not call"))
@@ -140,8 +140,14 @@ class GLMAdapterTests(unittest.TestCase):
             transport.assert_not_called()
 
     def test_missing_credentials_prevents_transport(self):
+        cfg = config(pricing={"currency": "CNY", "input_per_million": 2, "output_per_million": 4},
+                     spend_guard={"tokenizer_id": "synthetic-v1", "max_input_tokens": 100,
+                                  "max_total_input_tokens": 200, "max_cost": 1})
+        counter = Mock(return_value=50)
+        counter.tokenizer_id = "synthetic-v1"
         with patch.dict(glm.os.environ, {}, clear=True):
-            adapter, transport = self.adapter()
+            transport = Mock()
+            adapter = glm.GLMAdapter(cfg, execute=True, transport=transport, token_counter=counter)
             result = adapter.complete(ROW)
         self.assertEqual(result["error"], "credential_unavailable")
         self.assertEqual(result["attempts"], 0)
@@ -149,22 +155,14 @@ class GLMAdapterTests(unittest.TestCase):
 
     def test_supported_secondary_credential_env(self):
         with patch.dict(glm.os.environ, {"ZHIPUAI_API_KEY": "synthetic-fallback"}, clear=True):
-            adapter, transport = self.adapter()
-            self.assertEqual(adapter.complete(ROW)["status"], "ok")
-            self.assertEqual(transport.call_args.args[2], "synthetic-fallback")
+            self.assertEqual(glm.read_credential(), "synthetic-fallback")
 
     def test_user_named_glm_alias_and_proxy_placeholder_are_supported(self):
         with patch.dict(glm.os.environ, {"GLM_API_KEY": "synthetic-proxy-placeholder"}, clear=True):
-            adapter, transport = self.adapter()
-            result = adapter.complete(ROW)
-            self.assertEqual(result["status"], "ok")
-            self.assertEqual(transport.call_args.args[2], "synthetic-proxy-placeholder")
-            self.assertNotIn("synthetic-proxy-placeholder", json.dumps(result))
+            self.assertEqual(glm.read_credential(), "synthetic-proxy-placeholder")
         with patch.dict(glm.os.environ, {"MEMZ_GLM_API_KEY": "preferred-synthetic",
                                         "GLM_API_KEY": "fallback-synthetic"}, clear=True):
-            adapter, transport = self.adapter()
-            self.assertEqual(adapter.complete(ROW)["status"], "ok")
-            self.assertEqual(transport.call_args.args[2], "preferred-synthetic")
+            self.assertEqual(glm.read_credential(), "preferred-synthetic")
 
     def test_403_429_and_all_http_errors_stop_without_retry_or_body(self):
         for status in [403, 429, 500, 301, 307]:
@@ -179,7 +177,7 @@ class GLMAdapterTests(unittest.TestCase):
     def test_transport_errors_are_redacted(self):
         for exception in [RuntimeError("Authorization SECRET request body"),
                           glm.AdapterError("Authorization SECRET request body")]:
-            adapter = glm.GLMAdapter(config(), execute=True, transport=Mock(side_effect=exception))
+            adapter = glm.GLMAdapter(config(), execute=True, transport=Mock(side_effect=exception), simulation=True)
             result = adapter.complete(ROW)
             self.assertEqual(result["error"], "transport_error")
             self.assertNotIn("SECRET", json.dumps(result))

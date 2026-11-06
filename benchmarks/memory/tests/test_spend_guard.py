@@ -28,7 +28,7 @@ class SpendGuardTests(unittest.TestCase):
     def adapter(self, cfg=None, count=50, reply=None):
         transport = Mock(return_value=reply or response())
         tokens = counter(count)
-        adapter = glm.GLMAdapter(cfg or guarded(), execute=True, transport=transport, token_counter=tokens)
+        adapter = glm.GLMAdapter(cfg or guarded(), execute=True, transport=transport, token_counter=tokens, simulation=True)
         return adapter, transport, tokens
 
     def setUp(self):
@@ -71,7 +71,7 @@ class SpendGuardTests(unittest.TestCase):
     def test_missing_mismatched_or_invalid_counter_never_reaches_transport(self):
         for token_counter in [None, Mock(), counter(True), counter(0), counter(-1), counter(1.5)]:
             transport = Mock()
-            adapter = glm.GLMAdapter(guarded(), execute=True, transport=transport, token_counter=token_counter)
+            adapter = glm.GLMAdapter(guarded(), execute=True, transport=transport, token_counter=token_counter, simulation=True)
             with patch.object(glm.os.environ, "get", side_effect=AssertionError("no credential read")):
                 result = adapter.complete(ROW)
             self.assertIn(result["error"], {"token_counter_unavailable", "invalid_token_count"})
@@ -113,6 +113,21 @@ class SpendGuardTests(unittest.TestCase):
             with patch.object(glm.os.environ, "get", side_effect=AssertionError("no credential read")):
                 with self.assertRaisesRegex(glm.AdapterError, "cost_budget_exceeded"):
                     glm.read_inputs(path, guarded(max_cost=0.0003), token_counter=counter())
+
+    def test_production_python_entry_requires_guard_even_with_custom_transport(self):
+        for transport in [None, Mock()]:
+            with self.assertRaisesRegex(glm.AdapterError, "spend_guard_required"):
+                glm.GLMAdapter(config(), execute=True, transport=transport)
+
+    def test_simulation_is_explicit_marked_and_never_reads_real_credentials(self):
+        for transport in [None, glm.http_transport]:
+            with self.assertRaisesRegex(glm.AdapterError, "simulation_transport_required"):
+                glm.GLMAdapter(config(), execute=True, simulation=True, transport=transport)
+        with patch.object(glm.os.environ, "get", side_effect=AssertionError("no real secret reads")):
+            adapter = glm.GLMAdapter(config(), execute=True, simulation=True, transport=Mock(return_value=response()))
+            result = adapter.complete(ROW)
+        self.assertEqual(result["execution_mode"], "simulation")
+        self.assertEqual(result["status"], "ok")
 
     def test_cli_execute_fails_closed_without_a_verified_token_counter(self):
         for cfg in [config(), guarded()]:
