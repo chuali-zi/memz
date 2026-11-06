@@ -72,3 +72,9 @@ flowchart LR
 没有新增索引、数据库迁移、扩展、模型或服务。[已有标题索引研究](search-index-study.md)没有证明应用角色下可获收益，不能用管理员绕过 RLS 的计划替代应用证据。多词条件的扫描工作量可能增加，最多八项的输入限制只是界限，并不是性能保证。相关性排名需要另定排序与游标，全文分析需要另定语言规则，均留待有证据时再引入。
 
 原始技术依据（2026-11-06 核查，PostgreSQL 16）：[字符串函数](https://www.postgresql.org/docs/16/functions-string.html)定义 `position` 和受 locale 影响的 `lower`；[LIMIT 与排序](https://www.postgresql.org/docs/16/queries-limit.html)要求可预测的唯一顺序；[行安全策略](https://www.postgresql.org/docs/16/ddl-rowsecurity.html)说明应用查询的权限约束；[全文搜索介绍](https://www.postgresql.org/docs/16/textsearch-intro.html)表明语言分析、词形规范化不同于本轮字面片段匹配。本轮没有复制上游实现，也未新增论文复现成绩。
+
+## 单页快照与来源传输
+
+可选 `GET /api/projects/:p/context` 将角色判定、当前事实页、固定修订依据和本页所需完整来源纳入同一只读 REPEATABLE READ 事务。来源按 ID 独立读取并在 HTTP 响应中只出现一次；客户端验证版本、来源集合与协议回执后，再选择内联输出或来源字典，并执行既有完整前缀预算规则。默认 individual/batch 不改变。
+
+现有不可变修订本来就能保证事实与依据按版本对应；新路径的增量是单页事务视图与较少的重复传输，不是修复混版或提升检索质量。每页最多25条，不自动拆成多个事务；跨页仍是新快照，读取开始后发生的批准或权限撤销也不使已建立的事务快照自动更新。来源定位导入与预算早停各有额外产品语义，本轮未混入。候选取舍、协议及验证边界见 [snapshot-context.md](snapshot-context.md)。

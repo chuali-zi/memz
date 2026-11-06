@@ -120,6 +120,7 @@ const sourceSearch=await call(viewer,`/api/projects/1/sources?q=${encodeURICompo
 await require('./context-budget')({baseURL,call,owner,member});
 await require('./context-optimization')({baseURL,call,owner,member,viewer,other});
 await require('./lexical-retrieval')({baseURL,call,owner,member,viewer,other});
+await require('./context-snapshot')({baseURL,call,owner,member,viewer,other,pool,tx});
 
 // Run the reviewer's full story through a real separate Node process.
 const {stdout:storyOutput}=await require('node:util').promisify(require('node:child_process').execFile)(process.execPath,['scripts/demo-story.js'],{env:{...process.env,MEMZ_DEMO_BASE_URL:baseURL},timeout:30000});

@@ -4,6 +4,8 @@
 
 已阅读本项目 README、`RESEARCH.md`、`EVALUATION_PLAN.md`、`sources.lock.json`、`server.js` 与 `scripts/context-client.js`，并检查本地适用的 AGENTS.md / skills，未发现额外仓库指令。研究使用官方论文网页及 GitHub 只读插件；精确版本、日期、许可、文件范围记录在 [新增来源清单](research-sources-2026-11-06.json)。既有来源锁不被本文件覆盖。
 
+后续实现记录：多关键词的显式字面匹配见 [lexical-retrieval.md](../../docs/lexical-retrieval.md)；第三轮本地优化的候选比较、单页快照与来源传输合同见 [snapshot-context.md](../../docs/snapshot-context.md)。下文保留首轮分析基线和当时的实施状态，后续改动不作为本记录新增的论文复现或模型评测成绩。
+
 ## 1. 最值得实施的两项改进
 
 **第一项：有界批量读取固定修订的 provenance。** 基线客户端对 N 条事实需要 N+3 个 HTTP 请求：登录、事实页、N 次逐条来源、注销。本轮落实可选批量路径，每批最多25个 `(factId,version)` 引用，在单个 REPEATABLE READ 只读事务内检查权限并查询完整来源；事实页仍是前一个请求的快照，不能声称整页与所有批次共享一个快照。因为修订和来源不可变，各引用仍固定到事实页所见版本。保留原接口和默认输出，HTTP 往返收益由独立合成实验验证。

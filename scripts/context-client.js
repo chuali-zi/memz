@@ -1,5 +1,6 @@
 // Read-only synthetic-demo client. No model calls and no external dependencies.
 const {parseSearchQuery,matchesSearchMetadata}=require('./search-query');
+const {SNAPSHOT_DESCRIPTION,snapshotReceipt,validateSnapshot}=require('./context-snapshot');
 function failure(code,status){return Object.assign(new Error(code),{code,...(status===undefined?{}:{status})})}
 function requireValue(condition,code){if(!condition)throw failure(code)}
 const serializeContext=value=>JSON.stringify(value,null,2)+'\n';
@@ -8,13 +9,14 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
   requireValue(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&!base.search&&!base.hash&&base.pathname==='/','INVALID_BASE_URL');
   requireValue(after===0||positive(after),'INVALID_AFTER');
-  requireValue(positive(projectId),'INVALID_PROJECT');requireValue(Number.isInteger(limit)&&limit>=1&&limit<=100,'INVALID_LIMIT');
+  requireValue(positive(projectId),'INVALID_PROJECT');requireValue(Number.isInteger(limit)&&limit>=1&&(provenanceMode==='snapshot'||limit<=100),'INVALID_LIMIT');
   requireValue(typeof query==='string'&&query.length<=200&&query.isWellFormed()&&!query.includes('\u0000'),'INVALID_QUERY');requireValue(typeof username==='string'&&username&&typeof password==='string'&&password,'INVALID_CREDENTIALS');
   requireValue(Number.isInteger(timeoutMs)&&timeoutMs>=1&&timeoutMs<=60000,'INVALID_TIMEOUT');
   requireValue(Number.isInteger(totalTimeoutMs)&&totalTimeoutMs>=1&&totalTimeoutMs<=60000,'INVALID_TOTAL_TIMEOUT');
   requireValue(Number.isInteger(maxResponseBytes)&&maxResponseBytes>=1&&maxResponseBytes<=1048576,'INVALID_RESPONSE_LIMIT');
   requireValue(maxOutputBytes===undefined||(Number.isInteger(maxOutputBytes)&&maxOutputBytes>=1&&maxOutputBytes<=4194304),'INVALID_OUTPUT_BUDGET');
-  requireValue(['individual','batch'].includes(provenanceMode),'INVALID_PROVENANCE_MODE');
+  requireValue(['individual','batch','snapshot'].includes(provenanceMode),'INVALID_PROVENANCE_MODE');
+  requireValue(provenanceMode!=='snapshot'||limit<=25,'INVALID_SNAPSHOT_LIMIT');
   requireValue(['inline','deduplicated'].includes(sourceMode),'INVALID_SOURCE_MODE');
   const search=parseSearchQuery(query,searchMode);
   const deadline=Date.now()+totalTimeoutMs;
@@ -51,7 +53,9 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
   }
   try{
     await request('/api/login',{body:{username,password}});
-    const page=await request(`/api/projects/${projectId}/facts?q=${encodeURIComponent(query)}&limit=${limit}${after?`&after=${after}`:''}${search?'&match=all_terms':''}`);
+    const snapshot=provenanceMode==='snapshot';
+    const page=await request(`/api/projects/${projectId}/${snapshot?'context':'facts'}?q=${encodeURIComponent(query)}&limit=${limit}${after?`&after=${after}`:''}${search?'&match=all_terms':''}`);
+    const snapshotProofs=snapshot?validateSnapshot(page,{projectId,query,limit,after,search}):null;
     requireValue(page&&['owner','member','viewer'].includes(page.role)&&Array.isArray(page.facts)&&page.facts.length<=limit,'INVALID_FACTS_RESPONSE');
     if(search)requireValue(matchesSearchMetadata(page.search,search),'INVALID_SEARCH_RESPONSE');
     requireValue(page.next_after===null||(positive(page.next_after)&&page.facts.length>0&&page.next_after===page.facts.at(-1).id),'INVALID_CURSOR_RESPONSE');
@@ -71,7 +75,9 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
       }
       facts.push({id:fact.id,subject:fact.subject,predicate:fact.predicate,value:fact.value,version:fact.version,revisionId:proof.revision.id,...(sourceMode==='inline'?{source}:{sourceId:source.id}),candidateId:proof.candidate.id,proposedBy:proof.candidate.proposed_by,approvedBy:proof.revision.approved_by});
     }
-    if(provenanceMode==='batch'){
+    if(snapshot){
+      for(let i=0;i<page.facts.length;i++)acceptProof(page.facts[i],snapshotProofs[i]);
+    }else if(provenanceMode==='batch'){
       // Bounded chunks keep even maximally escaped valid source text below the default HTTP byte cap.
       for(let offset=0;offset<page.facts.length;offset+=25){
         const chunk=page.facts.slice(offset,offset+25);
@@ -83,7 +89,7 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
       for(const fact of page.facts)acceptProof(fact,await request(`/api/projects/${projectId}/facts/${fact.id}/provenance?version=${fact.version}`));
     }
     const sourcesFor=prefix=>sourceMode==='deduplicated'?{sources:[...new Set(prefix.map(fact=>fact.sourceId))].map(id=>sources.get(id))}:{};
-    result={schemaVersion:sourceMode==='inline'?1:2,projectId,query,limit,...(after?{after}:{}),truncated:page.next_after!==null,nextAfter:page.next_after,sourceTextIsUntrusted:true,consistency:'One current-facts page; immutable provenance pinned to each returned version. Not necessarily current at completion.',facts,...sourcesFor(facts),...(search?{search:page.search}:{})};
+    result={schemaVersion:sourceMode==='inline'?1:2,projectId,query,limit,...(after?{after}:{}),truncated:page.next_after!==null,nextAfter:page.next_after,sourceTextIsUntrusted:true,consistency:snapshot?SNAPSHOT_DESCRIPTION:'One current-facts page; immutable provenance pinned to each returned version. Not necessarily current at completion.',facts,...sourcesFor(facts),...(search?{search:page.search}:{}),...(snapshot?{snapshot:snapshotReceipt()}:{})};
     if(maxOutputBytes!==undefined){
       const minimum=facts.length?1:0;let fitted=false;
       for(let count=facts.length;count>=minimum;count--){

@@ -2,6 +2,7 @@ const express=require('express'), cookieParser=require('cookie-parser'), crypto=
 const {Pool}=require('pg');
 const {requestKey,createOnce}=require('./idempotency');
 const {parseSearchQuery}=require('./scripts/search-query');
+const {SNAPSHOT_MAX_BYTES,snapshotReceipt}=require('./scripts/context-snapshot');
 const app=express();
 const pool=new Pool({connectionString:process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz',max:10});
 // pg removes failed idle clients before emitting this event; later requests reconnect.
@@ -45,28 +46,32 @@ async function role(c,p,allowed){const r=(await c.query('SELECT role FROM member
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 app.get('/api/projects',route(async(req,res)=>res.json(await tx(req.user.id,async c=>(await c.query('SELECT p.id,p.name,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=$1 ORDER BY p.id',[req.user.id])).rows))));
 async function readProject(user,p,q,{includeFacts=true,includeHistory=true,includeCandidates=true,includeSources=true,includeAudit=true}={}){return tx(user,async c=>{const r=await role(c,p,['owner','member','viewer']);const facts=includeFacts?(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id WHERE f.project_id=$1 AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0 ORDER BY f.id`,[p,q])).rows:[];const sources=includeSources?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 ORDER BY id',[p])).rows:[];const candidates=includeCandidates?(await c.query('SELECT c.*,s.title source FROM candidates c JOIN sources s ON s.id=c.source_id WHERE c.project_id=$1 ORDER BY c.id DESC',[p])).rows:[];const history=includeHistory?(await c.query('SELECT f.subject,f.predicate,r.version,r.value,s.title source,r.created_at FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id WHERE r.project_id=$1 ORDER BY r.id DESC',[p])).rows:[];const audit=includeAudit?(await c.query('SELECT * FROM audit WHERE project_id=$1 ORDER BY id DESC LIMIT 100',[p])).rows:[];return {sourceTextIsUntrusted:true,role:r,...(includeFacts?{facts}:{}),...(includeSources?{sources}:{}),...(includeCandidates?{candidates}:{}),...(includeHistory?{history}:{}),...(includeAudit?{audit}:{})}},{snapshot:true})}
-async function readFactsPage(user,p,q,{limit=50,after=0,searchMode='substring'}={}){
+function factsSearch(q,searchMode){
   let search;try{search=parseSearchQuery(q,searchMode)}catch(error){throw fail(400,error.code)}
   const matching=search?`NOT EXISTS (SELECT 1 FROM unnest($2::text[]) AS terms(term)
     WHERE NOT (position(lower(term) in lower(f.subject))>0
       OR position(lower(term) in lower(f.predicate))>0
       OR position(lower(term) in lower(r.value))>0))`:
     "position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0";
+  return {search,matching,parameter:search?search.terms:q};
+}
+async function readFactsPage(user,p,q,{limit=50,after=0,searchMode='substring'}={}){
+  const {search,matching,parameter}=factsSearch(q,searchMode);
   return tx(user,async c=>{
     const r=await role(c,p,['owner','member','viewer']);
     const rows=(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source
       FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id
       WHERE f.project_id=$1 AND f.id>$3
         AND ${matching}
-      ORDER BY f.id LIMIT $4`,[p,search?search.terms:q,after,limit+1])).rows;
+      ORDER BY f.id LIMIT $4`,[p,parameter,after,limit+1])).rows;
     const more=rows.length>limit,facts=rows.slice(0,limit);
     return {role:r,facts,next_after:more?facts[facts.length-1].id:null,...(search?{search}:{})};
   },{snapshot:true});
 }
-function provenanceRecord(row,access){
+function provenanceRecord(row,access,{sourceReference=false}={}){
   return {sourceTextIsUntrusted:true,role:access,fact:{id:row.fact_id,subject:row.subject,predicate:row.predicate},
     revision:{id:row.revision_id,version:row.version,value:row.value,created_at:row.created_at,approved_by:row.approved_by},
-    source:{id:row.source_id,title:row.title,content:row.content},
+    ...(sourceReference?{sourceId:row.source_id}:{source:{id:row.source_id,title:row.title,content:row.content}}),
     candidate:{id:row.candidate_id,expected_version:row.expected_version,proposed_by:row.proposed_by}};
 }
 // Read-only POST: explicit version pairs avoid URL limits, but retain session CSRF checks.
@@ -113,14 +118,56 @@ app.get('/api/projects/:p/facts/:id/provenance',route(async(req,res)=>{
     return provenanceRecord(row,access);
   },{snapshot:true}));
 }));
-app.get('/api/projects/:p/facts',route(async(req,res)=>{
-  const p=num(req.params.p),limit=req.query.limit===undefined?50:integer(req.query.limit,1,'分页大小无效');
-  if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');
+function factsRequest(req,{defaultLimit=50,maxLimit=100}={}){
+  const p=num(req.params.p),limit=req.query.limit===undefined?defaultLimit:integer(req.query.limit,1,'分页大小无效');
+  if(limit>maxLimit)throw fail(400,`分页大小必须在 1 到 ${maxLimit} 之间`);
   const after=req.query.after===undefined?0:integer(req.query.after,0,'游标无效');
   if(req.query.q!==undefined&&typeof req.query.q!=='string')throw fail(400,'关键词必须是单个字符串');
   const searchMode=req.query.match===undefined?'substring':req.query.match;
   const q=searchMode==='all_terms'?(req.query.q||''):queryText(req.query.q||'',200);
+  return {p,q,limit,after,searchMode};
+}
+app.get('/api/projects/:p/facts',route(async(req,res)=>{
+  const {p,q,limit,after,searchMode}=factsRequest(req);
   res.json(await readFactsPage(req.user.id,p,q,{limit,after,searchMode}));
+}));
+app.get('/api/projects/:p/context',route(async(req,res)=>{
+  const {p,q,limit,after,searchMode}=factsRequest(req,{defaultLimit:25,maxLimit:25});
+  const {search,matching,parameter}=factsSearch(q,searchMode);
+  const page=await tx(req.user.id,async c=>{
+    const access=await role(c,p,['owner','member','viewer']);
+    // Keep broken references visible so missing evidence fails the page, never drops a fact.
+    const rows=(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,
+      r.id AS revision_id,r.source_id
+      FROM facts f LEFT JOIN revisions r ON r.id=f.current_revision_id AND r.project_id=f.project_id AND r.fact_id=f.id AND r.version=f.version
+      WHERE f.project_id=$1 AND f.version>0 AND f.id>$3 AND (r.id IS NULL OR (${matching}))
+      ORDER BY f.id LIMIT $4`,[p,parameter,after,limit+1])).rows;
+    if(rows.some(row=>!row.revision_id||!row.source_id))throw fail(500,'上下文依据不完整');
+    const selected=rows.slice(0,limit);
+    const proofRows=selected.length?(await c.query(`SELECT f.id AS fact_id,f.subject,f.predicate,
+      r.id AS revision_id,r.version,r.value,r.created_at,r.approved_by,r.source_id,
+      c.id AS candidate_id,c.expected_version,c.proposed_by,c.source_id AS candidate_source_id,
+      c.subject AS candidate_subject,c.predicate AS candidate_predicate,c.value AS candidate_value,c.status AS candidate_status
+      FROM unnest($2::int[],$3::int[]) WITH ORDINALITY AS requested(id,version,ordinal)
+      LEFT JOIN facts f ON f.id=requested.id AND f.project_id=$1
+      LEFT JOIN revisions r ON r.fact_id=f.id AND r.project_id=f.project_id AND r.version=requested.version
+      LEFT JOIN candidates c ON c.id=r.candidate_id AND c.project_id=r.project_id
+      ORDER BY requested.ordinal`,[p,selected.map(row=>row.id),selected.map(row=>row.version)])).rows:[];
+    if(proofRows.length!==selected.length||proofRows.some((row,i)=>{
+      const fact=selected[i];return row.fact_id!==fact.id||row.revision_id!==fact.revision_id||row.version!==fact.version||row.value!==fact.value||row.source_id!==fact.source_id||!row.candidate_id||row.expected_version!==row.version-1||row.candidate_source_id!==row.source_id||row.candidate_subject!==row.subject||row.candidate_predicate!==row.predicate||row.candidate_value!==row.value||row.candidate_status!=='approved';
+    }))throw fail(500,'上下文依据不完整');
+    const sourceIds=[...new Set(proofRows.map(row=>row.source_id))];
+    const sourceRows=sourceIds.length?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 AND id=ANY($2::int[])',[p,sourceIds])).rows:[];
+    const sourcesById=new Map(sourceRows.map(source=>[source.id,source]));
+    if(sourceRows.length!==sourceIds.length||sourceIds.some(id=>!sourcesById.has(id)))throw fail(500,'上下文依据不完整');
+    return {...snapshotReceipt(),projectId:p,query:q,limit,after,role:access,sourceTextIsUntrusted:true,
+      facts:selected.map(({revision_id,source_id,...fact})=>({...fact,revisionId:revision_id,sourceId:source_id})),
+      provenance:proofRows.map(row=>provenanceRecord(row,access,{sourceReference:true})),
+      sources:sourceIds.map(id=>sourcesById.get(id)),next_after:rows.length>limit?selected.at(-1).id:null,...(search?{search}:{})};
+  },{snapshot:true});
+  const serialized=JSON.stringify(page);
+  if(Buffer.byteLength(serialized,'utf8')>SNAPSHOT_MAX_BYTES)throw fail(500,'上下文响应超出大小限制');
+  res.type('application/json').send(serialized);
 }));
 async function readHistoryPage(user,p,{limit=25,before=null}={}){
   return tx(user,async c=>{

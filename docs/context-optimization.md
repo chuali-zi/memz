@@ -12,7 +12,7 @@ const context=await readContext({
 });
 ```
 
-库和 `--stdin` 的 `provenanceMode` 只接受 `individual`（默认）或 `batch`；`sourceMode` 只接受 `inline`（默认）或 `deduplicated`。非法值在登录前失败，错误码分别为 `INVALID_PROVENANCE_MODE`、`INVALID_SOURCE_MODE`。环境变量为 `MEMZ_PROVENANCE_MODE` 与 `MEMZ_SOURCE_MODE`；stdin 显式配置覆盖环境配置，仍不允许传凭据或服务地址。
+本页描述 `provenanceMode` 的 `individual`（默认）与 `batch`；新增的显式 `snapshot` 模式及其25条上限见[单页快照上下文](snapshot-context.md)。`sourceMode` 只接受 `inline`（默认）或 `deduplicated`。非法值在登录前失败，错误码分别为 `INVALID_PROVENANCE_MODE`、`INVALID_SOURCE_MODE`。环境变量为 `MEMZ_PROVENANCE_MODE` 与 `MEMZ_SOURCE_MODE`；stdin 显式配置覆盖环境配置，仍不允许传凭据或服务地址。
 
 ```sh
 printf '%s' '{"projectId":1,"query":"项目","provenanceMode":"batch","sourceMode":"deduplicated","maxOutputBytes":12000}' | node scripts/context-client.js --stdin

@@ -78,3 +78,14 @@ test('stdio and environment opt into lexical matching and reject invalid search 
     const before=requests,invalid=await invoke(JSON.stringify(input));assert.equal(invalid.code,1);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/INVALID_SEARCH_MODE|INVALID_QUERY|TOO_MANY_SEARCH_TERMS/);assert.equal(requests,before);
   }
 });
+
+test('stdio and environment opt into a bounded snapshot without changing default output',async()=>{
+  const request={projectId:1,query:'截止日 项目',searchMode:'all_terms',limit:1,provenanceMode:'snapshot',sourceMode:'deduplicated'};
+  const result=await invoke(JSON.stringify(request));assert.equal(result.code,0,result.stderr);const context=JSON.parse(result.stdout);
+  assert.equal(context.facts.length,1);assert.equal(context.schemaVersion,2);assert.deepEqual(context.snapshot,{schema:'memz-context-snapshot-v1',consistency:'single-page-repeatable-read'});assert.equal(context.facts[0].sourceId,context.sources[0].id);
+  const {provenanceMode,...withoutMode}=request;
+  const env=await invoke(JSON.stringify(withoutMode),{env:{MEMZ_PROVENANCE_MODE:'snapshot'}});assert.equal(env.code,0,env.stderr);assert.deepEqual(JSON.parse(env.stdout),context);
+  const overridden=await invoke(JSON.stringify({...request,provenanceMode:'individual'}),{env:{MEMZ_PROVENANCE_MODE:'snapshot'}});assert.equal(overridden.code,0,overridden.stderr);assert.equal(JSON.parse(overridden.stdout).snapshot,undefined);
+  const before=requests,invalid=await invoke(JSON.stringify({...request,limit:26}));assert.equal(invalid.code,1);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/INVALID_SNAPSHOT_LIMIT/);assert.equal(requests,before);
+  const tiny=await invoke(JSON.stringify({...request,maxOutputBytes:1}));assert.equal(tiny.code,1);assert.equal(tiny.stdout,'');assert.match(tiny.stderr,/OUTPUT_BUDGET_TOO_SMALL/);
+});

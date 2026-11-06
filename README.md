@@ -124,6 +124,8 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 只读上下文客户端可用 `MEMZ_SEARCH_MODE=all_terms MEMZ_QUERY="截止日 项目" npm run --silent demo:context` 启用无序多关键词查询；查询至少含一个、至多八个不同字面片段。默认仍为整段 `substring`，页面和 MCP 继续使用默认模式。规则、回执验证和并发分页边界见[多关键词检索说明](docs/lexical-retrieval.md)。
 
+显式设置 `MEMZ_PROVENANCE_MODE=snapshot MEMZ_SOURCE_MODE=deduplicated MEMZ_QUERY=项目 npm run --silent demo:context`，可在一次上下文请求中读取同一只读事务视图下的当前事实、完整依据与来源字典。此模式每页最多25条，来源全文按 ID 在 HTTP 响应中只传一次；原 individual/batch 模式及页面、MCP 默认行为保留。候选比较、协议、权限与跨页边界见[单页快照上下文](docs/snapshot-context.md)。这仍是人工批准事实的读取，不是自动长期记忆，也没有真实模型质量或端到端加速结论。
+
 无需真实智能体账号即可演示只读 MCP：启动本机服务后运行 `node scripts/mcp-read-example.js "项目"`，通过官方 SDK 返回已批准版本及来源原文，详见 [MCP 说明](docs/mcp-local.md)。
 
 来源与记忆文字始终是不可信数据，批准不使其中的指令可信。接口标记及宿主责任见 [记忆信任边界](docs/untrusted-memory.md)；未声称完整防提示注入或真实模型对抗验证。
