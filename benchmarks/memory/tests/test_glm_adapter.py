@@ -171,6 +171,63 @@ class GLMAdapterTests(unittest.TestCase):
             self.assertEqual(result["error"], "transport_error")
             self.assertNotIn("SECRET", json.dumps(result))
 
+    def test_successful_response_cannot_persist_reflected_credentials(self):
+        secret = "synthetic-not-a-real-key"
+        for field in ["answer", "model", "finish_reason", "id", "system_fingerprint"]:
+            data = json.loads(response()["body"])
+            if field == "answer":
+                data["choices"][0]["message"]["content"] = "echo: " + secret
+            elif field == "finish_reason":
+                data["choices"][0]["finish_reason"] = secret
+            else:
+                data[field] = secret
+            # Escaped JSON must be checked after decoding too.
+            body = glm.encode(data).replace(b"synthetic", b"\\u0073ynthetic")
+            with self.subTest(field=field):
+                adapter, transport = self.adapter(reply={"status": 200, "body": body})
+                result = adapter.complete(ROW)
+                self.assertEqual(result["error"], "credential_reflection_detected")
+                self.assertIsNone(result["answer"])
+                self.assertNotIn(secret, json.dumps(result))
+                self.assertEqual(adapter.complete(ROW)["error"], "adapter_halted")
+                self.assertEqual(transport.call_count, 1)
+
+    def test_strict_usage_halts_on_missing_or_inconsistent_accounting(self):
+        for usage in [None, {}, {"prompt_tokens": 50},
+                      {"prompt_tokens": 50, "completion_tokens": 3, "total_tokens": 54}]:
+            adapter, transport = self.adapter(config(strict_usage=True), response(usage=usage))
+            result = adapter.complete(ROW)
+            self.assertEqual(result["error"], "usage_unverifiable")
+            self.assertEqual(result["answer"], "Blue.")
+            self.assertEqual(adapter.complete(ROW)["error"], "adapter_halted")
+            self.assertEqual(transport.call_count, 1)
+        adapter, _ = self.adapter(config(strict_usage=True))
+        self.assertEqual(adapter.complete(ROW)["status"], "ok")
+        with self.assertRaises(glm.AdapterError):
+            glm.GLMAdapter(config(strict_usage="true"))
+
+    def test_cache_reasoning_and_provider_identity_are_retained_when_present(self):
+        usage = {"prompt_tokens": 50, "completion_tokens": 3, "total_tokens": 53,
+                 "prompt_tokens_details": {"cached_tokens": 40},
+                 "completion_tokens_details": {"reasoning_tokens": 2}}
+        adapter, _ = self.adapter(reply=response(usage=usage, id="response-1", system_fingerprint="fp1"))
+        result = adapter.complete(ROW)
+        self.assertEqual(result["usage_details"], {"cached_tokens": 40, "reasoning_tokens": 2})
+        self.assertEqual(result["provider_request_id"], "response-1")
+        self.assertEqual(result["system_fingerprint"], "fp1")
+        adapter, _ = self.adapter()
+        result = adapter.complete(ROW)
+        self.assertEqual(result["usage_details"], {"cached_tokens": None, "reasoning_tokens": None})
+        self.assertIsNone(result["provider_request_id"])
+        self.assertIsNone(result["system_fingerprint"])
+
+    def test_invalid_nested_usage_is_rejected(self):
+        for details in [True, {"cached_tokens": -1}, {"cached_tokens": True}, {"cached_tokens": 51}]:
+            usage = {"prompt_tokens": 50, "completion_tokens": 3, "total_tokens": 53,
+                     "prompt_tokens_details": details}
+            adapter, _ = self.adapter(reply=response(usage=usage))
+            self.assertEqual(adapter.complete(ROW)["error"], "invalid_response")
+
     def test_response_size_limit_before_json_parsing(self):
         adapter, _ = self.adapter(config(max_response_bytes=16))
         self.assertEqual(adapter.complete(ROW)["error"], "response_too_large")
@@ -258,6 +315,20 @@ class GLMAdapterTests(unittest.TestCase):
                 self.assertEqual(glm.main(args), 1)
                 transport.assert_not_called()
             self.assertEqual(json.loads(out.read_text())["status"], "dry_run")
+
+    def test_cli_results_are_private_even_with_permissive_umask(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cfg, source, out = root / "config.json", root / "input.jsonl", root / "out.jsonl"
+            cfg.write_bytes(glm.encode(config()))
+            source.write_bytes(glm.encode(ROW) + b"\n")
+            previous = glm.os.umask(0)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(glm.main(["--config", str(cfg), "--input", str(source), "--output", str(out)]), 0)
+            finally:
+                glm.os.umask(previous)
+            self.assertEqual(out.stat().st_mode & 0o777, 0o600)
 
     def test_preflight_rejects_entire_over_budget_file_before_execution(self):
         with tempfile.TemporaryDirectory() as folder:

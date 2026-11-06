@@ -48,7 +48,7 @@ def validate_config(config):
     required = {"model", "max_calls", "max_input_bytes", "max_request_bytes",
                 "max_response_bytes", "max_total_input_bytes", "max_output_tokens",
                 "max_total_output_tokens", "timeout_seconds"}
-    optional = {"endpoint", "temperature", "top_p", "thinking", "pricing"}
+    optional = {"endpoint", "temperature", "top_p", "thinking", "pricing", "strict_usage"}
     if not isinstance(config, dict) or not required <= config.keys() or config.keys() - required - optional:
         raise AdapterError("invalid_config_fields")
     validate_url(config.get("endpoint", ENDPOINT))
@@ -66,6 +66,8 @@ def validate_config(config):
             raise AdapterError("invalid_numeric_config")
     if config.get("thinking") not in (None, "enabled", "disabled"):
         raise AdapterError("invalid_thinking")
+    if "strict_usage" in config and type(config["strict_usage"]) is not bool:
+        raise AdapterError("invalid_strict_usage")
     pricing = config.get("pricing")
     if pricing is not None:
         if not isinstance(pricing, dict) or set(pricing) != {"currency", "input_per_million", "output_per_million"}:
@@ -188,11 +190,32 @@ def prepare_request(row, config):
     return body, input_bytes
 
 
-def parse_response(body, config):
+def reject_credential_reflection(data, credential):
+    """Inspect decoded values in memory, before any provider text can be retained.
+
+    This catches literal and JSON-escaped echoes, not arbitrary encodings or
+    transformations of secrets. Unknown provider fields are never persisted.
+    """
+    if not credential:
+        return
+    pending = [data]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, str) and credential in value:
+            raise AdapterError("credential_reflection_detected")
+        if isinstance(value, dict):
+            pending.extend(value.keys())
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+
+
+def parse_response(body, config, *, credential=None):
     if not isinstance(body, bytes) or len(body) > config["max_response_bytes"]:
         raise AdapterError("response_too_large")
     try:
         data = json.loads(body)
+        reject_credential_reflection(data, credential)
         if not isinstance(data, dict) or "error" in data:
             raise ValueError()
         choice = data["choices"][0]
@@ -203,14 +226,32 @@ def parse_response(body, config):
         if reported is not None and (not isinstance(reported, str) or len(reported) > 200):
             raise ValueError()
         usage = data.get("usage")
+        details = {"cached_tokens": None, "reasoning_tokens": None}
         if usage is not None:
             if not isinstance(usage, dict):
                 raise ValueError()
+            for parent, key, total in [("prompt_tokens_details", "cached_tokens", "prompt_tokens"),
+                                       ("completion_tokens_details", "reasoning_tokens", "completion_tokens")]:
+                nested = usage.get(parent)
+                if nested is not None:
+                    if not isinstance(nested, dict):
+                        raise ValueError()
+                    value = nested.get(key)
+                    if value is not None:
+                        if type(value) is not int or not 0 <= value <= 10**12:
+                            raise ValueError()
+                        if type(usage.get(total)) is int and value > usage[total]:
+                            raise ValueError()
+                    details[key] = value
             usage = {key: usage.get(key) for key in ("prompt_tokens", "completion_tokens", "total_tokens")}
             if any(v is not None and (type(v) is not int or not 0 <= v <= 10**12) for v in usage.values()):
                 raise ValueError()
         finish_reason = choice.get("finish_reason")
         if finish_reason is not None and (not isinstance(finish_reason, str) or len(finish_reason) > 100):
+            raise ValueError()
+        identity = {"provider_request_id": data.get("id"),
+                    "system_fingerprint": data.get("system_fingerprint")}
+        if any(v is not None and (not isinstance(v, str) or len(v) > 200) for v in identity.values()):
             raise ValueError()
     except (ValueError, TypeError, KeyError, IndexError, UnicodeError):
         raise AdapterError("invalid_response") from None
@@ -222,6 +263,7 @@ def parse_response(body, config):
                  usage["completion_tokens"] * pricing["output_per_million"]) / 1_000_000,
                 "basis": "configured_flat_rates_estimate_not_invoice"}
     return {"answer": answer, "provider_reported_model": reported, "usage": usage,
+            "usage_details": details, **identity,
             "finish_reason": finish_reason, "estimated_cost": cost}
 
 
@@ -242,6 +284,8 @@ class GLMAdapter:
         started = time.monotonic()
         result = {"status": "error", "error": None, "requested_model": self.config["model"],
                   "provider_reported_model": None, "usage": None, "estimated_cost": None,
+                  "usage_details": {"cached_tokens": None, "reasoning_tokens": None},
+                  "provider_request_id": None, "system_fingerprint": None,
                   "answer": None, "finish_reason": None, "attempts": 0,
                   "config_sha256": self.config_sha256, "id": None,
                   "input_tokens": None, "request_sha256": None, "request_bytes": None}
@@ -276,13 +320,20 @@ class GLMAdapter:
             if status != 200:
                 result["http_status"] = status
                 raise AdapterError("http_error")
-            result.update(parse_response(reply["body"], self.config))
+            result.update(parse_response(reply["body"], self.config, credential=key))
             result["status"] = "ok"
             if result["usage"] is not None:
                 result["input_tokens"] = result["usage"]["prompt_tokens"]
                 completion = result["usage"]["completion_tokens"]
                 if completion is not None and completion > self.config["max_output_tokens"]:
                     raise AdapterError("provider_output_budget_exceeded")
+            if self.config.get("strict_usage", False):
+                usage = result["usage"]
+                if (usage is None or any(v is None for v in usage.values())
+                        or usage["prompt_tokens"] + usage["completion_tokens"] != usage["total_tokens"]):
+                    # Retain safe available accounting and answer for the failure
+                    # denominator, but prohibit the next paid request.
+                    raise AdapterError("usage_unverifiable")
         except AdapterError as exc:
             # Injected transports are trusted test hooks, but their exception text
             # still must not become a diagnostic.
@@ -290,7 +341,8 @@ class GLMAdapter:
                     "input_too_large", "request_too_large", "call_budget_exceeded", "input_budget_exceeded",
                     "output_budget_exceeded", "credential_unavailable", "invalid_response", "redirect_blocked",
                     "http_error", "response_too_large", "unsupported_encoding", "endpoint_not_allowed",
-                    "timeout", "transport_error", "provider_output_budget_exceeded"}
+                    "timeout", "transport_error", "provider_output_budget_exceeded",
+                    "credential_reflection_detected", "usage_unverifiable"}
             result.update(status="error", error=str(exc) if str(exc) in safe else "transport_error")
             self.halted = True
         except Exception:
@@ -350,7 +402,10 @@ def main(argv=None):
         config = validate_config(load_json(args.config, 65536))
         rows = read_inputs(args.input, config)
         adapter = GLMAdapter(config, execute=args.execute)
-        with Path(args.output).open("x", encoding="utf-8") as output:
+        # Set private permissions at creation, even under a permissive umask.
+        # Exclusive creation still refuses existing files and symlinks.
+        with open(args.output, "x", encoding="utf-8",
+                  opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
             for row in rows:
                 result = adapter.complete(row)
                 output.write(encode(result).decode("utf-8") + "\n")

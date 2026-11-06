@@ -1,9 +1,11 @@
-# GLM reader adapter — offline preparation only
+# GLM reader adapter — bounded transport, live validation pending
 
 This adapter is a bounded provider transport for already assembled queries. It
 does not implement memory extraction, retrieval, gold loading, scoring, judging,
-or the complete experiment in `EVALUATION_PLAN.md`. No live call was authorized or
-performed while adding it. The requested model, exact snapshot, test scope,
+or the complete experiment in `EVALUATION_PLAN.md`. No live call was performed
+while adding it. A subsequent authorized cloud test on 2026-11-06 found no supported
+credential variable in the selected environment; see [the run report](CLOUD_TEST_2026-11-06.md).
+The requested model, exact snapshot, test scope,
 tokenizer, region, approved run budget and prices remain pending. A subscription
 does not establish API credits or authorization. This adapter does not use the
 model routing of the current conversation.
@@ -39,6 +41,10 @@ No URLs inside context are fetched, and no tools are enabled.
 `id`, `answer`, `requested_model`, `provider_reported_model`, `usage`,
 `estimated_cost`, `finish_reason`, `attempts`, `latency_seconds`,
 `config_sha256`, `request_sha256`, `request_bytes`, and `input_tokens`.
+It also retains bounded response `id` as `provider_request_id`,
+`system_fingerprint`, and `usage_details` with `cached_tokens` and
+`reasoning_tokens` when the provider supplies the corresponding nested usage
+fields. Unknown fields are discarded; missing counters/identity remain null.
 HTTP failures also carry `http_status`. Provider/model errors stop the instance;
 subsequent calls return `adapter_halted` without transport. Every attempt is made
 once, including 403/429; there are no retries or fallback providers.
@@ -54,8 +60,9 @@ as UTF-8 and record the adapter code revision alongside it.
 `requested_model` is configuration, **not actual routing evidence**.
 `provider_reported_model` is the provider response field, also not independent
 proof of underlying weights or snapshot. Missing model/usage remain null.
-Partial usage preserves unknown token counters as null, never zero; only standard
-prompt/completion/total counters are retained. Byte counts are safety limits,
+Partial usage preserves unknown token counters as null, never zero. Standard
+prompt/completion/total counters and the optional nested counters above are
+retained. Byte counts are safety limits,
 not token counts. Exact tokenizer accounting remains the experiment runner's job.
 
 Cost is null unless all explicit flat input/output prices and both usage counters
@@ -81,13 +88,20 @@ example is a synthetic offline config; `glm-test` is not a selected live model:
   "timeout_seconds": 30,
   "temperature": 0,
   "thinking": "disabled",
+  "strict_usage": true,
   "pricing": null
 }
 ```
 
 All nine model/budget/timeout fields shown before `temperature` are mandatory.
 Optional fields: `endpoint` (only the exact official URL), `temperature`, `top_p`,
-`thinking` (`enabled`/`disabled`) and `pricing`. If a provider model does not support
+`thinking` (`enabled`/`disabled`), `strict_usage` (boolean, default false) and `pricing`.
+`strict_usage` is a local accounting check, never sent to the provider. Enable it
+for measured runs: missing prompt/completion/total usage or an inconsistent total
+marks the row `usage_unverifiable` and halts before another request. Safe available
+usage and answer are retained for diagnosis and the failure denominator. Optional
+cache/reasoning counters can still be unknown; that remains an explicit limitation.
+If a provider model does not support
 an optional parameter, omit it and record the omission in the experiment config.
 Prices, when known, have exactly `currency` (three uppercase letters),
 `input_per_million`, `output_per_million`. Credentials are never config fields.
@@ -125,11 +139,17 @@ and path, forbids all redirects and alternate endpoints, limits response bodies,
 and isolates the single HTTP attempt in a killable worker with a wall deadline
 (plus up to 0.2 seconds bounded worker cleanup). It never reads HTTP error bodies.
 CLI diagnostics expose only fixed codes; raw exceptions, headers, Authorization,
-and request text are not logged. Result artifacts intentionally contain answers,
+and request text are not logged. Decoded successful responses are checked in memory
+for literal or JSON-escaped echoes of the transmitted credential. Any such echo
+discards the response with `credential_reflection_detected` and halts. This is not
+a detector for arbitrary encodings or transformed secrets. CLI output files are
+created exclusively with owner-only permissions (`0600`, subject to a more
+restrictive umask); existing files and symlinks are refused.
+Result artifacts intentionally contain answers,
 which can quote input context, so handle them as experiment data. The transport
 hook is only for trusted offline tests; injected code is not a security boundary.
 
-At implementation time the managed environment had no secret bindings and its
+At initial implementation time the managed environment had no secret bindings and its
 enforced network allowlist did not include `open.bigmodel.cn`. No network policy
 was changed. Live execution remains pending; no output here is model performance
 evidence or a completed benchmark.

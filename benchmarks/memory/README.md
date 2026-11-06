@@ -4,6 +4,8 @@
 
 本轮交付见 [优化与验证记录](OPTIMIZATION_2026-11-06.md)、[原始来源研究](RESEARCH_UPDATE_2026-11-06.md)、[离线检索通路](OFFLINE_RETRIEVAL.md) 与 [GLM 适配器（未实调用）](GLM_ADAPTER.md)。
 
+后续获授权的新云环境测试进展见 [2026-11-06 实测阻碍与安全修复](CLOUD_TEST_2026-11-06.md)：凭据未注入执行进程，Library 数据下载失败；真实模型调用仍为 0，已完成适配器安全与计量回归。
+
 完整方法研究见 [RESEARCH.md](RESEARCH.md)，公平实验协议见 [EVALUATION_PLAN.md](EVALUATION_PLAN.md)，原准备环境的实际验证和限制见 [VERIFICATION.md](VERIFICATION.md)。
 
 ## 分发范围与许可
