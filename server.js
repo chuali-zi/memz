@@ -1,6 +1,7 @@
 const express=require('express'), cookieParser=require('cookie-parser'), crypto=require('crypto');
 const {Pool}=require('pg');
 const {requestKey,createOnce}=require('./idempotency');
+const {parseSearchQuery}=require('./scripts/search-query');
 const app=express();
 const pool=new Pool({connectionString:process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz',max:10});
 // pg removes failed idle clients before emitting this event; later requests reconnect.
@@ -44,16 +45,22 @@ async function role(c,p,allowed){const r=(await c.query('SELECT role FROM member
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 app.get('/api/projects',route(async(req,res)=>res.json(await tx(req.user.id,async c=>(await c.query('SELECT p.id,p.name,m.role FROM projects p JOIN memberships m ON m.project_id=p.id WHERE m.user_id=$1 ORDER BY p.id',[req.user.id])).rows))));
 async function readProject(user,p,q,{includeFacts=true,includeHistory=true,includeCandidates=true,includeSources=true,includeAudit=true}={}){return tx(user,async c=>{const r=await role(c,p,['owner','member','viewer']);const facts=includeFacts?(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id WHERE f.project_id=$1 AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0 ORDER BY f.id`,[p,q])).rows:[];const sources=includeSources?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 ORDER BY id',[p])).rows:[];const candidates=includeCandidates?(await c.query('SELECT c.*,s.title source FROM candidates c JOIN sources s ON s.id=c.source_id WHERE c.project_id=$1 ORDER BY c.id DESC',[p])).rows:[];const history=includeHistory?(await c.query('SELECT f.subject,f.predicate,r.version,r.value,s.title source,r.created_at FROM revisions r JOIN facts f ON f.id=r.fact_id JOIN sources s ON s.id=r.source_id WHERE r.project_id=$1 ORDER BY r.id DESC',[p])).rows:[];const audit=includeAudit?(await c.query('SELECT * FROM audit WHERE project_id=$1 ORDER BY id DESC LIMIT 100',[p])).rows:[];return {sourceTextIsUntrusted:true,role:r,...(includeFacts?{facts}:{}),...(includeSources?{sources}:{}),...(includeCandidates?{candidates}:{}),...(includeHistory?{history}:{}),...(includeAudit?{audit}:{})}},{snapshot:true})}
-async function readFactsPage(user,p,q,{limit=50,after=0}={}){
+async function readFactsPage(user,p,q,{limit=50,after=0,searchMode='substring'}={}){
+  let search;try{search=parseSearchQuery(q,searchMode)}catch(error){throw fail(400,error.code)}
+  const matching=search?`NOT EXISTS (SELECT 1 FROM unnest($2::text[]) AS terms(term)
+    WHERE NOT (position(lower(term) in lower(f.subject))>0
+      OR position(lower(term) in lower(f.predicate))>0
+      OR position(lower(term) in lower(r.value))>0))`:
+    "position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0";
   return tx(user,async c=>{
     const r=await role(c,p,['owner','member','viewer']);
     const rows=(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,s.title source
       FROM facts f JOIN revisions r ON r.id=f.current_revision_id JOIN sources s ON s.id=r.source_id
       WHERE f.project_id=$1 AND f.id>$3
-        AND position(lower($2) in lower(f.subject||' '||f.predicate||' '||r.value))>0
-      ORDER BY f.id LIMIT $4`,[p,q,after,limit+1])).rows;
+        AND ${matching}
+      ORDER BY f.id LIMIT $4`,[p,search?search.terms:q,after,limit+1])).rows;
     const more=rows.length>limit,facts=rows.slice(0,limit);
-    return {role:r,facts,next_after:more?facts[facts.length-1].id:null};
+    return {role:r,facts,next_after:more?facts[facts.length-1].id:null,...(search?{search}:{})};
   },{snapshot:true});
 }
 function provenanceRecord(row,access){
@@ -111,8 +118,9 @@ app.get('/api/projects/:p/facts',route(async(req,res)=>{
   if(limit>100)throw fail(400,'分页大小必须在 1 到 100 之间');
   const after=req.query.after===undefined?0:integer(req.query.after,0,'游标无效');
   if(req.query.q!==undefined&&typeof req.query.q!=='string')throw fail(400,'关键词必须是单个字符串');
-  const q=queryText(req.query.q||'',200);
-  res.json(await readFactsPage(req.user.id,p,q,{limit,after}));
+  const searchMode=req.query.match===undefined?'substring':req.query.match;
+  const q=searchMode==='all_terms'?(req.query.q||''):queryText(req.query.q||'',200);
+  res.json(await readFactsPage(req.user.id,p,q,{limit,after,searchMode}));
 }));
 async function readHistoryPage(user,p,{limit=25,before=null}={}){
   return tx(user,async c=>{

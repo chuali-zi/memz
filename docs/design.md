@@ -61,3 +61,14 @@ flowchart LR
 ```
 
 应用连接使用 `memz_app`，管理员只执行初始化、备份和升级。聚合读取采用只读快照；审批采用行锁、事实键 advisory lock 和版本比较。服务仅监听本机 HTTP，固定公开账号与内存会话属于演示限制。测试报告通过独立临时数据库生成，不往现有演示库导入评测数据。
+
+
+## 可选多关键词检索：能力改进与兼容边界
+
+整段子串匹配要求查询按存储字段的拼接次序出现，例如种子事实“项目 / 截止日 / 20号”不能被“截止日 项目”匹配。本轮新增显式 `all_terms`，以空白分隔的字面词片段做无序 AND：每项可在 subject、predicate、当前 revision.value 的任一字段内命中。排序继续使用唯一的 fact.id 升序，不引入相关性分数，不改变原 after 位置游标；这是检索表达能力改进，没有查询加速或自然语言理解结论。
+
+默认 substring 分支和响应形状保持兼容，新模式单独回显 terms、字段、大小写规则与排序。客户端必须验证此回执，防止旧服务忽略新参数而静默执行另一种查询。新模式输入、共享解析和 opt-in 用法详见 [lexical-retrieval.md](lexical-retrieval.md)。批准修订、来源原文、RLS、版本固定、批量溯源和预算前缀都继续使用原路径。每页单独只读快照，翻页前已越过的事实后来改变匹配状态仍可能漏过；稳定排序不是跨请求冻结结果。
+
+没有新增索引、数据库迁移、扩展、模型或服务。[已有标题索引研究](search-index-study.md)没有证明应用角色下可获收益，不能用管理员绕过 RLS 的计划替代应用证据。多词条件的扫描工作量可能增加，最多八项的输入限制只是界限，并不是性能保证。相关性排名需要另定排序与游标，全文分析需要另定语言规则，均留待有证据时再引入。
+
+原始技术依据（2026-11-06 核查，PostgreSQL 16）：[字符串函数](https://www.postgresql.org/docs/16/functions-string.html)定义 `position` 和受 locale 影响的 `lower`；[LIMIT 与排序](https://www.postgresql.org/docs/16/queries-limit.html)要求可预测的唯一顺序；[行安全策略](https://www.postgresql.org/docs/16/ddl-rowsecurity.html)说明应用查询的权限约束；[全文搜索介绍](https://www.postgresql.org/docs/16/textsearch-intro.html)表明语言分析、词形规范化不同于本轮字面片段匹配。本轮没有复制上游实现，也未新增论文复现成绩。

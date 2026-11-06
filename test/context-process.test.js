@@ -66,3 +66,15 @@ test('stdio and environment independently select batch and deduplicated context'
   const overridden=await invoke('{"projectId":1,"query":"项目","limit":1,"provenanceMode":"individual","sourceMode":"inline"}',{env:{MEMZ_PROVENANCE_MODE:'batch',MEMZ_SOURCE_MODE:'deduplicated'}});assert.equal(overridden.code,0,overridden.stderr);assert.equal(JSON.parse(overridden.stdout).schemaVersion,1);
   for(const input of ['{"provenanceMode":"parallel"}','{"sourceMode":null}']){const before=requests,result=await invoke(input);assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_(PROVENANCE|SOURCE)_MODE/);assert.equal(requests,before)}
 });
+
+test('stdio and environment opt into lexical matching and reject invalid search before HTTP',async()=>{
+  const request={projectId:1,query:'截止日 项目',limit:1,searchMode:'all_terms',provenanceMode:'batch',sourceMode:'deduplicated'};
+  const result=await invoke(JSON.stringify(request));assert.equal(result.code,0,result.stderr);const context=JSON.parse(result.stdout);
+  assert.equal(context.facts.length,1);assert.deepEqual(context.search.terms,['截止日','项目']);assert.equal(context.search.order,'fact_id_asc');assert.equal(context.schemaVersion,2);
+  const {searchMode,...withoutMode}=request;
+  const env=await invoke(JSON.stringify(withoutMode),{env:{MEMZ_SEARCH_MODE:'all_terms'}});assert.equal(env.code,0,env.stderr);assert.deepEqual(JSON.parse(env.stdout),context);
+  const overridden=await invoke(JSON.stringify({...request,searchMode:'substring'}),{env:{MEMZ_SEARCH_MODE:'all_terms'}});assert.equal(overridden.code,0,overridden.stderr);assert.equal(JSON.parse(overridden.stdout).search,undefined);
+  for(const input of [{searchMode:'ranked'},{searchMode:null},{searchMode:'all_terms',query:' '},{searchMode:'all_terms',query:'a b c d e f g h i'}]){
+    const before=requests,invalid=await invoke(JSON.stringify(input));assert.equal(invalid.code,1);assert.equal(invalid.stdout,'');assert.match(invalid.stderr,/INVALID_SEARCH_MODE|INVALID_QUERY|TOO_MANY_SEARCH_TERMS/);assert.equal(requests,before);
+  }
+});

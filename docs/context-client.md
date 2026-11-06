@@ -51,7 +51,7 @@ JSON包含事实值/版本、修订ID、完整来源、候选/提议者/批准�
 printf '%s' '{"projectId":1,"query":"项目","limit":10}' | node scripts/context-client.js --stdin
 ```
 
-输入只允许projectId、query、limit、after和可选maxOutputBytes，分别覆盖同名环境配置；不接受凭据、服务地址或其他字段。端点和账号由父进程环境配置，不能通过输入请求切换身份或目的地。环境变量不是密钥保险箱，同一操作系统用户的权限仍需由部署方管理。不要在命令行参数中传密码。原有环境变量模式和readContext库接口保持可用。
+输入只允许 projectId、query、limit、after、maxOutputBytes、provenanceMode、sourceMode、searchMode，分别覆盖同名环境配置；后面三个是显式可选的[批量/去重](context-optimization.md)与[多关键词匹配](lexical-retrieval.md)模式，不接受凭据、服务地址或其他字段。端点和账号由父进程环境配置，不能通过输入请求切换身份或目的地。环境变量不是密钥保险箱，同一操作系统用户的权限仍需由部署方管理。不要在命令行参数中传密码。原有环境变量模式和readContext库接口保持可用。
 
 这是单次JSON协议，不是NDJSON、常驻服务或MCP。stdin最多16 KiB，须在5秒内结束；多对象、无效UTF-8、未知字段及超量输入直接失败且不发HTTP请求。成功只向stdout输出一个JSON结果；失败stdout为空，stderr为固定错误码，退出码1。父进程应同时读取stdout和stderr并检查退出码。
 
