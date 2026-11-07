@@ -39,6 +39,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:product:ui
         timeout-minutes: 2
+      - run: npm run test:responsive:ui
+        timeout-minutes: 2
       - run: PGPASSWORD=postgres_demo_only psql -h 127.0.0.1 -U postgres -d memz -v ON_ERROR_STOP=1 -f db/schema.sql
       - run: npm run test:system:evidence
         env:
