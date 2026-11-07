@@ -12,6 +12,10 @@
 
 连接池最多10个连接，checkout排队与新连接握手各受5秒连接等待约束；每条PostgreSQL语句默认10秒服务端期限，每次驱动query读取等待15秒。`DATABASE_URL` 中同名的 `connectionTimeoutMillis`、`statement_timeout`、`query_timeout` 参数会移除，由应用固定设置；其他连接配置继续保留。非法URL只产生固定错误，不保留其内容/cause。
 
+每个池通过 `runTransaction` 同时最多保留32个尚未完成交接的checkout申请。同步预留槽位发生在调用驱动connect之前；连接握手、驱动排队和已成功但await尚未恢复的交接都计入，checkout成功或失败后归还。已交接给事务持有的连接另受池上限10约束，COMMIT、ROLLBACK和release不重新申请槽位。第33个申请在connect、BEGIN和业务SQL前拒绝，HTTP返回503、固定“服务繁忙，请稍后重试”和 `Retry-After: 1`；不驱逐已接收申请，不自动重试任何写入。写客户端仍遵循原有保守结果状态及原幂等键重试规则。
+
+32是固定保护默认值，不是容量承诺、全局HTTP并发限制或速率限制。`pg.waitingCount` 只统计驱动队列，不包括握手，因此不能用于这一配额。受信内部代码及测试直接使用导出的原始 `pool.connect` / `pool.query` 会绕过事务配额；HTTP业务数据库路径统一经事务helper。配额清零也不表示驱动超时后的迟到握手已经全部结束，迟到连接仍由pg自行丢弃/归还。
+
 这些不是整个HTTP请求、整个多语句事务或任意JavaScript callback的总时限；多个依次执行的语句可能累计更久。当前没有业务SQL或连接池的生产容量承诺。调整阈值应先测量实际负载与慢查询，再修改并运行回归。
 
 事务局部身份仍通过 `set_config(..., true)` 设置。普通失败先ROLLBACK后归还健康连接；服务端取消也要求回滚。连接断开或驱动读超时直接丢弃连接，避免把ROLLBACK排到尚未完成的查询后继续等待；ROLLBACK自己失败也销毁连接，并向调用方保留原始异常。checked-out期间的连接error事件有监听器，避免后台断线成为未处理进程异常。
@@ -21,6 +25,8 @@
 ## 验证
 
 核心系统测试包含真实PostgreSQL的statement取消、驱动超时、活动backend终止、RLS身份清理与池饱和恢复；握手黑洞测试使用本机TCP服务与合成凭据。单元测试另外覆盖COMMIT不确定、ROLLBACK失败保留原错误和坏连接释放，不把mock当作真实数据库故障证据。
+
+`test/database-admission.test.js` 确定性覆盖32/33边界、两池独立、同步异常/拒绝清理、活动事务不重复入场及连接错误监听器的单次await交接。`test/database-admission-postgres.test.js` 在随机隔离库验证原始池可排50个checkout、受保护的32申请含握手、溢出来源/候选不写业务行/审计/幂等回执、6个排队申请超时后恢复、backend终止与RLS。这里的本机合成小规模观察不是生产压测或吞吐基准。
 
 使用推荐隔离runner：
 

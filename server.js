@@ -355,10 +355,11 @@ app.use((err,req,res,next)=>{
     'request.size.invalid':[400,'请求体长度无效']
   };
   const databaseFailure=databaseErrorKind(err);
-  const unavailableMessage=(req.readOnly||['GET','HEAD'].includes(req.method))?(databaseFailure==='timeout'?'数据库请求超时，请稍后重试':'数据库暂时不可用，请稍后重试'):'数据库连接中断，写入结果可能不确定；请先核实，创建重试请复用原幂等键';
+  const unavailableMessage=databaseFailure==='busy'?'服务繁忙，请稍后重试':(req.readOnly||['GET','HEAD'].includes(req.method))?(databaseFailure==='timeout'?'数据库请求超时，请稍后重试':'数据库暂时不可用，请稍后重试'):'数据库连接中断，写入结果可能不确定；请先核实，创建重试请复用原幂等键';
   const [status,message]=parseErrors[err.type]||(databaseFailure?[503,unavailableMessage]:null)||(['Z_DATA_ERROR','Z_BUF_ERROR'].includes(err.code)?[400,'压缩请求体无效']:[err.status||500,err.status&&err.status<500?err.message:'请求无法处理']);
   if(status>=500)console.error('Request failed:',safeErrorCode(err));
   if(res.headersSent)return next(err);
+  if(databaseFailure==='busy')res.set('Retry-After','1');
   res.status(status).json({error:message});
 });
 if(require.main===module){
