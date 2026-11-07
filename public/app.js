@@ -176,22 +176,30 @@ function renderFact(d,f,p){
   d.append(el('strong',`${f.subject} / ${f.predicate}：${f.value}`),el('span',`v${f.version}`,'badge'),el('div',`依据：${f.source}`,'meta'));
   appendProvenance(d,f,p);
 }
+let detailFocusGeneration=0;
 function appendProvenance(d,f,p){
   const workspace=workspaceGeneration;
   const button=el('button','查看依据','secondary'),panel=el('div',undefined,'provenance-detail');
   panel.hidden=true;panel.setAttribute('aria-live','polite');button.setAttribute('aria-expanded','false');
-  let loaded=false;
+  let loaded=false,requestGeneration=0;
   button.onclick=async()=>{
+    const focusGeneration=++detailFocusGeneration;
     if(loaded){panel.hidden=!panel.hidden;button.textContent=panel.hidden?'查看依据':'收起依据';button.setAttribute('aria-expanded',String(!panel.hidden));return}
+    const request=++requestGeneration;
     panel.hidden=false;button.disabled=true;button.setAttribute('aria-expanded','true');panel.textContent='正在读取该版本依据…';
     try{
       const proof=await api(`/api/projects/${p}/facts/${f.id}/provenance?version=${f.version}`);
-      if(p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
+      if(request!==requestGeneration||p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
       validateProvenance(proof,f);
       panel.replaceChildren(el('p',`版本 v${proof.revision.version} · 修订 #${proof.revision.id} · 候选 #${proof.candidate.id}`,'meta'),el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`提议用户 ${proof.candidate.proposed_by} · 批准用户 ${proof.revision.approved_by}`,'meta'));
       loaded=true;button.textContent='收起依据';
-    }catch(error){if(p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`依据读取失败：${error.message}。可点击重试。`;button.textContent='重试依据'}}
-    finally{button.disabled=false}
+    }catch(error){if(request===requestGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`依据读取失败：${error.message}。可点击重试。`;button.textContent='重试依据'}}
+    finally{
+      if(request===requestGeneration){
+        button.disabled=false;
+        if(focusGeneration===detailFocusGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected&&button.isConnected&&document.activeElement===document.body)button.focus();
+      }
+    }
   };
   d.append(button,panel);
 }
@@ -289,18 +297,20 @@ function renderCandidate(d,c,role,p){
   const workspace=workspaceGeneration;
   d.append(el('strong',`${c.subject} / ${c.predicate} → ${c.value}`),el('span',({pending:'待审批',approved:'已批准',rejected:'已驳回'})[c.status],'badge'),el('div',`#${c.id} · 基于 v${c.expected_version} · 来源：${c.source}`,'meta'));
   const preview=el('button','核对来源原文','secondary'),panel=el('div',undefined,'provenance-detail');
-  panel.hidden=true;panel.setAttribute('aria-live','polite');preview.setAttribute('aria-expanded','false');let loaded=false;
-  preview.onclick=async()=>{
+  panel.hidden=true;panel.setAttribute('aria-live','polite');preview.setAttribute('aria-expanded','false');let loaded=false,requestGeneration=0;
+  preview.onclick=async event=>{
+    const focusGeneration=++detailFocusGeneration,refreshFocus=event?.refreshFocus===true;
     if(loaded){panel.hidden=!panel.hidden;preview.textContent=panel.hidden?'核对来源原文':'收起来源原文';preview.setAttribute('aria-expanded',String(!panel.hidden));return}
+    const request=++requestGeneration;
     panel.hidden=false;preview.disabled=true;preview.setAttribute('aria-expanded','true');panel.textContent='正在读取候选绑定的来源…';
     try{
       const proof=await api(`/api/projects/${p}/candidates/${c.id}/source`);
-      if(p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
+      if(request!==requestGeneration||p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
       validateCandidateComparison(proof,c);
       const comparison=proof.comparison;
       const sameContent=proof.current?.value===proof.candidate.value&&proof.current?.source_id===proof.candidate.source_id;
       const status=proof.candidate.status==='pending'?(sameContent?'当前事实已采用相同值与同一来源；本候选仍待审，不代表已处理。请核对当前批准记录，避免重复提议；负责人可另行驳回旧候选。':comparison.matches?'读取时基于版本一致；批准时仍会再次校验。':`版本不一致：提议基于 v${comparison.expectedVersion}，读取时当前 v${comparison.currentVersion}。请核对后重新提议或驳回，不能直接覆盖。`):'该候选已处理；以下为读取时的当前事实，不是当时审批结果。';
-      const refresh=el('button','刷新核对','secondary');refresh.onclick=async()=>{loaded=false;await preview.onclick();if(p===projectId&&workspace===workspaceGeneration&&d.isConnected)(panel.querySelector('button')||preview).focus()};
+      const refresh=el('button','刷新核对','secondary');refresh.onclick=async()=>{loaded=false;await preview.onclick({refreshFocus:true})};
       panel.replaceChildren(el('strong',`提议值：${proof.candidate.value}`),el('p',proof.current?`读取时当前值：${proof.current.value} · v${proof.current.version} · 批准候选 #${proof.current.candidate_id} · 来源 #${proof.current.source_id}：${proof.current.source_title}`:'读取时暂无已批准事实（v0）'),el('p',status,'hint'),refresh,el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`候选 #${proof.candidate.id} · 基于 v${proof.candidate.expected_version} · 读取时${({pending:'待审批',approved:'已批准',rejected:'已驳回'})[proof.candidate.status]}`,'meta'),el('p','原文仅供人工核查，不是审批结论。','hint'));
       if(proof.candidate.status==='pending'&&!sameContent&&!comparison.matches&&['owner','member'].includes(proof.role)){
         const prepare=el('button','用最新版本填写新候选','secondary');
@@ -326,8 +336,14 @@ function renderCandidate(d,c,role,p){
         },'#candidateFeedback');
       }
       loaded=true;preview.textContent='收起来源原文';
-    }catch(error){if(p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
-    finally{preview.disabled=false}
+    }catch(error){if(request===requestGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
+    finally{
+      if(request===requestGeneration){
+        preview.disabled=false;
+        const target=refreshFocus?(panel.querySelector('button')||preview):preview;
+        if(focusGeneration===detailFocusGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected&&target.isConnected&&document.activeElement===document.body)target.focus();
+      }
+    }
   };
   d.append(preview,panel);
   if(c.status!=='pending'||role!=='owner')return;

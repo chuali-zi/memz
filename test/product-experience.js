@@ -1192,3 +1192,82 @@ for(const form of ['sourceForm','proposal'])test(`a ${form} failure with lost fo
     assert.match(await page.locator(feedback).textContent(),form==='sourceForm'?/来源 #7 已保存/:/候选已提交/);assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
+
+async function detailFocusFixture(page,kind){
+  if(kind!=='candidates')return provenanceFixture(page,{history:kind==='history'});
+  const {proof}=await conflictFixture(page);await page.locator('#refreshCandidates').click();
+  await page.locator('#candidates').getByRole('button',{name:'核对来源原文',exact:true}).waitFor();
+  return {proof,pattern:'**/api/projects/1/candidates/10/source'};
+}
+async function keyboardDetailTrigger(page,kind,{refresh=false}={}){
+  await page.locator('#'+kind+'Title').focus();
+  const text=refresh?'刷新核对':kind==='candidates'?'核对来源原文':'查看依据';
+  for(let step=0;step<30;step++){
+    await page.keyboard.press('Tab');
+    if(await page.evaluate(({kind,text})=>{const node=document.activeElement;return node.tagName==='BUTTON'&&node.closest('#'+kind)&&node.textContent===text},{kind,text}))return;
+  }
+  assert.fail('detail trigger must be reachable with Tab');
+}
+async function keyboardDraft(page,direction){
+  for(let step=0;step<35;step++){
+    await page.keyboard.press(direction);
+    if(await page.locator('#proposal [name=value]').evaluate(node=>node===document.activeElement))return;
+  }
+  assert.fail('draft must remain keyboard reachable during detail loading');
+}
+for(const kind of ['facts','history','candidates'])test(`keyboard ${kind} detail failure and successful retry restore the current trigger`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,pattern}=await detailFocusFixture(page,kind);await settled(page,'#loginForm');
+    await keyboardDetailTrigger(page,kind);const pending=await hold(page,pattern,'GET');await page.keyboard.press('Enter');await pending.observed;
+    await page.keyboard.press('Enter');assert.equal(pending.requests.length,1,'a repeated Enter cannot start a duplicate pending detail');
+    pending.release({error:'合成键盘详情故障'},503);
+    const retry=page.locator('#'+kind).getByRole('button',{name:kind==='candidates'?'重试来源原文':'重试依据',exact:true});await retry.waitFor();
+    const panel=page.locator('#'+kind+' .provenance-detail');assert.equal(await panel.getAttribute('aria-live'),'polite');assert.match(await panel.textContent(),/503 合成键盘详情故障/);
+    assert.equal(await retry.evaluate(node=>node===document.activeElement),true);assert.equal(await retry.evaluate(node=>getComputedStyle(node).outlineStyle),'solid');
+    const next=await hold(page,pattern,'GET');await page.keyboard.press('Enter');await next.observed;proof.source.content='合成完整长来源😀\n'+'长文本'.repeat(600);next.release(proof);
+    const trigger=page.locator('#'+kind).getByRole('button',{name:kind==='candidates'?'收起来源原文':'收起依据',exact:true});await trigger.waitFor();
+    assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);assert.ok((await panel.textContent()).includes(proof.source.content));
+    await page.keyboard.press('Enter');assert.equal(await panel.isHidden(),true);assert.equal(await page.evaluate(({kind})=>document.activeElement.closest('#'+kind)!==null&&document.activeElement.textContent===(kind==='candidates'?'核对来源原文':'查看依据'),{kind}),true);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+for(const kind of ['facts','candidates'])test(`late ${kind} detail completion leaves an actively edited draft and caret alone`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,pattern}=await detailFocusFixture(page,kind);await settled(page,'#loginForm');await keyboardDetailTrigger(page,kind);
+    const pending=await hold(page,pattern,'GET');await page.keyboard.press('Enter');await pending.observed;await keyboardDraft(page,kind==='facts'?'Tab':'Shift+Tab');
+    await page.keyboard.press('Control+a');await page.keyboard.type('读取期间保留的新草稿');await page.keyboard.press('ArrowLeft');const input=page.locator('#proposal [name=value]'),caret=await input.evaluate(node=>[node.selectionStart,node.selectionEnd]);
+    pending.release(proof);await page.locator('#'+kind).getByRole('button',{name:kind==='candidates'?'收起来源原文':'收起依据',exact:true}).waitFor();
+    assert.equal(await input.evaluate(node=>node===document.activeElement),true);assert.deepEqual(await input.evaluate(node=>[node.selectionStart,node.selectionEnd]),caret);await page.keyboard.type('继续');assert.equal(await input.inputValue(),'读取期间保留的新草继续稿');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('keyboard comparison refresh respects a newer draft focus and retains caret and manual submission intent',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof}=await conflictFixture(page);await settled(page,'#loginForm');await keyboardDetailTrigger(page,'candidates',{refresh:true});
+    const pending=await hold(page,'**/api/projects/1/candidates/10/source','GET');await page.keyboard.press('Enter');await pending.observed;await keyboardDraft(page,'Shift+Tab');
+    await page.keyboard.press('Control+a');await page.keyboard.type('刷新期间的新草稿');await page.keyboard.press('ArrowLeft');const input=page.locator('#proposal [name=value]'),caret=await input.evaluate(node=>[node.selectionStart,node.selectionEnd]),original=await draft(page);
+    pending.release(proof);await page.locator('#candidates').getByRole('button',{name:'刷新核对',exact:true}).waitFor();
+    assert.equal(await input.evaluate(node=>node===document.activeElement),true);assert.deepEqual(await input.evaluate(node=>[node.selectionStart,node.selectionEnd]),caret);assert.deepEqual(await draft(page),original);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('a late keyboard detail cannot focus a different A to B to A visit or populate its replacement row',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,pattern}=await provenanceFixture(page);await settled(page,'#loginForm');await keyboardDetailTrigger(page,'facts');const pending=await hold(page,pattern,'GET');await page.keyboard.press('Enter');await pending.observed;
+    await page.locator('#project').focus();for(const key of ['ArrowDown','ArrowUp']){await page.keyboard.press(key);await page.waitForFunction(()=>['facts','history','candidates','sources','audit'].every(root=>document.querySelector('#'+root).getAttribute('aria-busy')==='false'))}
+    assert.equal(await page.locator('#project').inputValue(),'1');const focus=await page.evaluate(()=>document.activeElement.id),response=page.waitForResponse(pattern);pending.release(proof);await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.evaluate(()=>document.activeElement.id),focus);assert.equal(focus,'project');assert.equal(await page.locator('#facts .provenance-detail').isHidden(),true);assert.equal(await page.locator('#facts .provenance-detail').textContent(),'');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('an older detail response cannot restore focus ahead of a newer keyboard detail request',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {fact,proof,pattern}=await provenanceFixture(page),second={...fact,id:42,subject:'第二个键盘事实'},secondProof=structuredClone(proof);secondProof.fact.id=42;secondProof.fact.subject=second.subject;secondProof.revision.id=92;secondProof.candidate.id=12;
+    await page.route('**/api/projects/1/facts?*',route=>route.fulfill({json:{facts:[fact,second],next_after:null}}));await page.locator('#refreshWorkspace').click();await page.locator('#factsStatus').getByText(/2 条/).waitFor();await keyboardDetailTrigger(page,'facts');
+    const first=await hold(page,pattern,'GET'),next=await hold(page,'**/api/projects/1/facts/42/provenance?version=2','GET');await page.keyboard.press('Enter');await first.observed;
+    await page.keyboard.press('Tab');assert.equal(await page.locator('#facts .entry').nth(1).locator('button').evaluate(node=>node===document.activeElement),true);await page.keyboard.press('Enter');await next.observed;
+    first.release(proof);await page.locator('#facts .entry').nth(0).getByRole('button',{name:'收起依据',exact:true}).waitFor();assert.equal(await page.evaluate(()=>document.activeElement===document.body),true);
+    next.release(secondProof);const newest=page.locator('#facts .entry').nth(1).getByRole('button',{name:'收起依据',exact:true});await newest.waitFor();assert.equal(await newest.evaluate(node=>node===document.activeElement),true);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
