@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {EventEmitter}=require('node:events');
 const {runTransaction}=require('../scripts/database');
 
-function fixture(query=async()=>({rows:[]})){
+function fixture(query=async sql=>({rows:[],command:sql.split(' ',1)[0]})){
   const client=new EventEmitter(),queries=[],releases=[];
   client.query=async(...args)=>{queries.push(args);return query(...args)};
   client.release=error=>releases.push(error);
@@ -43,6 +43,18 @@ test('uncertain COMMIT failure is neither replayed nor masked by a rollback',asy
   await assert.rejects(()=>runTransaction(f.pool,1,()=>{calls++;return 1}),error=>error===failure);
   assert.equal(calls,1);assert.equal(f.connects(),1);
   assert.equal(f.queries.at(-1)[0],'COMMIT');assert.deepEqual(f.releases,[failure]);
+});
+test('only an explicit COMMIT command can confirm success, without exposing invalid receipts or retrying',async()=>{
+  for(const committed of [{command:'ROLLBACK'},{command:'synthetic-private-result'},undefined]){
+    const f=fixture(async sql=>sql==='COMMIT'?committed:{rows:[]});let calls=0;
+    await assert.rejects(()=>runTransaction(f.pool,1,()=>{calls++;return {value:'synthetic-private-result'}}),error=>{
+      assert.equal(error.message,'Database transaction did not commit');
+      assert.equal(error.cause,undefined);assert.ok(!String(error).includes('synthetic-private-result'));return true;
+    });
+    assert.equal(calls,1);assert.equal(f.connects(),1);
+    assert.equal(f.queries.filter(([sql])=>sql==='COMMIT').length,1);
+    assert.equal(f.queries.at(-1)[0],'ROLLBACK');assert.deepEqual(f.releases,[undefined]);
+  }
 });
 test('client read timeout destroys the connection without queuing rollback behind the unfinished query',async()=>{
   const failure=new Error('Query read timeout'),f=fixture();

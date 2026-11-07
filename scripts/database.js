@@ -37,7 +37,10 @@ async function runTransaction(pool,user,fn,{snapshot=false}={}){
     await client.query(snapshot?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');
     await client.query("SELECT set_config('app.user_id',$1,true)",[String(user)]);
     const result=await fn(client);
-    await client.query('COMMIT');
+    const committed=await client.query('COMMIT');
+    // An aborted transaction accepts COMMIT but reports ROLLBACK. This can
+    // happen when fn catches a SQL error; its return value is not a receipt.
+    if(committed?.command!=='COMMIT')throw new Error('Database transaction did not commit');
     return result;
   }catch(error){
     if(connectionError||discardConnection(error))discard=connectionError||error;

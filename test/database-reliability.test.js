@@ -29,6 +29,29 @@ test('statement cancellation rolls back the whole transaction and clears its loc
   }finally{client.release()}
   assert.equal((await tx(1,client=>client.query('SELECT role FROM memberships WHERE project_id=1'))).rows[0].role,'owner');
 });
+test('a callback that catches its SQL failure cannot turn an aborted PostgreSQL transaction into a success receipt',async()=>{
+  for(const timedOut of [false,true]){
+    let pid,calls=0,swallowed;
+    await assert.rejects(()=>tx(1,async client=>{
+      calls++;pid=client.processID;
+      await client.query('CREATE TEMP TABLE memz_swallowed_failure(value int) ON COMMIT DROP');
+      await client.query('INSERT INTO memz_swallowed_failure VALUES(1)');
+      if(timedOut)await client.query('SET LOCAL statement_timeout=75');
+      try{await client.query(timedOut?'SELECT pg_sleep(2)':'SELECT 1/0')}
+      catch(error){swallowed=error.code}
+      return {ok:true,value:'synthetic-private-result'};
+    }),error=>error.message==='Database transaction did not commit'&&error.cause===undefined);
+    assert.equal(calls,1,'failed commit confirmation must never repeat the callback');
+    assert.equal(swallowed,timedOut?'57014':'22012');
+    const client=await pool.connect();
+    try{
+      assert.equal(client.processID,pid);
+      assert.equal((await client.query("SELECT to_regclass('pg_temp.memz_swallowed_failure') AS table_name")).rows[0].table_name,null);
+      assert.equal((await client.query("SELECT nullif(current_setting('app.user_id',true),'') AS user_id")).rows[0].user_id,null);
+      assert.equal((await client.query('SELECT * FROM facts')).rowCount,0);
+    }finally{client.release()}
+  }
+});
 test('client response timeout discards the unfinished connection and the next transaction reconnects',async()=>{
   let pid;
   await assert.rejects(()=>tx(1,async client=>{
