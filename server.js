@@ -5,7 +5,7 @@ const {parseSearchQuery}=require('./scripts/search-query');
 const {SNAPSHOT_MAX_BYTES,snapshotReceipt}=require('./scripts/context-snapshot');
 const {SessionStore,SESSION_TTL_MS}=require('./scripts/session-store');
 const {databasePoolOptions,databaseErrorKind,safeErrorCode,runTransaction}=require('./scripts/database');
-const {createShutdownGate,installShutdown}=require('./scripts/server-lifecycle');
+const {listenPort,createShutdownGate,installShutdown}=require('./scripts/server-lifecycle');
 const {MAX_CURRENT_LABELS,CURRENT_LABELS_MAX_BYTES,EXACT_CONTEXT_MAX_BYTES,currentLabelsReceipt,exactContextReceipt,validateCurrentLabels,validateExactContextRequest,validateExactSelector,validateExactContext}=require('./scripts/exact-context-protocol');
 const app=express();
 const shutdownGate=createShutdownGate();
@@ -362,7 +362,20 @@ app.use((err,req,res,next)=>{
   res.status(status).json({error:message});
 });
 if(require.main===module){
-  const server=app.listen(process.env.PORT||3000,'127.0.0.1',()=>console.log(`Memz http://127.0.0.1:${server.address().port}`));
-  installShutdown({server,pool,onDrain:shutdownGate.beginDrain});
+  // Node treats nonnumeric listen strings as Unix socket paths. PORT must stay
+  // a TCP port; never create a file or echo a supplied configuration value.
+  let startupFailed=false,started=false,port;
+  const startupFailure=message=>{if(startupFailed)return;startupFailed=true;console.error(message);process.exitCode=1;pool.end().catch(()=>{})};
+  try{port=listenPort(process.env.PORT)}catch{startupFailure('Memz startup failed: invalid PORT.')}
+  if(port!==undefined){
+    const server=app.listen(port,'127.0.0.1',error=>{
+      // Express forwards listen errors to its callback as well as the event.
+      if(error)return startupFailure('Memz startup failed: cannot listen.');
+      started=true;
+      console.log(`Memz http://127.0.0.1:${server.address().port}`);
+    });
+    const shutdown=installShutdown({server,pool,onDrain:shutdownGate.beginDrain});
+    server.on('error',()=>started?shutdown.fail():startupFailure('Memz startup failed: cannot listen.'));
+  }
 }
 module.exports={app,pool,tx,decide,readProject,readFactsPage,readHistoryPage,readCandidatesPage,readSourcesPage,readCurrentLabels,readExactContext};

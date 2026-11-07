@@ -1,5 +1,11 @@
 const SHUTDOWN_TIMEOUT_MS=20000;
 
+function listenPort(value){
+  if(value===undefined||value==='')return 3000;
+  if(typeof value!=='string'||!/^[0-9]{1,5}$/.test(value)||Number(value)>65535)throw new Error('INVALID_PORT');
+  return Number(value);
+}
+
 function createShutdownGate(){
   let draining=false;
   return {
@@ -14,9 +20,10 @@ function createShutdownGate(){
 // Installed only by the CLI. Imported apps keep ownership of their own server,
 // signals and pool. The deadline includes both HTTP drain and pool shutdown.
 function installShutdown({server,pool,onDrain=()=>{}}){
-  let stopping=false,finished=false,deadline;
+  let stopping=false,finished=false,failed=false,deadline;
   function finish(code,message){
     if(finished)return;
+    if(failed&&code===0)code=1;
     finished=true;clearTimeout(deadline);
     if(message)console.error(message);
     if(code!==0){try{server.closeAllConnections?.()}catch{}}
@@ -42,7 +49,12 @@ function installShutdown({server,pool,onDrain=()=>{}}){
   }
   process.on('SIGTERM',shutdown);
   process.on('SIGINT',shutdown);
+  shutdown.fail=()=>{
+    if(finished)return;
+    if(!failed){failed=true;console.error('HTTP server failed; stopping.')}
+    shutdown();
+  };
   return shutdown;
 }
 
-module.exports={SHUTDOWN_TIMEOUT_MS,createShutdownGate,installShutdown};
+module.exports={SHUTDOWN_TIMEOUT_MS,listenPort,createShutdownGate,installShutdown};
