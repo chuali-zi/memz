@@ -60,6 +60,21 @@ function validatePage(page,list,cursor){
   if(list==='sources'&&!page.sources.every(source=>Number.isSafeInteger(source.id)&&source.id>0&&typeof source.title==='string'&&typeof source.content==='string'))invalid();
 }
 
+// These endpoints are not snapshot receipts: check the fields this page consumes,
+// without inventing a project-name length or rejecting unused additive metadata.
+function validateProjects(projects){
+  const ids=new Set(),invalid=()=>{throw new Error('项目列表响应格式异常，请稍后重试')};
+  if(!Array.isArray(projects))invalid();
+  for(const project of projects){
+    if(!project||typeof project!=='object'||Array.isArray(project)||!['id','name','role'].every(key=>Object.hasOwn(project,key))||!Number.isInteger(project.id)||project.id<1||project.id>2147483647||typeof project.name!=='string'||!['owner','member','viewer'].includes(project.role)||ids.has(project.id))invalid();
+    ids.add(project.id);
+  }
+}
+function validateWorkspaceBootstrap(result){
+  if(!result||typeof result!=='object'||Array.isArray(result)||!Object.hasOwn(result,'role')||!Object.hasOwn(result,'sourceTextIsUntrusted')||!['owner','member','viewer'].includes(result.role)||result.sourceTextIsUntrusted!==true)throw new Error('工作台响应格式异常，请稍后重试');
+  return {role:result.role,sourceTextIsUntrusted:true};
+}
+
 async function switchAccount(){
   try{await api('/api/logout',{method:'POST'})}
   catch(error){if(error.status!==401)throw error}
@@ -72,12 +87,23 @@ async function loadProjects(){
   const generation=++projectGeneration;workspaceGeneration++;
   projectId=null;data=null;selectedSource=null;sourcePage=[];for(const id of ['#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);
   const select=$('#project');select.replaceChildren();
+  // Refreshing accessible projects starts a new access boundary, even if the
+  // response fails or is empty. Never retain the prior identity's interactions.
+  factGeneration++;historyGeneration++;candidateGeneration++;sourceGeneration++;auditGeneration++;
+  for(const root of ['facts','history','candidates','sources','audit']){
+    $('#'+root).replaceChildren();$('#'+root).setAttribute('aria-busy','false');$('#'+root+'Status').textContent='';
+    $('#'+root+'Previous').disabled=true;$('#'+root+'Next').disabled=true;
+  }
+  sourceOptions();
   for(const button of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))button.disabled=true;
   message('正在加载项目…');
   try{
     const projects=await api('/api/projects');
     if(generation!==projectGeneration)return;
-    projects.forEach(p=>{const o=el('option',`${p.name} · ${p.role}`);o.value=p.id;select.append(o)});
+    validateProjects(projects);
+    const options=document.createDocumentFragment();
+    projects.forEach(p=>{const o=el('option',`${p.name} · ${p.role}`);o.value=p.id;options.append(o)});
+    select.replaceChildren(options);
     if(!projects.length){message('当前账号没有可访问的项目。请切换账号或刷新工作台重试。');return}
     projectId=Number(select.value);message('');await load();
   }catch(error){if(generation===projectGeneration)message(`项目列表加载失败：${error.message}。请刷新工作台重试。`)}
@@ -346,7 +372,7 @@ async function load(){
   try{
     const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false`);
     if(generation!==contextGeneration||p!==projectId)return;
-    data=result;
+    data=validateWorkspaceBootstrap(result);
     // A resolved read failure cannot clear a newer message from another action.
     if(workspaceProblem?.workspace===workspaceGeneration&&workspaceProblem.project===p&&workspaceProblem.notice===noticeGeneration)message('');
     workspaceProblem=null;

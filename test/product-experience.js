@@ -66,7 +66,7 @@ async function openPage(){
     let body;
     if(url.pathname==='/api/login')body={csrf:'synthetic-csrf',name:'Synthetic owner'};
     else if(url.pathname==='/api/projects')body=[{id:1,name:'合成项目一',role:'owner'},{id:2,name:'合成项目二',role:'owner'}];
-    else if(resource==='data')body={role:'owner'};
+    else if(resource==='data')body={sourceTextIsUntrusted:true,role:'owner'};
     else if(resource==='sources')body={sources:[{id:1,title:'合成依据',content:'仅用于交互测试。'}],next_after:null};
     else if(resource==='facts')body={facts:[],next_after:null};
     else if(resource==='history')body={history:[],next_before:null};
@@ -539,7 +539,7 @@ async function projectBoundaryFixture(page){
     if(mode==='network'){await route.abort();return}
     if(mode==='403'){await route.fulfill({status:403,json:{error:'合成项目权限拒绝'}});return}
     const config=pagedLists.find(config=>config.root===resource);
-    await route.fulfill({json:resource==='data'?{role:'owner'}:{[config.items]:[config.row(20)],[config.next]:null,role:'owner'}});
+    await route.fulfill({json:resource==='data'?{sourceTextIsUntrusted:true,role:'owner'}:{[config.items]:[config.row(20)],[config.next]:null,role:'owner'}});
   });
   return {get observed(){return bounded(observed,'waiting for project data request')},release:value=>{mode=value;release()},recover:()=>{mode='ok'}};
 }
@@ -678,7 +678,7 @@ test('workspace recovery preserves a newer uncertain-operation notice',async()=>
     await page.route('**/api/logout',route=>route.fulfill({status:503,json:{error:'合成退出故障，写入结果可能不确定'}}));
     await page.locator('#identity button').click();await page.locator('#notice').getByText(/503 合成退出故障/).waitFor();
     const newer=await page.locator('#notice').textContent();
-    recovery.release({role:'owner'});await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    recovery.release({sourceTextIsUntrusted:true,role:'owner'});await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
     assert.equal(await page.locator('#notice').textContent(),newer);assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
@@ -690,8 +690,111 @@ test('late login completion cannot move focus after the user changes workspace',
     await page.locator('#loginForm button').click();await initial.observed;
     await page.locator('#project').selectOption('2');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
     await page.locator('.intro h1').click();assert.equal(await page.evaluate(()=>document.activeElement===document.body),true);
-    initial.release({role:'owner'});await settled(page,'#loginForm');
+    initial.release({sourceTextIsUntrusted:true,role:'owner'});await settled(page,'#loginForm');
     assert.equal(await page.evaluate(()=>document.activeElement===document.body),true);
     assert.equal(await page.locator('#project').inputValue(),'2');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a malformed bootstrap cannot become accepted workspace data or enable writes',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await page.route('**/api/projects/1/data?*',route=>route.fulfill({json:{}}));
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    assert.equal(await page.evaluate(()=>data),null);
+    for(const selector of ['#proposal button','#sourceForm button','#stale','#injection'])assert.equal(await page.locator(selector).isDisabled(),true);
+    assert.match(await page.locator('#notice').textContent(),/工作台响应格式异常/);
+    await page.unroute('**/api/projects/1/data?*');await page.locator('#refreshWorkspace').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator('#notice').textContent(),'');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a malformed project list cannot publish partial options at a refreshed access boundary',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);await page.waitForFunction(()=>['facts','history','candidates','sources','audit'].every(id=>document.querySelector(`#${id}`).getAttribute('aria-busy')==='false'));
+    await page.locator('#proposal [name=value]').fill('保留的候选草稿');
+    const priorText=await page.locator('#proposal [name=value]').inputValue();
+    await page.route('**/api/projects',route=>route.fulfill({json:[{id:9,name:'不可部分接纳的项目',role:'owner'},null]}));
+    await page.evaluate(()=>loadProjects());
+    assert.equal(await page.evaluate(()=>projectId),null);
+    assert.equal(await page.locator('#project option').count(),0);assert.equal(await page.locator('#sourceSelect option').count(),0);
+    for(const root of ['facts','history','candidates','sources','audit'])assert.equal(await page.locator('#'+root).textContent(),'');
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),priorText);
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),'保留的候选草稿');assert.match(await page.locator('#notice').textContent(),/项目列表响应格式异常/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('an invalid project id cannot create invalid API paths and the project list can be retried',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const invalid=[];page.on('request',request=>{if(/\/api\/projects\/(?:NaN|null|undefined|0)\//.test(request.url()))invalid.push(request.url())});
+    await page.route('**/api/projects',route=>route.fulfill({json:[{id:'not-a-number',name:'合成坏项目',role:'owner'}]}));
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    assert.equal(await page.locator('#project option').count(),0);assert.deepEqual(invalid,[]);
+    assert.equal(await page.evaluate(()=>projectId),null);assert.equal(await page.locator('#sourceForm button').isDisabled(),true);
+    await page.unroute('**/api/projects');await page.locator('#refreshWorkspace').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator('#project').inputValue(),'1');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('bad bootstrap receipts keep writes unavailable and drafts intact until a valid role and trust receipt',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let receipt={};await page.route('**/api/projects/1/data?*',route=>route.fulfill({json:receipt}));
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    await page.locator('#proposal [name=value]').fill('坏回执期间保留的候选草稿');
+    await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('坏回执期间保留的来源草稿');
+    for(const value of [null,[],{}, {role:'owner'}, {sourceTextIsUntrusted:true}, {role:'admin',sourceTextIsUntrusted:true}, {role:'owner',sourceTextIsUntrusted:false}, {role:'owner',sourceTextIsUntrusted:'true'}]){
+      receipt=value;await page.evaluate(()=>load());
+      assert.equal(await page.evaluate(()=>data),null);assert.match(await page.locator('#notice').textContent(),/工作台响应格式异常/);
+      for(const selector of ['#proposal button','#sourceForm button','#stale','#injection'])assert.equal(await page.locator(selector).isDisabled(),true);
+      assert.equal(await page.locator('#proposal [name=value]').inputValue(),'坏回执期间保留的候选草稿');
+      assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'坏回执期间保留的来源草稿');
+      assert.equal(await page.locator('#sourceSelect').inputValue(),'1','independently valid source pages remain readable');
+    }
+    receipt={sourceTextIsUntrusted:true,role:'owner',additiveMetadata:{ignored:'not rendered or retained'}};
+    await page.locator('#refreshWorkspace').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.deepEqual(await page.evaluate(()=>data),{role:'owner',sourceTextIsUntrusted:true});assert.equal(await page.locator('#notice').textContent(),'');
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),'坏回执期间保留的候选草稿');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('project receipts reject invalid shapes and identities while allowing actual unconstrained names',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let receipt={};const invalidPaths=[];
+    page.on('request',request=>{if(/\/api\/projects\/(?:NaN|null|undefined|0|-1)\//.test(request.url()))invalidPaths.push(request.url())});
+    await page.route('**/api/projects',route=>route.fulfill({json:receipt}));
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    const valid={id:1,name:'合成项目',role:'owner'};
+    for(const value of [null,{},[null],[{}],[{...valid,id:0}],[{...valid,id:1.5}],[{...valid,id:'1'}],[{...valid,id:2147483648}],[{...valid,role:'admin'}],[{...valid,name:null}],[valid,{...valid,name:'重复编号'}]]){
+      receipt=value;await page.evaluate(()=>loadProjects());
+      assert.equal(await page.evaluate(()=>projectId),null);assert.equal(await page.locator('#project option').count(),0);
+      assert.equal(await page.locator('#sourceSelect option').count(),0);assert.match(await page.locator('#notice').textContent(),/项目列表响应格式异常/);
+      assert.equal(await page.locator('#sourceForm button').isDisabled(),true);
+    }
+    receipt=[{id:1,name:'',role:'owner',unused:'ignored'},{id:2,name:'长'.repeat(300),role:'member'}];
+    await page.locator('#refreshWorkspace').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.deepEqual(await page.locator('#project option').allTextContents(),[' · owner','长'.repeat(300)+' · member']);
+    assert.equal(await page.locator('#project').inputValue(),'1');assert.deepEqual(invalidPaths,[]);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a malformed bootstrap cannot masquerade as recovery from a prior workspace failure',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let phase=0;
+    await page.route('**/api/projects/1/data?*',async route=>{
+      if(phase===0)await route.fulfill({status:503,json:{error:'合成初次工作台故障'}});
+      else if(phase===1)await route.fulfill({json:{}});else await route.fallback();
+    });
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    assert.match(await page.locator('#notice').textContent(),/503 合成初次工作台故障/);
+    phase=1;await page.evaluate(()=>load());
+    assert.match(await page.locator('#notice').textContent(),/工作台加载失败.*工作台响应格式异常/);
+    assert.equal(await page.evaluate(()=>data),null);assert.equal(await page.locator('#sourceForm button').isDisabled(),true);
+    phase=2;await page.locator('#refreshWorkspace').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator('#notice').textContent(),'');assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
