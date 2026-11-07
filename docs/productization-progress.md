@@ -69,9 +69,26 @@ df320d8完整远端[CI成功](https://github.com/chuali-zi/memz/actions/runs/423
 - 9954da4：MCP显式 `MEMZ_MCP_ENABLE_LABEL_CONTEXT=1` 增加question-only工具，固定项目/身份/protocol，默认清单及顺序兼容；大标签metadata仅内部使用，输出最多32768，超预算不截断/不断stdio。SDK合同35、隔离PG6通过，业务digest未变。
 - c3d7587：真实PG提交后才触发SDK取消，7次有界HTTP确认注销、BUSY释放、同进程同键重放同pending ID，无重复记录或自动审批；Node22单项1/1，随机库与进程/socket清理确认。
 
-最新完整远端成功检查点：[c3d7587 CI](https://github.com/chuali-zi/memz/actions/runs/42394780746)。同一干净提交在Node22.23.4本云验证core314/314、migrations9/9与完整真实PG UI通过，分别在验证工作树 `artifacts/system/run-1794071294367-8c5225f2`、`artifacts/ui/run-1794071294846-4b1fc9f2`。同提交实际SQL计划报告已按原字节保存在 `evaluation/evidence/exact-reader-plans-2026-11-07/`，115889字节报告及README的SHA256均核对通过；报告保留source clean状态、原始计划、数据hash、并行/热状态限制与随机库删除确认。这些是真实服务/数据库上的合成工程回归，不是新增模型或LoCoMo实验。
+该阶段完整远端成功检查点：[c3d7587 CI](https://github.com/chuali-zi/memz/actions/runs/42394780746)。同一干净提交在Node22.23.4本云验证core314/314、migrations9/9与完整真实PG UI通过，分别在验证工作树 `artifacts/system/run-1794071294367-8c5225f2`、`artifacts/ui/run-1794071294846-4b1fc9f2`。同提交实际SQL计划报告已按原字节保存在 `evaluation/evidence/exact-reader-plans-2026-11-07/`，115889字节报告及README的SHA256均核对通过；报告保留source clean状态、原始计划、数据hash、并行/热状态限制与随机库删除确认。这些是真实服务/数据库上的合成工程回归，不是新增模型或LoCoMo实验。
 
-当前继续推进未完成数据库checkout申请的固定容量保护、浏览器完整响应的1MiB资源与严格UTF-8边界；只读审查与合成/真实服务回归继续进行。未提交/未推送阶段以git状态和各文件测试记录为准，不把工作树改动称为远端交付。继续夜间窗口内的实质工作，遵守用户后续停止/变更指令。
+## 2026-11-07 18:41 UTC 检查点
+
+- c0ab6ba：浏览器完整响应限制1MiB并严格校验UTF-8，总期限包含body；异常创建保留原幂等键，已知失败不被清理错误覆盖。产品浏览器76项通过；固定提交在本云使用独立容器完成真实数据库停启恢复。
+- 14e8875：每个池最多32个未完成checkout交接，包含握手及promise交接窗口；满额在connect/BEGIN前返回503/Retry-After1，成功和失败均释放预约。原10个连接上限保留；这是固定准入边界，不是吞吐或延迟保证。
+- f29e186：HTTP聚合读取在同一快照中先检查行数、字段和总字节，再读取正文；最多512行（audit100）、原始与投影各4MiB，超限整体422并提示分页，不截断。内部评测全量baseline保留。纯单元26及隔离PG9项通过。
+- 2a0bd13：context-process回归改用独占随机库和角色，保留11项原断言，避免外部审批影响两次独立读取；有界子进程和清理均验证。历史[4dfbf84 CI](https://github.com/chuali-zi/memz/actions/runs/42395288504)为core313/314、迁移9/9，已知失败标题属于该套件，但原始TAP未取得，不能断言该历史失败已确切归因。共享数据库竞态已独立复现；隔离后该套件及后续完整CI通过。
+- 74bbf10：登录/注销回执先验证后提交界面状态；保留原opaque CSRF、不写DOM或storage；注销单次在途，坏回执保留草稿。产品浏览器82项通过。本云干净Node22提交core338/338、迁移9/9与真实PG UI通过，验证工作树目录为 `artifacts/system/run-1794073705701-cf924380` 与 `artifacts/ui/run-1794073706206-e9254c1e`。
+- 7934b7d：MCP配置生成器显式 `--label-context`，默认输出兼容，始终关闭提议工具；9项回归通过，包括官方SDK的真实stdio子进程，不代表已安装或验证真实桌面宿主。
+- d974917：v2问句上限210，支持两个各100字符标签及完整连接词；v1仍为200。联合90项及隔离PG7项通过；211字符拒绝且零HTTP，gold未被读取。
+- 755a8ac：SQL计划捕获移除两层异步转发造成的错误交接窗口，使用native callback及短错误桥；30项离线回归通过，旧原始证据hash不改，后续CI真实SQL计划继续通过。
+- e8c65f4：页头及长名称/提示的实际换行，320/360/768/1280四种宽度真实Chromium回归通过，完整文本保留，无隐藏溢出来掩盖内容。
+- e579134：[本机health探针](health-probes.md)复用现有池及事务准入；liveness不访问数据库，readiness只读单条catalog检查。GET/HEAD及条件请求实时固定响应，沿用本机Host和停机gate，不创建会话、不输出配置或原始错误。诊断共享目录检查，覆盖角色、RLS、表/列/类型、迁移和名称解析基本前提；并非业务或生产安全认证。
+
+最新完整远端成功检查点为[e579134 CI](https://github.com/chuali-zi/memz/actions/runs/42401374090)：core386/386、migrations9/9、产品UI82/82、响应式4/4、真实服务合成memory adapter12/12；query plans、exact-reader plans、真实数据库停启恢复、完整PG UI与材料包步骤均成功。系统原始报告目录 `artifacts/system/run-1794076115123-f1450b1d`、UI目录 `artifacts/ui/run-1794076246936-99053ab4` 是该远端CI归档内路径，不能当成本机已下载文件。Python准备任务也成功。后续工作树改动与新提交另行记录，不将局部验证代替完整CI。
+
+数据阻碍仍独立存在：本轮以最新Library搜索完整结果和当前官方helper做一次有界下载，失败于 `hosted_apps_tools_list / network_failure`，尚未进入materialization，消费端没有取得归档或部分字节。状态为网络原因待恢复/待确定，不是权限拒绝或保险库配置失败；未绕过其他网络限制、未换执行器或连续盲试。未进行SHA256、tar成员及LoCoMo数据校验，未新增模型请求。仅脱敏状态保存在工作区 `/workspace/library-diagnostics/benchmark-prep-library-7263m5rz/status.json`。GLM保险库条目及覆盖范围已由用户证据确认；当前任务不能据此推断请求名称、发布或运行时注入，未要求用户重复核对已确认设置。
+
+下一轮正在落实DeepSeek实验入口与已有SpendGuard的一致性，包括严格执行标志、调用前累计预算、异常usage和响应凭据回显防护；真实价格/tokenizer未核实时继续fail closed。这些开发和模拟验证不改写2026-11-06已有351次真实请求的历史证据，也不新增外部模型调用。夜间窗口继续进行。
 
 ## 技术栈决定与主要缺口
 

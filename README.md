@@ -8,7 +8,7 @@
 
 [可复现对照](docs/demo-script.md#同一输入的对照阅读)在同一合成流程中展示“最后收到的提议”与实际批准事实：前者最终为30号，后者仍为15号v2。对照是明确定义的简易读取规则，不是其他聊天系统或模型的效果评测。运行后的表格含本次真实候选、版本和来源ID。
 
-工程化迭代与下一阶段验收见[产品化推进记录](docs/productization-progress.md)。启动前可先做[离线 Compose 配置检查](docs/compose-safety.md)，会话容量与数据库故障边界见[运行可靠性](docs/runtime-reliability.md)。
+工程化迭代与下一阶段验收见[产品化推进记录](docs/productization-progress.md)。启动前可先做[离线 Compose 配置检查](docs/compose-safety.md)，运行时可观察[本机存活与基本就绪探针](docs/health-probes.md)；会话容量与数据库故障边界见[运行可靠性](docs/runtime-reliability.md)。
 
 ## 启动
 
@@ -128,7 +128,7 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 本机智能体可使用 [MCP stdio 兼容适配](docs/mcp-local.md)：固定项目、默认只读，显式开启后可提交待审；支持 2025-11-25 握手，不提供审批工具。
 
-宿主配置可用 `node scripts/mcp-config.js --host claude-desktop` 或 `--host vscode` 生成，只输出待审阅 JSON，不修改用户设置。
+宿主配置可用 `node scripts/mcp-config.js --host claude-desktop` 或 `--host vscode` 生成，只输出待审阅 JSON，不修改用户设置。可用[显式字段问句配置](docs/mcp-config-label-context.md)加入 `--label-context`，提议工具仍关闭。
 
 只读上下文客户端可用 `MEMZ_SEARCH_MODE=all_terms MEMZ_QUERY="截止日 项目" npm run --silent demo:context` 启用无序多关键词查询；查询至少含一个、至多八个不同字面片段。默认仍为整段 `substring`，页面和 MCP 继续使用默认模式。规则、回执验证和并发分页边界见[多关键词检索说明](docs/lexical-retrieval.md)。
 
