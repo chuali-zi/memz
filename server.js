@@ -113,6 +113,7 @@ function provenanceRecord(row,access,{sourceReference=false}={}){
 }
 // Read-only POST: explicit version pairs avoid URL limits, but retain session CSRF checks.
 app.post('/api/projects/:p/facts/provenance',requireJsonObject,route(async(req,res)=>{
+  req.readOnly=true;
   const p=num(req.params.p),refs=req.body.facts;
   if(Object.keys(req.body).some(key=>key!=='facts')||!Array.isArray(refs)||refs.length<1||refs.length>25)throw fail(400,'依据批次必须包含 1 到 25 个版本引用');
   const seen=new Set();
