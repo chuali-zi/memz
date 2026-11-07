@@ -65,6 +65,8 @@ HTTP静态资源固定取自应用自身的 `public/`，不随启动工作目录
 
 成功监听后的HTTP server error进入同一个有界排空流程并退出1，固定诊断不含原始异常。重复error或信号只触发一次pool关闭；不会把运行时错误误当启动失败而留下已结束连接池的活监听器。
 
+单个HTTP请求若在headers已发出后失败，错误处理中止本响应及其连接，不追加第二份JSON，也不把原异常交给Express默认logger；既有服务端错误日志只记录安全错误码。headers前保持原JSON错误合同。已经发送的字节无法收回，客户端应把中断视为不完整响应，不能据此断言写入未发生或SQL已回滚；其他连接仍可继续服务。`node --test test/post-headers-error.test.js` 只在独立CLI子进程对合成路径预加载故障，验证development/production均无原异常回显、部分连接关闭、正常500回执与后续存活探针可用；无生产故障接口、数据库或模型调用。
+
 期限依赖事件循环可运行，不能抢占同步死循环；外部进程监督仍需要自己的最终停止期限。卡住handler、卡住pool.end和真实PG锁等待已分别设计合成回归，不把连接排空称为任意故障下无数据损失保证。
 
 直接Node子进程的正向回归见 `node --test test/server-shutdown.test.js test/startup-validation.test.js`：信号测试通过与CLI相同的生命周期模块覆盖在途HTTP完成、重复信号、连接门禁及实际20秒期限；启动校验直接执行 `server.js`。它们不把npm包装进程当作应用，也不验证任何实际supervisor配置。
