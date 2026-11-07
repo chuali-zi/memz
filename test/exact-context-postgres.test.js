@@ -5,6 +5,8 @@ const {randomBytes}=require('node:crypto');
 const {Client}=require('pg');
 const {validateCurrentLabels,validateExactContext}=require('../scripts/exact-context-protocol');
 const {validateSnapshot}=require('../scripts/context-snapshot');
+const {readLabelContext}=require('../scripts/label-context');
+const {spawn}=require('node:child_process');
 const name='memz_exact_context_'+randomBytes(8).toString('hex');
 let admin,owner,service,server,created=false,base,accounts,fixture256,fixture512,fixture513;
 async function request(path,{auth=accounts.viewer,body,method=body===undefined?'GET':'POST'}={}){
@@ -170,4 +172,87 @@ test('invalid metadata labels are rejected whole and never truncated into a vali
 test('legacy snapshot headers and payloads remain valid after sharing evidence assembly',async()=>{
   const response=await request(`/api/projects/${fixture256.projectId}/context?q=&limit=25`);assert.equal(response.status,200);
   validateSnapshot(response.data,{projectId:fixture256.projectId,query:'',limit:25,after:0,search:null});assert.equal(response.data.facts.length,25);assert.equal(response.data.next_after,response.data.facts.at(-1).id);assert.equal(Object.hasOwn(response.data,'selector'),false);
+});
+function recordedFetch(){
+  const paths=[];
+  return {paths,fetchImpl:async(url,options)=>{paths.push(new URL(url).pathname);return fetch(url,options)}};
+}
+function v2Options(fixture,question,extra={}){return {baseURL:base,projectId:fixture.projectId,question,protocol:'metadata_exact_v2',...extra}}
+test('opt-in v2 client reads real complete 256/512 projects in four requests while default v1 still refuses the scope',async()=>{
+  for(const fixture of [fixture256,fixture512]){
+    const selector=fixture.labels.at(-1),question=selector.subject+'的'+selector.predicate+'是什么？',f=recordedFetch();
+    const result=await readLabelContext(v2Options(fixture,question,{fetchImpl:f.fetchImpl}));
+    assert.equal(result.status,'matched');assert.equal(result.schema,'memz-label-context-v2');assert.equal(result.execution.modelCalls,0);assert.deepEqual(result.context.selector,selector);
+    validateExactContext(result.context,{projectId:fixture.projectId,selector});assert.equal(result.context.sources[0].content,fixture.content);assert.equal(result.context.provenance.length,1);assert.equal(f.paths.length,4);
+    assert.deepEqual(f.paths,['/api/login',`/api/projects/${fixture.projectId}/current-labels`,`/api/projects/${fixture.projectId}/context/exact`,'/api/logout']);
+  }
+  const old=await readLabelContext({baseURL:base,projectId:fixture256.projectId,question:fixture256.subject+'的字段255是什么？'});
+  assert.equal(old.schema,'memz-label-context-v1');assert.equal(old.status,'needs_scope');assert.equal(old.reason,'SCOPE_TOO_LARGE');
+  const f=recordedFetch(),overflow=await readLabelContext(v2Options(fixture513,fixture513.subject+'的字段0是什么？',{fetchImpl:f.fetchImpl}));
+  assert.equal(overflow.status,'needs_scope');assert.equal(overflow.reason,'SCOPE_TOO_LARGE');assert.equal(overflow.context,undefined);assert.equal(f.paths.length,3);
+});
+test('v2 client does not cross scopes or bypass project permission revoked between its two real reads',async()=>{
+  const scoped=recordedFetch(),otherQuestion=fixture512.subject+'的字段0是什么？';
+  const unknown=await readLabelContext(v2Options(fixture256,otherQuestion,{fetchImpl:scoped.fetchImpl}));assert.equal(unknown.status,'needs_scope');assert.equal(unknown.context,undefined);assert.equal(scoped.paths.length,3);
+  await assert.rejects(()=>readLabelContext(v2Options(fixture256,fixture256.subject+'的字段0是什么？',{username:'other',password:'demo-other'})),{code:'HTTP_403'});
+  const fixture=await seed(1,'中途撤权'),selector=fixture.labels[0],paths=[];let revoked=false;
+  try{
+    await assert.rejects(()=>readLabelContext(v2Options(fixture,selector.subject+'的字段0是什么？',{fetchImpl:async(url,options)=>{
+      const path=new URL(url).pathname;paths.push(path);const response=await fetch(url,options);
+      if(path.endsWith('/current-labels')&&!revoked){await response.clone().json();revoked=true;await owner.query('DELETE FROM memberships WHERE project_id=$1 AND user_id=3',[fixture.projectId])}
+      return response;
+    }})),error=>error.code==='HTTP_403'&&error.status===403&&error.message==='HTTP_403'&&error.context===undefined);
+    assert.equal(revoked,true);assert.equal(paths.length,4);assert.equal(paths.at(-1),'/api/logout');
+  }finally{await owner.query("INSERT INTO memberships(project_id,user_id,role) VALUES($1,3,'viewer') ON CONFLICT DO NOTHING",[fixture.projectId])}
+});
+test('v2 reads a newly approved version after metadata without pretending both real reads share a snapshot',async()=>{
+  const fixture=await seed(1,'客户端新批准'),selector=fixture.labels[0],newSource=await request(`/api/projects/${fixture.projectId}/sources`,{auth:accounts.owner,body:{title:'第二次读取的新依据',content:'新版本完整原文😀\n只能引用此来源。'}});
+  const candidate=await request(`/api/projects/${fixture.projectId}/candidates`,{auth:accounts.owner,body:{...selector,value:'新批准值',source_id:newSource.data.id,expected_version:1}});
+  let changed=false;
+  const result=await readLabelContext(v2Options(fixture,selector.subject+'的字段0是什么？',{fetchImpl:async(url,options)=>{
+    const response=await fetch(url,options);
+    if(new URL(url).pathname.endsWith('/current-labels')&&!changed){await response.clone().json();changed=true;assert.equal((await request(`/api/projects/${fixture.projectId}/candidates/${candidate.data.id}/approve`,{auth:accounts.owner,body:{}})).status,200)}
+    return response;
+  }}));
+  assert.equal(changed,true);assert.equal(result.status,'matched');assert.equal(result.context.facts[0].version,2);assert.equal(result.context.facts[0].value,'新批准值');assert.equal(result.context.sources[0].content,'新版本完整原文😀\n只能引用此来源。');assert.match(result.consistency,/separate/);
+});
+test('v2 client rejects a tampered selector in a real PostgreSQL response and still logs out',async()=>{
+  const selector=fixture256.labels[0],paths=[];
+  await assert.rejects(()=>readLabelContext(v2Options(fixture256,selector.subject+'的字段0是什么？',{fetchImpl:async(url,options)=>{
+    const path=new URL(url).pathname;paths.push(path);const response=await fetch(url,options);
+    if(path.endsWith('/context/exact')){const wire=await response.json();wire.selector.predicate='synthetic-private-mismatch';return Response.json(wire)}
+    return response;
+  }})),error=>error.code==='INVALID_EXACT_CONTEXT_RESPONSE'&&error.message==='INVALID_EXACT_CONTEXT_RESPONSE'&&!Object.hasOwn(error,'context'));
+  assert.equal(paths.length,4);assert.equal(paths.at(-1),'/api/logout');
+});
+test('v2 deadline aborts an actual HTTP request blocked by a real PostgreSQL lock',async()=>{
+  const fixture=await seed(1,'真实期限探针');let closed=false,entered=false,pid,lockObserved=false;
+  const observe=(req,res)=>{if(req.url===`/api/projects/${fixture.projectId}/current-labels`){entered=true;res.once('close',()=>{closed=true})}};
+  const restore=intercept(async query=>{
+    if(typeof query.sql==='string'&&query.sql.includes('octet_length(subject)')&&query.parameters[1]?.[0]===fixture.projectId)pid=query.client.processID;
+    return query.run();
+  });
+  server.on('request',observe);await owner.query('BEGIN');await owner.query('LOCK TABLE facts IN ACCESS EXCLUSIVE MODE');
+  try{
+    const rejection=assert.rejects(readLabelContext(v2Options(fixture,fixture.subject+'的字段0是什么？',{timeoutMs:5000,totalTimeoutMs:2000})),{code:'TOTAL_TIMEOUT'});
+    const observationDeadline=Date.now()+1800;
+    while(!lockObserved&&Date.now()<observationDeadline){
+      await owner.query('SELECT pg_stat_clear_snapshot()');
+      const observed=await owner.query("SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1 AND datname=current_database()",[pid||0]);
+      lockObserved=entered&&observed.rows[0]?.wait_event_type==='Lock';
+      if(!lockObserved)await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    await rejection;
+    assert.equal(entered,true,'metadata must actually reach the server before its deadline');assert.equal(lockObserved,true,'the real backend must be observed waiting on this fixture lock');
+    const until=Date.now()+2000;while(!closed&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,10));assert.equal(closed,true,'the client must close the HTTP transport instead of merely abandoning its promise');
+  }finally{await owner.query('ROLLBACK');restore();server.removeListener('request',observe)}
+  assert.equal((await service.tx(3,client=>client.query('SELECT 1 AS value'))).rows[0].value,1);
+});
+test('the explicit v2 stdin CLI reads a real 512-label project with full provenance and no implicit v1 fallback',async()=>{
+  const selector=fixture512.labels.at(-1),question=selector.subject+'的'+selector.predicate+'是什么？';
+  const child=spawn(process.execPath,['scripts/label-context.js','--stdin'],{cwd:require('node:path').resolve(__dirname,'..'),env:{...process.env,MEMZ_BASE_URL:base,MEMZ_USERNAME:'viewer',MEMZ_PASSWORD:'demo-viewer',MEMZ_LABEL_PROTOCOL:'snapshot_filter_v1'},stdio:['pipe','pipe','pipe']});
+  let stdout='',stderr='';child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.stdin.on('error',()=>{});
+  const timer=setTimeout(()=>child.kill('SIGKILL'),10000);child.stdin.end(JSON.stringify({projectId:fixture512.projectId,question,protocol:'metadata_exact_v2'}));
+  const code=await new Promise(resolve=>child.once('close',resolve));clearTimeout(timer);
+  assert.equal(code,0);assert.equal(stderr,'');const result=JSON.parse(stdout);assert.equal(result.schema,'memz-label-context-v2');assert.equal(result.status,'matched');assert.equal(result.context.provenance.length,1);assert.equal(result.context.sources[0].content,fixture512.content);assert.equal(result.execution.modelCalls,0);assert.ok(!stdout.includes('sid='));assert.ok(!stdout.includes('demo-viewer'));
 });

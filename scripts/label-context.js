@@ -1,21 +1,24 @@
 // Explicit bounded current-view template reader. No model calls or fallback.
 const {readContext}=require('./context-client');
 const {planLabelQuery,PLANNER_MODE,MAX_LABEL_ROWS}=require('./label-query-plan');
+const {planExactLabelQuery,EXACT_PLANNER_MODE}=require('./label-query-plan-v2');
+const {validateCurrentLabels,validateExactContext}=require('./exact-context-protocol');
+const {withReadSession}=require('./read-session');
 const failure=code=>Object.assign(new Error(code),{code});
 const check=(condition,code)=>{if(!condition)throw failure(code)};
 const serialize=value=>JSON.stringify(value,null,2)+'\n';
 const positive=value=>Number.isInteger(value)&&value>0&&value<=2147483647;
 const within=(value,max)=>Number.isInteger(value)&&value>=1&&value<=max;
 const text=(value,max)=>typeof value==='string'&&value.length>=1&&value.length<=max&&value.isWellFormed()&&!value.includes('\u0000');
-const moduleKeys=['baseURL','username','password','projectId','question','timeoutMs','totalTimeoutMs','maxResponseBytes','maxOutputBytes','fetchImpl'];
-const stdinKeys=['projectId','question','timeoutMs','totalTimeoutMs','maxResponseBytes','maxOutputBytes'];
+const moduleKeys=['baseURL','username','password','projectId','question','protocol','timeoutMs','totalTimeoutMs','maxResponseBytes','maxOutputBytes','fetchImpl'];
+const stdinKeys=['projectId','question','protocol','timeoutMs','totalTimeoutMs','maxResponseBytes','maxOutputBytes'];
 function allowedObject(value,keys){
   return !!value&&typeof value==='object'&&!Array.isArray(value)&&[Object.prototype,null].includes(Object.getPrototypeOf(value))&&Reflect.ownKeys(value).every(key=>keys.includes(key));
 }
 
 async function readLabelContext(options={}){
   check(allowedObject(options,moduleKeys),'INVALID_LABEL_CONTEXT_INPUT');
-  const {baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId,question,
+  const {baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId,question,protocol='snapshot_filter_v1',
     timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes=1048576,fetchImpl=fetch}=options;
   check(text(baseURL,2048)&&!/[\u0000-\u0020\u007f]/u.test(baseURL),'INVALID_BASE_URL');
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
@@ -23,6 +26,7 @@ async function readLabelContext(options={}){
   check(positive(projectId),'INVALID_PROJECT');
   // Validate question before login, without supplying evidence or selecting a label.
   planLabelQuery({question,labels:[]});
+  check(['snapshot_filter_v1','metadata_exact_v2'].includes(protocol),'INVALID_LABEL_PROTOCOL');
   check(text(username,100)&&text(password,8192),'INVALID_CREDENTIALS');
   check(within(timeoutMs,60000),'INVALID_TIMEOUT');check(within(totalTimeoutMs,60000),'INVALID_TOTAL_TIMEOUT');
   check(within(maxResponseBytes,1048576),'INVALID_RESPONSE_LIMIT');check(within(maxOutputBytes,4194304),'INVALID_OUTPUT_BUDGET');
@@ -52,9 +56,10 @@ async function readLabelContext(options={}){
     }finally{stages.push({stage,elapsedMs:elapsed(phaseStarted)})}
   }
   function result(status,plan,{reason,context,selection}={}){
-    const value={schema:'memz-label-context-v1',projectId,question,sourceTextIsUntrusted:true,status,
+    const exact=protocol==='metadata_exact_v2';
+    const value={schema:exact?'memz-label-context-v2':'memz-label-context-v1',...(exact?{protocol}:{}),projectId,question,sourceTextIsUntrusted:true,status,
       ...(reason?{reason}:{}),plan,
-      consistency:'Planning labels and selected facts use separate current-page snapshots; no shared view across phases. Returned revisions and full sources are pinned to the retrieval snapshot, not necessarily current at completion.',
+      consistency:exact?'Planning metadata and exact evidence use separate read-only repeatable-read transactions in one authenticated session; no shared or frozen view across reads. Returned revisions and full sources are pinned to the exact retrieval snapshot, not necessarily current or still authorized at completion.':'Planning labels and selected facts use separate current-page snapshots; no shared view across phases. Returned revisions and full sources are pinned to the retrieval snapshot, not necessarily current at completion.',
       execution:{modelCalls:0,stages,totalElapsedMs:elapsed(started)},
       ...(selection?{selection}:{}),
       ...(context?{context}:{})};
@@ -62,7 +67,30 @@ async function readLabelContext(options={}){
     check(Date.now()<deadline&&!controller.signal.aborted,'TOTAL_TIMEOUT');
     return value;
   }
+  async function metadataExact(){
+    const remaining=deadline-Date.now();check(remaining>0&&!controller.signal.aborted,'TOTAL_TIMEOUT');
+    const phaseStarted=performance.now();let draft;
+    try{
+      draft=await withReadSession({base,username,password,timeoutMs,totalTimeoutMs:remaining,maxResponseBytes,fetchImpl,signal:controller.signal},async request=>{
+        const metadata=await request(`/api/projects/${projectId}/current-labels`);
+        validateCurrentLabels(metadata,{projectId});
+        if(!metadata.complete){
+          const plan={schemaVersion:1,mode:EXACT_PLANNER_MODE,view:'current',status:'needs_scope',reason:'SCOPE_TOO_LARGE'};
+          return {status:plan.status,reason:plan.reason,plan};
+        }
+        const plan=planExactLabelQuery({question,labels:metadata.labels.map(({subject,predicate})=>({subject,predicate}))});
+        if(plan.status!=='planned')return {status:plan.status,reason:plan.reason,plan};
+        const context=await request(`/api/projects/${projectId}/context/exact`,{body:{selector:plan.selector}});
+        validateExactContext(context,{projectId,selector:plan.selector});
+        const selection={method:'exact_subject_predicate',applied:true,candidateFacts:context.facts.length,retainedFacts:context.facts.length,candidateSources:context.sources.length,retainedSources:context.sources.length};
+        if(context.facts.length===0)return {status:'no_match',reason:'LABEL_NOT_FOUND_NOW',plan,selection};
+        return {status:'matched',plan,context,selection};
+      });
+    }finally{stages.push({stage:'metadata_exact_session',elapsedMs:elapsed(phaseStarted)})}
+    return result(draft.status,draft.plan,draft);
+  }
   try{
+    if(protocol==='metadata_exact_v2')return await metadataExact();
     const scope=await snapshot('','substring','scope_snapshot');
     if(scope.truncated||scope.nextAfter!==null){
       const plan={schemaVersion:1,mode:PLANNER_MODE,view:'current',status:'needs_scope',reason:'SCOPE_TOO_LARGE'};
@@ -116,11 +144,11 @@ async function stdinRequest(){
 async function main(){
   check(process.argv.length===2||(process.argv.length===3&&process.argv[2]==='--stdin'),'INVALID_ARGUMENTS');
   const input=process.argv[2]==='--stdin'?await stdinRequest():{};
-  const config={baseURL:process.env.MEMZ_BASE_URL||'http://127.0.0.1:3000',username:process.env.MEMZ_USERNAME||'viewer',password:process.env.MEMZ_PASSWORD||'demo-viewer',question:process.env.MEMZ_QUESTION};
+  const config={baseURL:process.env.MEMZ_BASE_URL||'http://127.0.0.1:3000',username:process.env.MEMZ_USERNAME||'viewer',password:process.env.MEMZ_PASSWORD||'demo-viewer',question:process.env.MEMZ_QUESTION,...(process.env.MEMZ_LABEL_PROTOCOL===undefined?{}:{protocol:process.env.MEMZ_LABEL_PROTOCOL})};
   for(const [env,key] of [['MEMZ_PROJECT_ID','projectId'],['MEMZ_TIMEOUT_MS','timeoutMs'],['MEMZ_TOTAL_TIMEOUT_MS','totalTimeoutMs'],['MEMZ_MAX_RESPONSE_BYTES','maxResponseBytes'],['MEMZ_MAX_OUTPUT_BYTES','maxOutputBytes']])if(process.env[env]!==undefined)config[key]=Number(process.env[env]);
   process.stdout.write(serialize(await readLabelContext({...config,...input})));
 }
-const publicCodes=new Set(['INVALID_LABEL_CONTEXT_INPUT','INVALID_BASE_URL','INVALID_PROJECT','INVALID_PLANNER_QUESTION','INVALID_PLANNER_LABEL','INVALID_PLANNER_INPUT','INVALID_CREDENTIALS','INVALID_TIMEOUT','INVALID_TOTAL_TIMEOUT','INVALID_RESPONSE_LIMIT','INVALID_OUTPUT_BUDGET','INVALID_FETCH','INVALID_STDIN_JSON','INVALID_STDIN_REQUEST','INVALID_ARGUMENTS','INPUT_TIMEOUT','INPUT_TOO_LARGE','INPUT_FAILED','OUTPUT_BUDGET_TOO_SMALL','TOTAL_TIMEOUT','REQUEST_TIMEOUT','REQUEST_FAILED','RESPONSE_TOO_LARGE','INVALID_JSON_RESPONSE','INVALID_LOGIN_RESPONSE','INVALID_SNAPSHOT_RESPONSE','INVALID_FACTS_RESPONSE','INVALID_SEARCH_RESPONSE','INVALID_CURSOR_RESPONSE','INVALID_FACT_RESPONSE','PROVENANCE_MISMATCH','INVALID_PROVENANCE_RESPONSE','SOURCE_MISMATCH','AMBIGUOUS_CONTEXT_LABEL']);
+const publicCodes=new Set(['INVALID_LABEL_CONTEXT_INPUT','INVALID_LABEL_PROTOCOL','INVALID_CURRENT_LABELS_RESPONSE','INVALID_EXACT_CONTEXT_RESPONSE','INVALID_EXACT_SELECTOR','INVALID_BASE_URL','INVALID_PROJECT','INVALID_PLANNER_QUESTION','INVALID_PLANNER_LABEL','INVALID_PLANNER_INPUT','INVALID_CREDENTIALS','INVALID_TIMEOUT','INVALID_TOTAL_TIMEOUT','INVALID_RESPONSE_LIMIT','INVALID_OUTPUT_BUDGET','INVALID_FETCH','INVALID_STDIN_JSON','INVALID_STDIN_REQUEST','INVALID_ARGUMENTS','INPUT_TIMEOUT','INPUT_TOO_LARGE','INPUT_FAILED','OUTPUT_BUDGET_TOO_SMALL','TOTAL_TIMEOUT','REQUEST_TIMEOUT','REQUEST_FAILED','RESPONSE_TOO_LARGE','INVALID_JSON_RESPONSE','INVALID_LOGIN_RESPONSE','INVALID_SNAPSHOT_RESPONSE','INVALID_FACTS_RESPONSE','INVALID_SEARCH_RESPONSE','INVALID_CURSOR_RESPONSE','INVALID_FACT_RESPONSE','PROVENANCE_MISMATCH','INVALID_PROVENANCE_RESPONSE','SOURCE_MISMATCH','AMBIGUOUS_CONTEXT_LABEL']);
 if(require.main===module)main().catch(error=>{
   const code=publicCodes.has(error?.code)||/^HTTP_[1-5][0-9]{2}$/.test(error?.code||'')?error.code:'READ_FAILED';
   console.error('Label context failed: '+code);process.exitCode=1;

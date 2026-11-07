@@ -1,6 +1,7 @@
 // Read-only synthetic-demo client. No model calls and no external dependencies.
 const {parseSearchQuery,matchesSearchMetadata}=require('./search-query');
 const {SNAPSHOT_DESCRIPTION,snapshotReceipt,validateSnapshot}=require('./context-snapshot');
+const {withReadSession}=require('./read-session');
 function failure(code,status){return Object.assign(new Error(code),{code,...(status===undefined?{}:{status})})}
 function requireValue(condition,code){if(!condition)throw failure(code)}
 const serializeContext=value=>JSON.stringify(value,null,2)+'\n';
@@ -19,46 +20,8 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
   requireValue(provenanceMode!=='snapshot'||limit<=25,'INVALID_SNAPSHOT_LIMIT');
   requireValue(['inline','deduplicated'].includes(sourceMode),'INVALID_SOURCE_MODE');
   const search=parseSearchQuery(query,searchMode);
-  const deadline=Date.now()+totalTimeoutMs;
-  let cookie='',csrf='',result,problem;
-  async function request(path,{body,logout=false}={}){
-    const remaining=logout?Math.min(timeoutMs,5000):Math.min(timeoutMs,deadline-Date.now());
-    if(remaining<=0)throw failure('TOTAL_TIMEOUT');
-    let response;
-    try{response=await fetchImpl(new URL(path,base),{method:body===undefined?'GET':'POST',redirect:'error',signal:AbortSignal.timeout(remaining),headers:{...(cookie?{cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':csrf})},...(body===undefined?{}:{body:JSON.stringify(body)})})}
-    catch(error){throw failure(['AbortError','TimeoutError'].includes(error.name)?'REQUEST_TIMEOUT':'REQUEST_FAILED')}
-    if(logout&&response.status===401){
-      // Already logged out is acceptable, but its unused body may never end.
-      // Cancel it explicitly rather than retain an open response until timeout.
-      try{await response.body?.cancel()}
-      catch(error){throw failure(['AbortError','TimeoutError'].includes(error.name)?'REQUEST_TIMEOUT':'REQUEST_FAILED')}
-      return null;
-    }
-    if(!response.ok)throw failure(`HTTP_${response.status}`,response.status);
-    let value;
-    try{
-      const reader=response.body?.getReader();requireValue(reader,'INVALID_JSON_RESPONSE');
-      const chunks=[];let bytes=0;
-      try{
-        while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;
-          if(bytes>maxResponseBytes){await reader.cancel();throw failure('RESPONSE_TOO_LARGE')}
-          chunks.push(Buffer.from(part.value));
-        }
-      }finally{reader.releaseLock()}
-      value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks,bytes)));
-    }catch(error){
-      if(error.code==='RESPONSE_TOO_LARGE')throw error;
-      throw failure(['AbortError','TimeoutError'].includes(error.name)?'REQUEST_TIMEOUT':'INVALID_JSON_RESPONSE');
-    }
-    if(path==='/api/login'){
-      const headers=response.headers.getSetCookie?.()||[response.headers.get('set-cookie')||''];
-      cookie=headers.map(header=>header.split(';')[0]).find(value=>/^sid=[^;]+$/.test(value))||'';
-      requireValue(cookie&&typeof value?.csrf==='string'&&value.csrf,'INVALID_LOGIN_RESPONSE');csrf=value.csrf;
-    }
-    return value;
-  }
-  try{
-    await request('/api/login',{body:{username,password}});
+  return withReadSession({base,username,password,timeoutMs,totalTimeoutMs,maxResponseBytes,fetchImpl},async request=>{
+    let result;
     const snapshot=provenanceMode==='snapshot';
     const page=await request(`/api/projects/${projectId}/${snapshot?'context':'facts'}?q=${encodeURIComponent(query)}&limit=${limit}${after?`&after=${after}`:''}${search?'&match=all_terms':''}`);
     const snapshotProofs=snapshot?validateSnapshot(page,{projectId,query,limit,after,search}):null;
@@ -106,9 +69,8 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
       }
       requireValue(fitted,'OUTPUT_BUDGET_TOO_SMALL');
     }
-  }catch(error){problem=error}
-  if(cookie){try{await request('/api/logout',{body:{},logout:true})}catch(error){problem=problem||error}}
-  if(problem)throw problem;return result;
+    return result;
+  });
 }
 async function stdinRequest(){
   const bytes=await new Promise((resolve,reject)=>{

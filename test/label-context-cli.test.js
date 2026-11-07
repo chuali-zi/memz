@@ -3,11 +3,20 @@ const assert=require('node:assert/strict');
 const http=require('node:http');
 const {spawn}=require('node:child_process');
 const {page}=require('./label-context-fixture');
+const {currentLabelsReceipt,exactContextReceipt}=require('../scripts/exact-context-protocol');
 let requests=0;
+let exactFault=false;
 const server=http.createServer((req,res)=>{
   req.resume();requests++;const url=new URL(req.url,'http://localhost');res.setHeader('content-type','application/json');
   if(url.pathname==='/api/login'){res.setHeader('set-cookie','sid=synthetic-cli; HttpOnly');res.end(JSON.stringify({csrf:'synthetic-cli'}));return}
   if(url.pathname==='/api/logout'){res.end('{}');return}
+  if(url.pathname==='/api/projects/7/current-labels'){
+    res.end(JSON.stringify({...currentLabelsReceipt(),projectId:7,role:'viewer',sourceTextIsUntrusted:true,limit:512,complete:true,labels:page().facts.map(({subject,predicate})=>({subject,predicate}))}));return;
+  }
+  if(url.pathname==='/api/projects/7/context/exact'){
+    const wire=page({facts:[page().facts[0]]});
+    res.end(JSON.stringify({...exactContextReceipt(),projectId:7,selector:{subject:'晨桥服务',predicate:exactFault?'错误选择器':'交付时间'},role:'viewer',sourceTextIsUntrusted:true,facts:wire.facts,provenance:wire.provenance,sources:wire.sources}));return;
+  }
   if(url.pathname!=='/api/projects/7/context'){res.statusCode=403;res.end('{}');return}
   res.end(JSON.stringify(page({query:url.searchParams.get('q'),searchMode:url.searchParams.get('match')||'substring'})));
 });
@@ -58,4 +67,20 @@ test('declines remain explicit JSON while authorization and final output failure
   assert.equal(declined.code,0);assert.equal(declined.stderr,'');assert.equal(JSON.parse(declined.stdout).status,'needs_scope');assert.equal(requests-before,3);
   const denied=await invoke('{"projectId":99}');assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.match(denied.stderr,/HTTP_403/);
   const tiny=await invoke('{"maxOutputBytes":1}');assert.equal(tiny.code,1);assert.equal(tiny.stdout,'');assert.match(tiny.stderr,/OUTPUT_BUDGET_TOO_SMALL/);
+});
+test('stdin and environment explicitly opt into v2 while an explicit v1 override preserves the old route',async()=>{
+  for(const settings of [{input:'{"protocol":"metadata_exact_v2"}'},{input:'{}',options:{env:{MEMZ_LABEL_PROTOCOL:'metadata_exact_v2'},args:[]}}]){
+    const before=requests,result=await invoke(settings.input,settings.options);assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(requests-before,4);
+    const value=JSON.parse(result.stdout);assert.equal(value.schema,'memz-label-context-v2');assert.equal(value.protocol,'metadata_exact_v2');assert.equal(value.status,'matched');assert.equal(value.context.provenance.length,1);assert.equal(value.execution.modelCalls,0);assert.equal(Object.hasOwn(value.context,'query'),false);
+  }
+  const before=requests,result=await invoke('{"protocol":"snapshot_filter_v1"}',{env:{MEMZ_LABEL_PROTOCOL:'metadata_exact_v2'}});
+  assert.equal(result.code,0);assert.equal(requests-before,6);assert.equal(JSON.parse(result.stdout).schema,'memz-label-context-v1');
+});
+test('v2 selector injection, unsupported protocol, bad wire and too-small stdout budgets never print partial context',async()=>{
+  for(const input of ['{"protocol":"exact"}','{"protocol":null}','{"protocol":"metadata_exact_v2","selector":{"subject":"x","predicate":"y"}}']){
+    const before=requests,result=await invoke(input);assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_LABEL_PROTOCOL|INVALID_STDIN_REQUEST/);assert.equal(requests,before);
+  }
+  exactFault=true;
+  try{const result=await invoke('{"protocol":"metadata_exact_v2"}');assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_EXACT_CONTEXT_RESPONSE/)}finally{exactFault=false}
+  const tiny=await invoke('{"protocol":"metadata_exact_v2","maxOutputBytes":1}');assert.equal(tiny.code,1);assert.equal(tiny.stdout,'');assert.match(tiny.stderr,/OUTPUT_BUDGET_TOO_SMALL/);
 });
