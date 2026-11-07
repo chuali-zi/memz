@@ -3,14 +3,14 @@ const {readContext}=require('./context-client');
 const {planLabelQuery,PLANNER_MODE,MAX_LABEL_ROWS}=require('./label-query-plan');
 const {planExactLabelQuery,EXACT_PLANNER_MODE}=require('./label-query-plan-v2');
 const {validateCurrentLabels,validateExactContext}=require('./exact-context-protocol');
-const {withReadSession}=require('./read-session');
+const {withReadSession,validReadSignal}=require('./read-session');
 const failure=code=>Object.assign(new Error(code),{code});
 const check=(condition,code)=>{if(!condition)throw failure(code)};
 const serialize=value=>JSON.stringify(value,null,2)+'\n';
 const positive=value=>Number.isInteger(value)&&value>0&&value<=2147483647;
 const within=(value,max)=>Number.isInteger(value)&&value>=1&&value<=max;
 const text=(value,max)=>typeof value==='string'&&value.length>=1&&value.length<=max&&value.isWellFormed()&&!value.includes('\u0000');
-const moduleKeys=['baseURL','username','password','projectId','question','protocol','timeoutMs','totalTimeoutMs','maxResponseBytes','maxOutputBytes','fetchImpl'];
+const moduleKeys=['baseURL','username','password','projectId','question','protocol','timeoutMs','totalTimeoutMs','maxResponseBytes','maxOutputBytes','fetchImpl','signal'];
 const stdinKeys=['projectId','question','protocol','timeoutMs','totalTimeoutMs','maxResponseBytes','maxOutputBytes'];
 function allowedObject(value,keys){
   return !!value&&typeof value==='object'&&!Array.isArray(value)&&[Object.prototype,null].includes(Object.getPrototypeOf(value))&&Reflect.ownKeys(value).every(key=>keys.includes(key));
@@ -19,7 +19,7 @@ function allowedObject(value,keys){
 async function readLabelContext(options={}){
   check(allowedObject(options,moduleKeys),'INVALID_LABEL_CONTEXT_INPUT');
   const {baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId,question,protocol='snapshot_filter_v1',
-    timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes=1048576,fetchImpl=fetch}=options;
+    timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes=1048576,fetchImpl=fetch,signal}=options;
   check(text(baseURL,2048)&&!/[\u0000-\u0020\u007f]/u.test(baseURL),'INVALID_BASE_URL');
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
   check(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&!base.search&&!base.hash&&base.pathname==='/','INVALID_BASE_URL');
@@ -31,6 +31,7 @@ async function readLabelContext(options={}){
   check(within(timeoutMs,60000),'INVALID_TIMEOUT');check(within(totalTimeoutMs,60000),'INVALID_TOTAL_TIMEOUT');
   check(within(maxResponseBytes,1048576),'INVALID_RESPONSE_LIMIT');check(within(maxOutputBytes,4194304),'INVALID_OUTPUT_BUDGET');
   check(typeof fetchImpl==='function','INVALID_FETCH');
+  check(validReadSignal(signal),'INVALID_SIGNAL');check(!signal?.aborted,'REQUEST_CANCELLED');
   const deadline=Date.now()+totalTimeoutMs,controller=new AbortController(),cleanup=[];
   const started=performance.now(),stages=[];
   const elapsed=since=>Number((performance.now()-since).toFixed(3));
@@ -47,15 +48,17 @@ async function readLabelContext(options={}){
     return fetchImpl(url,{...request,signal:transport.signal});
   }
   async function snapshot(query,searchMode,stage){
+    check(!signal?.aborted,'REQUEST_CANCELLED');
     const remaining=deadline-Date.now();check(remaining>0&&!controller.signal.aborted,'TOTAL_TIMEOUT');
     const phaseStarted=performance.now();
     try{
       return await readContext({baseURL:base.href,username,password,projectId,query,searchMode,
         limit:MAX_LABEL_ROWS,provenanceMode:'snapshot',sourceMode:'deduplicated',timeoutMs,
-        totalTimeoutMs:Math.min(remaining,60000),maxResponseBytes,fetchImpl:boundedFetch});
+        totalTimeoutMs:Math.min(remaining,60000),maxResponseBytes,fetchImpl:boundedFetch,signal});
     }finally{stages.push({stage,elapsedMs:elapsed(phaseStarted)})}
   }
   function result(status,plan,{reason,context,selection}={}){
+    check(!signal?.aborted,'REQUEST_CANCELLED');
     const exact=protocol==='metadata_exact_v2';
     const value={schema:exact?'memz-label-context-v2':'memz-label-context-v1',...(exact?{protocol}:{}),projectId,question,sourceTextIsUntrusted:true,status,
       ...(reason?{reason}:{}),plan,
@@ -64,14 +67,16 @@ async function readLabelContext(options={}){
       ...(selection?{selection}:{}),
       ...(context?{context}:{})};
     check(Buffer.byteLength(serialize(value),'utf8')<=maxOutputBytes,'OUTPUT_BUDGET_TOO_SMALL');
+    check(!signal?.aborted,'REQUEST_CANCELLED');
     check(Date.now()<deadline&&!controller.signal.aborted,'TOTAL_TIMEOUT');
     return value;
   }
   async function metadataExact(){
+    check(!signal?.aborted,'REQUEST_CANCELLED');
     const remaining=deadline-Date.now();check(remaining>0&&!controller.signal.aborted,'TOTAL_TIMEOUT');
     const phaseStarted=performance.now();let draft;
     try{
-      draft=await withReadSession({base,username,password,timeoutMs,totalTimeoutMs:remaining,maxResponseBytes,fetchImpl,signal:controller.signal},async request=>{
+      draft=await withReadSession({base,username,password,timeoutMs,totalTimeoutMs:remaining,maxResponseBytes,fetchImpl,signal:controller.signal,cancelSignal:signal},async request=>{
         const metadata=await request(`/api/projects/${projectId}/current-labels`);
         validateCurrentLabels(metadata,{projectId});
         if(!metadata.complete){
@@ -148,7 +153,7 @@ async function main(){
   for(const [env,key] of [['MEMZ_PROJECT_ID','projectId'],['MEMZ_TIMEOUT_MS','timeoutMs'],['MEMZ_TOTAL_TIMEOUT_MS','totalTimeoutMs'],['MEMZ_MAX_RESPONSE_BYTES','maxResponseBytes'],['MEMZ_MAX_OUTPUT_BYTES','maxOutputBytes']])if(process.env[env]!==undefined)config[key]=Number(process.env[env]);
   process.stdout.write(serialize(await readLabelContext({...config,...input})));
 }
-const publicCodes=new Set(['INVALID_LABEL_CONTEXT_INPUT','INVALID_LABEL_PROTOCOL','INVALID_CURRENT_LABELS_RESPONSE','INVALID_EXACT_CONTEXT_RESPONSE','INVALID_EXACT_SELECTOR','INVALID_BASE_URL','INVALID_PROJECT','INVALID_PLANNER_QUESTION','INVALID_PLANNER_LABEL','INVALID_PLANNER_INPUT','INVALID_CREDENTIALS','INVALID_TIMEOUT','INVALID_TOTAL_TIMEOUT','INVALID_RESPONSE_LIMIT','INVALID_OUTPUT_BUDGET','INVALID_FETCH','INVALID_STDIN_JSON','INVALID_STDIN_REQUEST','INVALID_ARGUMENTS','INPUT_TIMEOUT','INPUT_TOO_LARGE','INPUT_FAILED','OUTPUT_BUDGET_TOO_SMALL','TOTAL_TIMEOUT','REQUEST_TIMEOUT','REQUEST_FAILED','RESPONSE_TOO_LARGE','INVALID_JSON_RESPONSE','INVALID_LOGIN_RESPONSE','INVALID_SNAPSHOT_RESPONSE','INVALID_FACTS_RESPONSE','INVALID_SEARCH_RESPONSE','INVALID_CURSOR_RESPONSE','INVALID_FACT_RESPONSE','PROVENANCE_MISMATCH','INVALID_PROVENANCE_RESPONSE','SOURCE_MISMATCH','AMBIGUOUS_CONTEXT_LABEL']);
+const publicCodes=new Set(['INVALID_SIGNAL','REQUEST_CANCELLED','INVALID_LABEL_CONTEXT_INPUT','INVALID_LABEL_PROTOCOL','INVALID_CURRENT_LABELS_RESPONSE','INVALID_EXACT_CONTEXT_RESPONSE','INVALID_EXACT_SELECTOR','INVALID_BASE_URL','INVALID_PROJECT','INVALID_PLANNER_QUESTION','INVALID_PLANNER_LABEL','INVALID_PLANNER_INPUT','INVALID_CREDENTIALS','INVALID_TIMEOUT','INVALID_TOTAL_TIMEOUT','INVALID_RESPONSE_LIMIT','INVALID_OUTPUT_BUDGET','INVALID_FETCH','INVALID_STDIN_JSON','INVALID_STDIN_REQUEST','INVALID_ARGUMENTS','INPUT_TIMEOUT','INPUT_TOO_LARGE','INPUT_FAILED','OUTPUT_BUDGET_TOO_SMALL','TOTAL_TIMEOUT','REQUEST_TIMEOUT','REQUEST_FAILED','RESPONSE_TOO_LARGE','INVALID_JSON_RESPONSE','INVALID_LOGIN_RESPONSE','INVALID_SNAPSHOT_RESPONSE','INVALID_FACTS_RESPONSE','INVALID_SEARCH_RESPONSE','INVALID_CURSOR_RESPONSE','INVALID_FACT_RESPONSE','PROVENANCE_MISMATCH','INVALID_PROVENANCE_RESPONSE','SOURCE_MISMATCH','AMBIGUOUS_CONTEXT_LABEL']);
 if(require.main===module)main().catch(error=>{
   const code=publicCodes.has(error?.code)||/^HTTP_[1-5][0-9]{2}$/.test(error?.code||'')?error.code:'READ_FAILED';
   console.error('Label context failed: '+code);process.exitCode=1;

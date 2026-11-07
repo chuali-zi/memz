@@ -22,9 +22,9 @@ const server=http.createServer((req,res)=>{
 });
 const ready=new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve))});
-async function invoke(input,{env={},close=true,args=['--stdin']}={}){
+async function invoke(input,{env={},close=true,args=['--stdin'],script='scripts/label-context.js'}={}){
   await ready;
-  const child=spawn(process.execPath,['scripts/label-context.js',...args],{env:{...process.env,MEMZ_BASE_URL:`http://127.0.0.1:${server.address().port}`,MEMZ_USERNAME:'viewer',MEMZ_PASSWORD:'demo-viewer',MEMZ_PROJECT_ID:'7',MEMZ_QUESTION:'晨桥服务的交付时间是什么？',...env},stdio:['pipe','pipe','pipe']});
+  const child=spawn(process.execPath,[script,...args],{env:{...process.env,MEMZ_BASE_URL:`http://127.0.0.1:${server.address().port}`,MEMZ_USERNAME:'viewer',MEMZ_PASSWORD:'demo-viewer',MEMZ_PROJECT_ID:'7',MEMZ_QUESTION:'晨桥服务的交付时间是什么？',...env},stdio:['pipe','pipe','pipe']});
   return new Promise((resolve,reject)=>{
     let stdout='',stderr='';const timer=setTimeout(()=>{child.kill('SIGKILL');reject(new Error('Label CLI did not terminate'))},10000);
     child.stdout.on('data',data=>{stdout+=data;if(Buffer.byteLength(stdout)>4194304){child.kill('SIGKILL');reject(new Error('Label CLI output exceeded its bound'))}});
@@ -83,4 +83,13 @@ test('v2 selector injection, unsupported protocol, bad wire and too-small stdout
   exactFault=true;
   try{const result=await invoke('{"protocol":"metadata_exact_v2"}');assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_EXACT_CONTEXT_RESPONSE/)}finally{exactFault=false}
   const tiny=await invoke('{"protocol":"metadata_exact_v2","maxOutputBytes":1}');assert.equal(tiny.code,1);assert.equal(tiny.stdout,'');assert.match(tiny.stderr,/OUTPUT_BUDGET_TOO_SMALL/);
+});
+test('caller signal is module-only: both stdin CLIs reject it and neither constructs one from environment text',async()=>{
+  for(const script of ['scripts/context-client.js','scripts/label-context.js']){
+    for(const signal of [null,{},'synthetic-private-signal']){
+      const before=requests,result=await invoke(JSON.stringify({signal}),{script});assert.equal(result.code,1);assert.equal(result.stdout,'');assert.match(result.stderr,/INVALID_STDIN_REQUEST/);assert.ok(!result.stderr.includes('synthetic-private-signal'));assert.equal(requests,before);
+    }
+    const result=await invoke('{}',{script,env:{MEMZ_SIGNAL:'synthetic-private-signal',MEMZ_PROVENANCE_MODE:'snapshot',MEMZ_SOURCE_MODE:'deduplicated'}});
+    assert.equal(result.code,0);assert.equal(result.stderr,'');assert.ok(!result.stdout.includes('synthetic-private-signal'));
+  }
 });

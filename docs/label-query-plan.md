@@ -43,6 +43,8 @@ const result = await readLabelContext({
 
 库的username最多100、password最多8192、baseURL最多2048个UTF-16单位，均须非空、合法Unicode且无NUL；地址还拒绝原始ASCII空白/控制符，只接受无嵌入凭据、query或hash的HTTP(S)根地址。这些限制在任何fetch之前检查，错误只返回固定 `INVALID_CREDENTIALS` 或 `INVALID_BASE_URL`，不携带原输入。
 
+`readContext` 和 `readLabelContext` 的模块参数另可接受 `signal: controller.signal`，类型须为原生AbortSignal；非法类型在HTTP前报 `INVALID_SIGNAL`，预取消为零HTTP并报 `REQUEST_CANCELLED`。它不是stdin字段，两个CLI都会拒绝stdin中的signal；也不读取或转换 `MEMZ_SIGNAL` 等环境文本。signal及其reason不写入结果或错误，取消不会抛出调用者提供的原reason。
+
 ```sh
 MEMZ_PROJECT_ID=1 MEMZ_QUESTION='项目的截止日是什么？' node scripts/label-context.js
 printf '%s' '{"projectId":1,"question":"项目的截止日是什么？"}' | node scripts/label-context.js --stdin
@@ -87,6 +89,8 @@ stdin只接受 `projectId`、`question`、`protocol`、`timeoutMs`、`totalTimeo
 总期限由共享AbortController真实中止HTTP请求和响应body流，覆盖v1的两个会话或v2的一次登录/两次读取/注销，不通过单独Promise.race遗留客户端后台请求。结果物化后，不论匹配成功或明确拒绝，均主动中止自有transport再拆除取消监听。共享内部 `read-session.js` 对可接受的注销401及其他非2xx响应显式取消未使用正文，并在每次请求finally中止自有transport；失败正文取消异常不覆盖原HTTP错误，超限正文取消异常也不覆盖 `RESPONSE_TOO_LARGE`。原readContext的公开参数、header和正常输出不变，原有独立尽力注销时间规则不变；label读取入口另外用自己的全流程期限覆盖注销。它与每次请求的期限共同生效。库的可注入fetchImpl须遵守AbortSignal；不能保证任意忽略信号的自定义实现会停止，也不能由同进程计时器抢占同步阻塞的事件循环。
 
 最初的HTTP或协议错误不会被之后注销超时覆盖；注销失败和总超时仍是错误，不降级为成功或“未找到”。总期限到达后不能保证服务端会话已经清理：注销是尽力操作，剩余会话仍受服务端期限与容量约束。错误时CLI只写固定错误码到stderr并退出非0，不写部分stdout。无匹配等明确状态是完整JSON回执，退出0，调用者必须检查status。
+
+调用者signal只中止业务登录和读取，包括等待headers及消费body；取消后不再开始后续读取。已取得有效cookie/CSRF的会话仍执行尽力注销，caller signal不会中止该注销。注销受原有独立 `min(timeoutMs,5000)` 清理期限约束，label入口还受全流程总budget约束，不能无限延长。若取消发生时登录尚未取得完整有效凭据，不能保证清理服务端可能已创建的会话，且不会继续读取。成功数据返回前再次检查caller状态，取消即使发生在已完成读取后的注销期间，也不返回成功数据。正常取消固定为 `REQUEST_CANCELLED`；若更早已经发生HTTP、协议或资源主错误，则保留该主错误，不让后续清理异常或取消reason覆盖它。未传signal的v1/v2输出schema及HTTP序列不变。
 
 最终输出上限统计整份UTF-8 JSON、缩进、换行、plan、selection和耗时字段。成功和decline都计算；预算不足报 `OUTPUT_BUDGET_TOO_SMALL`，不会裁剪来源、丢弃依据或返回事实前缀。环境连接或凭据不会写入回执或错误日志。
 
@@ -167,8 +171,12 @@ node --test test/exact-context-protocol.test.js test/label-query-plan-v2.test.js
 
 第三阶段区分三类验证：mock transport用于穷举严格receipt、坏字段与整份UTF-8预算；独立本机HTTP服务故意不结束登录、metadata、exact、错误或注销正文，证明实际取消连接、主错误保留和跨读取总deadline；真实随机PostgreSQL库及真实应用HTTP验证256/512成功、513拒绝、v1仍needs_scope、跨scope、权限中途撤销、批准新版本、真实数据库锁等待时HTTP被取消，以及真实stdin子进程。客户端篡改真实服务返回selector的故障注入另行标识，不把它当成服务器曾主动返回坏wire。所有数据是原创合成fixture，没有模型调用或答案质量实验。
 
+模块caller-signal回归另用真实loopback服务覆盖登录/读取headers和body、取消后继续注销、注销401未结束正文、注销期间的晚到取消、有限清理和label总budget。独立随机PG用例在观察到真实后端Lock等待后主动取消，证明HTTP实际关闭、会话已注销，并在释放本fixture锁后验证新的授权读取、RLS及连接池仍可用。它不承诺中止服务端已经开始的SQL，也不构成性能阈值或生产取消认证。
+
 ```sh
 node --test test/exact-context-http.test.js test/request-body.test.js test/database-errors.test.js
 node --test test/label-context-v2.test.js test/label-context-cli.test.js test/read-session.test.js
+node --test test/read-cancellation.test.js
 MIGRATION_TEST_DATABASE_URL="$TEST_DATABASE_URL" node --test test/exact-context-postgres.test.js
+MIGRATION_TEST_DATABASE_URL="$TEST_DATABASE_URL" node --test test/read-cancellation-postgres.test.js
 ```

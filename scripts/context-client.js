@@ -1,12 +1,12 @@
 // Read-only synthetic-demo client. No model calls and no external dependencies.
 const {parseSearchQuery,matchesSearchMetadata}=require('./search-query');
 const {SNAPSHOT_DESCRIPTION,snapshotReceipt,validateSnapshot}=require('./context-snapshot');
-const {withReadSession}=require('./read-session');
+const {withReadSession,validReadSignal}=require('./read-session');
 function failure(code,status){return Object.assign(new Error(code),{code,...(status===undefined?{}:{status})})}
 function requireValue(condition,code){if(!condition)throw failure(code)}
 const serializeContext=value=>JSON.stringify(value,null,2)+'\n';
 const positive=value=>Number.isInteger(value)&&value>0&&value<=2147483647;
-async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId=1,query='',limit=25,after=0,timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes,provenanceMode='individual',sourceMode='inline',searchMode='substring',fetchImpl=fetch}={}){
+async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',password='demo-viewer',projectId=1,query='',limit=25,after=0,timeoutMs=5000,totalTimeoutMs=30000,maxResponseBytes=1048576,maxOutputBytes,provenanceMode='individual',sourceMode='inline',searchMode='substring',fetchImpl=fetch,signal}={}){
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
   requireValue(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&!base.search&&!base.hash&&base.pathname==='/','INVALID_BASE_URL');
   requireValue(after===0||positive(after),'INVALID_AFTER');
@@ -20,7 +20,8 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
   requireValue(provenanceMode!=='snapshot'||limit<=25,'INVALID_SNAPSHOT_LIMIT');
   requireValue(['inline','deduplicated'].includes(sourceMode),'INVALID_SOURCE_MODE');
   const search=parseSearchQuery(query,searchMode);
-  return withReadSession({base,username,password,timeoutMs,totalTimeoutMs,maxResponseBytes,fetchImpl},async request=>{
+  requireValue(validReadSignal(signal),'INVALID_SIGNAL');requireValue(!signal?.aborted,'REQUEST_CANCELLED');
+  return withReadSession({base,username,password,timeoutMs,totalTimeoutMs,maxResponseBytes,fetchImpl,cancelSignal:signal},async request=>{
     let result;
     const snapshot=provenanceMode==='snapshot';
     const page=await request(`/api/projects/${projectId}/${snapshot?'context':'facts'}?q=${encodeURIComponent(query)}&limit=${limit}${after?`&after=${after}`:''}${search?'&match=all_terms':''}`);
@@ -58,6 +59,7 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
       for(const fact of page.facts)acceptProof(fact,await request(`/api/projects/${projectId}/facts/${fact.id}/provenance?version=${fact.version}`));
     }
     const sourcesFor=prefix=>sourceMode==='deduplicated'?{sources:[...new Set(prefix.map(fact=>fact.sourceId))].map(id=>sources.get(id))}:{};
+    requireValue(!signal?.aborted,'REQUEST_CANCELLED');
     result={schemaVersion:sourceMode==='inline'?1:2,projectId,query,limit,...(after?{after}:{}),truncated:page.next_after!==null,nextAfter:page.next_after,sourceTextIsUntrusted:true,consistency:snapshot?SNAPSHOT_DESCRIPTION:'One current-facts page; immutable provenance pinned to each returned version. Not necessarily current at completion.',facts,...sourcesFor(facts),...(search?{search:page.search}:{}),...(snapshot?{snapshot:snapshotReceipt()}:{})};
     if(maxOutputBytes!==undefined){
       const minimum=facts.length?1:0;let fitted=false;
@@ -69,6 +71,7 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
       }
       requireValue(fitted,'OUTPUT_BUDGET_TOO_SMALL');
     }
+    requireValue(!signal?.aborted,'REQUEST_CANCELLED');
     return result;
   });
 }
