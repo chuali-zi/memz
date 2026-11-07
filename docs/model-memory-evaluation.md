@@ -32,7 +32,7 @@ MEMZ_PROJECT_ID=1 MEMZ_BEFORE=123 npm run --silent demo:history
 
 ## 复现实验
 
-需要Node.js 20+、Python3.10+和已初始化memz_app角色的**专用测试**PostgreSQL；下例管理员连接通过环境配置，不在仓库保存。export创建随机临时库，执行合成owner批准，启动本地HTTP，生成上下文后关闭并清理临时库，不修改传入数据库。
+需要Node.js 22+、Python3.10+和已初始化memz_app角色的**专用测试**PostgreSQL；下例管理员连接通过环境配置，不在仓库保存。export创建随机临时库，执行合成owner批准，启动本地HTTP，生成上下文后关闭并清理临时库，不修改传入数据库。
 
 ```sh
 npm ci

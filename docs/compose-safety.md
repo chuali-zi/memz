@@ -13,7 +13,7 @@ COMPOSE_DISABLE_ENV_FILE=1 docker compose --env-file /dev/null -f compose.yml \
   | node scripts/check-compose-safety.js
 ```
 
-此命令需要支持上述选项的 Docker Compose 插件、Node.js 20+，不需要运行中的 Docker daemon、PostgreSQL 或 npm 依赖。Compose 负责解析 YAML、展开短语法，校验器接收规范化 JSON；不自行实现 YAML 解析。[Docker 官方配置命令说明](https://docs.docker.com/reference/cli/docker/compose/config/)列明这些选项。
+此命令需要支持上述选项的 Docker Compose 插件、Node.js 22+，不需要运行中的 Docker daemon、PostgreSQL 或 npm 依赖。Compose 负责解析 YAML、展开短语法，校验器接收规范化 JSON；不自行实现 YAML 解析。[Docker 官方配置命令说明](https://docs.docker.com/reference/cli/docker/compose/config/)列明这些选项。
 
 命令显式选择仓库文件、禁用默认 `.env` 及 service 环境文件解析，并保留变量占位符；不读取环境文件中的秘密。Compose 的错误输出被丢弃，避免原始配置或插值错误进入共享日志；解析失败或空输入会得到校验器的固定失败 JSON。`pipefail` 使上游 Compose 失败也导致整个管道失败。不要将 Compose JSON 用 `tee`、shell 调试模式或临时文件另行归档，其中可能包含环境值。
 

@@ -14,7 +14,7 @@
 
 首次接入者可按[开发者完整上手指南](docs/developer-quickstart.md)从空库走到来源、审批和客户端上下文；包含第二终端配置、预算续读以及实际遇到的安装问题。以下命令使用POSIX shell语法。
 
-需要 Docker Compose、Node.js 20+ 和 npm，端口 5432、3000 可用。默认仅绑定127.0.0.1；HTTP Host只接受localhost、127.0.0.1或[::1]及合法端口，不接受自定义域名。不需外部账号或 API key。主机名校验不是身份认证，公开账号仍仅供演示，详见[运行边界](docs/demo-boundary.md)。
+需要 Docker Compose、Node.js 22+ 和 npm，端口 5432、3000 可用。默认仅绑定127.0.0.1；HTTP Host只接受localhost、127.0.0.1或[::1]及合法端口，不接受自定义域名。不需外部账号或 API key。主机名校验不是身份认证，公开账号仍仅供演示，详见[运行边界](docs/demo-boundary.md)。
 
 ```sh
 npm ci
@@ -34,6 +34,8 @@ docker compose up -d --wait
 启动前的 [只读诊断](docs/setup-check.md) 能提示误用管理员连接、基本表/迁移前提缺失和 RLS 配置问题；不自动修复，不代替完整演示或恢复验证。
 
 已有卷不会自动重新执行 `schema.sql`，保留数据升级请使用下节的增量迁移，**不要重跑 schema 或删除卷**。环境变量 `PORT` 可修改应用监听端口（例如 `PORT=3001 npm start`）；使用启动日志显示的实际地址。环境变量 `DATABASE_URL` 可覆盖默认应用连接；数据库管理员凭据仅用于初始化与迁移，不传给应用服务。不要在公开网络暴露该服务。
+
+本轮分别验证 Node 22.23.4（与 CI 匹配）和云环境 Node 24.22.1；Node 22/24 仍为官方 LTS，运行支持下限采用 22。[官方发布状态](https://nodejs.org/en/about/previous-releases)。这只调整运行前提，不修改数据库或服务接口；现有云环境仍使用默认 Node 24。
 
 ## 保留数据升级
 
