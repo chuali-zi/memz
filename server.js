@@ -3,13 +3,14 @@ const {Pool}=require('pg');
 const {requestKey,createOnce}=require('./idempotency');
 const {parseSearchQuery}=require('./scripts/search-query');
 const {SNAPSHOT_MAX_BYTES,snapshotReceipt}=require('./scripts/context-snapshot');
+const {SessionStore,SESSION_TTL_MS}=require('./scripts/session-store');
 const app=express();
 const pool=new Pool({connectionString:process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz',max:10});
 // pg removes failed idle clients before emitting this event; later requests reconnect.
 // Do not log the error/client object: it can contain connection credentials.
 pool.on('error',()=>console.error('Database idle connection lost; future requests will reconnect.'));
 const accounts={owner:{id:1,password:'demo-owner',name:'负责人'},member:{id:2,password:'demo-member',name:'成员'},viewer:{id:3,password:'demo-viewer',name:'只读者'},other:{id:4,password:'demo-other',name:'另一项目用户'}};
-const sessions=new Map();
+const sessions=new SessionStore();
 app.disable('x-powered-by');
 app.use((req,res,next)=>{res.set('X-Content-Type-Options','nosniff');res.set('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"); next()});
 // The public-account demo accepts only literal loopback host names, independent of Origin.
@@ -19,8 +20,16 @@ app.use((req,res,next)=>{
   next();
 });
 app.use(express.json({limit:'16kb',verify:(req,res,buffer)=>{req.jsonBodyBytes=buffer.length}})); app.use(cookieParser());
-app.post('/api/login',requireJsonObject,(req,res)=>{if(req.get('origin') && req.get('origin')!==`${req.protocol}://${req.get('host')}`) return res.status(403).json({error:'请求来源无效'}); const a=typeof req.body.username==='string'&&Object.hasOwn(accounts,req.body.username) ? accounts[req.body.username] : null;if(!a||typeof req.body?.password!=='string'||a.password!==req.body.password)return res.status(401).json({error:'账号或密码错误'});const token=crypto.randomBytes(32).toString('hex'),csrf=crypto.randomBytes(24).toString('hex');sessions.set(token,{...a,csrf,expires:Date.now()+8*3600000});res.cookie('sid',token,{httpOnly:true,sameSite:'strict',secure:process.env.COOKIE_SECURE==='true',maxAge:8*3600000});res.json({name:a.name,csrf})});
-app.use('/api',(req,res,next)=>{req.user=sessions.get(req.cookies.sid);if(req.user && req.user.expires<Date.now()){sessions.delete(req.cookies.sid);req.user=null}if(!req.user)return res.status(401).json({error:'请先登录'});if(!['GET','HEAD'].includes(req.method)&&req.get('x-csrf-token')!==req.user.csrf)return res.status(403).json({error:'请求校验失败'});next()});
+app.post('/api/login',requireJsonObject,(req,res)=>{
+  if(req.get('origin')&&req.get('origin')!==`${req.protocol}://${req.get('host')}`)return res.status(403).json({error:'请求来源无效'});
+  const a=typeof req.body.username==='string'&&Object.hasOwn(accounts,req.body.username)?accounts[req.body.username]:null;
+  if(!a||typeof req.body.password!=='string'||a.password!==req.body.password)return res.status(401).json({error:'账号或密码错误'});
+  const token=crypto.randomBytes(32).toString('hex'),csrf=crypto.randomBytes(24).toString('hex');
+  if(!sessions.create(token,{id:a.id,name:a.name,csrf},{replaceToken:req.cookies.sid}))return res.set('Retry-After','60').status(503).json({error:'登录会话已满，请稍后重试'});
+  res.cookie('sid',token,{httpOnly:true,sameSite:'strict',secure:process.env.COOKIE_SECURE==='true',maxAge:SESSION_TTL_MS});
+  res.json({name:a.name,csrf});
+});
+app.use('/api',(req,res,next)=>{req.user=sessions.get(req.cookies.sid);if(!req.user)return res.status(401).json({error:'请先登录'});if(!['GET','HEAD'].includes(req.method)&&req.get('x-csrf-token')!==req.user.csrf)return res.status(403).json({error:'请求校验失败'});next()});
 app.post('/api/logout',(req,res)=>{sessions.delete(req.cookies.sid);res.clearCookie('sid');res.json({ok:true})});
 app.get('/api/me',(req,res)=>res.json({name:req.user.name,csrf:req.user.csrf}));
 async function tx(user,fn,{snapshot=false}={}){const c=await pool.connect();try{await c.query(snapshot?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');await c.query("SELECT set_config('app.user_id',$1,true)",[String(user)]);const out=await fn(c);await c.query('COMMIT');return out}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}
