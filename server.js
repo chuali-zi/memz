@@ -6,6 +6,7 @@ const {SNAPSHOT_MAX_BYTES,snapshotReceipt}=require('./scripts/context-snapshot')
 const {SessionStore,SESSION_TTL_MS}=require('./scripts/session-store');
 const {databasePoolOptions,databaseErrorKind,safeErrorCode,runTransaction}=require('./scripts/database');
 const {createShutdownGate,installShutdown}=require('./scripts/server-lifecycle');
+const {MAX_CURRENT_LABELS,CURRENT_LABELS_MAX_BYTES,EXACT_CONTEXT_MAX_BYTES,currentLabelsReceipt,exactContextReceipt,validateCurrentLabels,validateExactContextRequest,validateExactSelector,validateExactContext}=require('./scripts/exact-context-protocol');
 const app=express();
 const shutdownGate=createShutdownGate();
 const pool=new Pool(databasePoolOptions(process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz'));
@@ -144,6 +145,29 @@ app.get('/api/projects/:p/facts',route(async(req,res)=>{
   const {p,q,limit,after,searchMode}=factsRequest(req);
   res.json(await readFactsPage(req.user.id,p,q,{limit,after,searchMode}));
 }));
+async function contextEvidence(c,p,selected,access){
+  const proofRows=selected.length?(await c.query(`SELECT f.id AS fact_id,f.subject,f.predicate,
+    r.id AS revision_id,r.version,r.value,r.created_at,r.approved_by,r.source_id,
+    c.id AS candidate_id,c.expected_version,c.proposed_by,c.source_id AS candidate_source_id,
+    c.subject AS candidate_subject,c.predicate AS candidate_predicate,c.value AS candidate_value,c.status AS candidate_status
+    FROM unnest($2::int[],$3::int[]) WITH ORDINALITY AS requested(id,version,ordinal)
+    LEFT JOIN facts f ON f.id=requested.id AND f.project_id=$1
+    LEFT JOIN revisions r ON r.fact_id=f.id AND r.project_id=f.project_id AND r.version=requested.version
+    LEFT JOIN candidates c ON c.id=r.candidate_id AND c.project_id=r.project_id
+    ORDER BY requested.ordinal`,[p,selected.map(row=>row.id),selected.map(row=>row.version)])).rows:[];
+  if(proofRows.length!==selected.length||proofRows.some((row,i)=>{
+    const fact=selected[i];return row.fact_id!==fact.id||row.revision_id!==fact.revision_id||row.version!==fact.version||row.value!==fact.value||row.source_id!==fact.source_id||!row.candidate_id||row.expected_version!==row.version-1||row.candidate_source_id!==row.source_id||row.candidate_subject!==row.subject||row.candidate_predicate!==row.predicate||row.candidate_value!==row.value||row.candidate_status!=='approved';
+  }))throw fail(500,'上下文依据不完整');
+  const sourceIds=[...new Set(proofRows.map(row=>row.source_id))];
+  const sourceRows=sourceIds.length?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 AND id=ANY($2::int[])',[p,sourceIds])).rows:[];
+  const sourcesById=new Map(sourceRows.map(source=>[source.id,source]));
+  if(sourceRows.length!==sourceIds.length||sourceIds.some(id=>!sourcesById.has(id)))throw fail(500,'上下文依据不完整');
+  return {
+    facts:selected.map(({revision_id,source_id,...fact})=>({...fact,revisionId:revision_id,sourceId:source_id})),
+    provenance:proofRows.map(row=>provenanceRecord(row,access,{sourceReference:true})),
+    sources:sourceIds.map(id=>sourcesById.get(id))
+  };
+}
 app.get('/api/projects/:p/context',route(async(req,res)=>{
   const {p,q,limit,after,searchMode}=factsRequest(req,{defaultLimit:25,maxLimit:25});
   const {search,matching,parameter}=factsSearch(q,searchMode);
@@ -157,30 +181,61 @@ app.get('/api/projects/:p/context',route(async(req,res)=>{
       ORDER BY f.id LIMIT $4`,[p,parameter,after,limit+1])).rows;
     if(rows.some(row=>!row.revision_id||!row.source_id))throw fail(500,'上下文依据不完整');
     const selected=rows.slice(0,limit);
-    const proofRows=selected.length?(await c.query(`SELECT f.id AS fact_id,f.subject,f.predicate,
-      r.id AS revision_id,r.version,r.value,r.created_at,r.approved_by,r.source_id,
-      c.id AS candidate_id,c.expected_version,c.proposed_by,c.source_id AS candidate_source_id,
-      c.subject AS candidate_subject,c.predicate AS candidate_predicate,c.value AS candidate_value,c.status AS candidate_status
-      FROM unnest($2::int[],$3::int[]) WITH ORDINALITY AS requested(id,version,ordinal)
-      LEFT JOIN facts f ON f.id=requested.id AND f.project_id=$1
-      LEFT JOIN revisions r ON r.fact_id=f.id AND r.project_id=f.project_id AND r.version=requested.version
-      LEFT JOIN candidates c ON c.id=r.candidate_id AND c.project_id=r.project_id
-      ORDER BY requested.ordinal`,[p,selected.map(row=>row.id),selected.map(row=>row.version)])).rows:[];
-    if(proofRows.length!==selected.length||proofRows.some((row,i)=>{
-      const fact=selected[i];return row.fact_id!==fact.id||row.revision_id!==fact.revision_id||row.version!==fact.version||row.value!==fact.value||row.source_id!==fact.source_id||!row.candidate_id||row.expected_version!==row.version-1||row.candidate_source_id!==row.source_id||row.candidate_subject!==row.subject||row.candidate_predicate!==row.predicate||row.candidate_value!==row.value||row.candidate_status!=='approved';
-    }))throw fail(500,'上下文依据不完整');
-    const sourceIds=[...new Set(proofRows.map(row=>row.source_id))];
-    const sourceRows=sourceIds.length?(await c.query('SELECT id,title,content FROM sources WHERE project_id=$1 AND id=ANY($2::int[])',[p,sourceIds])).rows:[];
-    const sourcesById=new Map(sourceRows.map(source=>[source.id,source]));
-    if(sourceRows.length!==sourceIds.length||sourceIds.some(id=>!sourcesById.has(id)))throw fail(500,'上下文依据不完整');
     return {...snapshotReceipt(),projectId:p,query:q,limit,after,role:access,sourceTextIsUntrusted:true,
-      facts:selected.map(({revision_id,source_id,...fact})=>({...fact,revisionId:revision_id,sourceId:source_id})),
-      provenance:proofRows.map(row=>provenanceRecord(row,access,{sourceReference:true})),
-      sources:sourceIds.map(id=>sourcesById.get(id)),next_after:rows.length>limit?selected.at(-1).id:null,...(search?{search}:{})};
+      ...await contextEvidence(c,p,selected,access),next_after:rows.length>limit?selected.at(-1).id:null,...(search?{search}:{})};
   },{snapshot:true});
   const serialized=JSON.stringify(page);
   if(Buffer.byteLength(serialized,'utf8')>SNAPSHOT_MAX_BYTES)throw fail(500,'上下文响应超出大小限制');
   res.type('application/json').send(serialized);
+}));
+async function readCurrentLabels(user,p){
+  return tx(user,async c=>{
+    const access=await role(c,p,['owner','member','viewer']);
+    // This statement projects only keys. Oversized corrupt fields become an
+    // invalid marker, never a truncated replacement key, and fail validation.
+    // The byte guard bounds driver allocation without fetching value or source.
+    const rows=(await c.query(`SELECT id,
+      CASE WHEN octet_length(subject)<=400 THEN subject ELSE NULL END AS subject,
+      CASE WHEN octet_length(predicate)<=400 THEN predicate ELSE NULL END AS predicate
+      FROM facts WHERE project_id=$1 AND version>0 ORDER BY id LIMIT $2`,[p,MAX_CURRENT_LABELS+1])).rows;
+    const complete=rows.length<=MAX_CURRENT_LABELS;
+    const page={...currentLabelsReceipt(),projectId:p,role:access,sourceTextIsUntrusted:true,limit:MAX_CURRENT_LABELS,complete,
+      labels:complete?rows.map(({subject,predicate})=>({subject,predicate})):[]};
+    validateCurrentLabels(page,{projectId:p});return page;
+  },{snapshot:true});
+}
+function exactSelector(body){
+  try{return validateExactContextRequest(body)}catch{throw fail(400,'精确选择器无效')}
+}
+async function readExactContext(user,p,input){
+  const selector=validateExactSelector(input);
+  return tx(user,async c=>{
+    const access=await role(c,p,['owner','member','viewer']);
+    const rows=(await c.query(`SELECT f.id,f.subject,f.predicate,f.version,r.value,
+      r.id AS revision_id,r.source_id
+      FROM facts f LEFT JOIN revisions r ON r.id=f.current_revision_id AND r.project_id=f.project_id AND r.fact_id=f.id AND r.version=f.version
+      WHERE f.project_id=$1 AND f.subject=$2 AND f.predicate=$3 AND f.version>0 LIMIT 2`,[p,selector.subject,selector.predicate])).rows;
+    if(rows.length>1||rows.some(row=>!row.revision_id||!row.source_id||row.subject!==selector.subject||row.predicate!==selector.predicate))throw fail(500,'上下文依据不完整');
+    return {...exactContextReceipt(),projectId:p,selector,role:access,sourceTextIsUntrusted:true,...await contextEvidence(c,p,rows,access)};
+  },{snapshot:true});
+}
+function sendProtocol(res,page,maxBytes,validate){
+  const serialized=JSON.stringify(page);
+  if(Buffer.byteLength(serialized,'utf8')>maxBytes)throw fail(500,'上下文响应超出大小限制');
+  if(validate)validate(JSON.parse(serialized));
+  res.type('application/json').send(serialized);
+}
+app.get('/api/projects/:p/current-labels',route(async(req,res)=>{
+  if(Object.keys(req.query).length||req.body!==undefined||Number(req.get('content-length')||0)>0||req.get('transfer-encoding'))throw fail(400,'标签请求不接受参数或请求体');
+  const p=num(req.params.p);
+  sendProtocol(res,await readCurrentLabels(req.user.id,p),CURRENT_LABELS_MAX_BYTES);
+}));
+app.post('/api/projects/:p/context/exact',requireJsonObject,route(async(req,res)=>{
+  req.readOnly=true;
+  if(Object.keys(req.query).length)throw fail(400,'精确请求不接受查询参数');
+  const p=num(req.params.p),selector=exactSelector(req.body);
+  const page=await readExactContext(req.user.id,p,selector);
+  sendProtocol(res,page,EXACT_CONTEXT_MAX_BYTES,value=>validateExactContext(value,{projectId:p,selector}));
 }));
 async function readHistoryPage(user,p,{limit=25,before=null}={}){
   return tx(user,async c=>{
@@ -300,7 +355,7 @@ app.use((err,req,res,next)=>{
     'request.size.invalid':[400,'请求体长度无效']
   };
   const databaseFailure=databaseErrorKind(err);
-  const unavailableMessage=['GET','HEAD'].includes(req.method)?(databaseFailure==='timeout'?'数据库请求超时，请稍后重试':'数据库暂时不可用，请稍后重试'):'数据库连接中断，写入结果可能不确定；请先核实，创建重试请复用原幂等键';
+  const unavailableMessage=(req.readOnly||['GET','HEAD'].includes(req.method))?(databaseFailure==='timeout'?'数据库请求超时，请稍后重试':'数据库暂时不可用，请稍后重试'):'数据库连接中断，写入结果可能不确定；请先核实，创建重试请复用原幂等键';
   const [status,message]=parseErrors[err.type]||(databaseFailure?[503,unavailableMessage]:null)||(['Z_DATA_ERROR','Z_BUF_ERROR'].includes(err.code)?[400,'压缩请求体无效']:[err.status||500,err.status&&err.status<500?err.message:'请求无法处理']);
   if(status>=500)console.error('Request failed:',safeErrorCode(err));
   if(res.headersSent)return next(err);
@@ -310,4 +365,4 @@ if(require.main===module){
   const server=app.listen(process.env.PORT||3000,'127.0.0.1',()=>console.log(`Memz http://127.0.0.1:${server.address().port}`));
   installShutdown({server,pool,onDrain:shutdownGate.beginDrain});
 }
-module.exports={app,pool,tx,decide,readProject,readFactsPage,readHistoryPage,readCandidatesPage,readSourcesPage};
+module.exports={app,pool,tx,decide,readProject,readFactsPage,readHistoryPage,readCandidatesPage,readSourcesPage,readCurrentLabels,readExactContext};

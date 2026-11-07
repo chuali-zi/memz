@@ -98,11 +98,11 @@ MIGRATION_TEST_DATABASE_URL="$TEST_DATABASE_URL" node --test test/label-context-
 
 执行器测试使用原创合成fixture，真实HTTP测试证明登录、流式正文、注销及跨阶段共享期限会中断连接；真实PostgreSQL测试自行创建并删除随机临时库，覆盖RLS项目拒绝、值字段额外命中、来源修剪、25条范围拒绝、两遍之间批准新版本与窗口溢出，以及真实CLI读取。测试不调用模型、不读取答案标签；它们不是42题自然语言召回基准的重新运行，也不表示该缺口已普遍解决。
 
-## v2独立协议与纯规划器（第一阶段）
+## v2独立协议与纯规划器（HTTP已接入，CLI尚未接入）
 
-本节的纯协议校验及规划器已实现，**尚未接入HTTP端点或CLI模式**。现有CLI仍默认固定25条snapshot和all_terms，不会自动改用v2。本阶段不增加模型调用、schema迁移或依赖。
+本节的纯协议校验、规划器和两个HTTP端点已实现，**尚未接入CLI模式或新的认证客户端入口**。现有CLI仍默认固定25条snapshot和all_terms，不会自动改用v2。本阶段不增加模型调用、schema迁移或依赖。
 
-`scripts/exact-context-protocol.js` 提供两个独立wire合同，预定分别用于 `GET /api/projects/:p/current-labels` 和保留CSRF的只读 `POST /api/projects/:p/context/exact`。认证、数据库事务、实际字节读取限制及HTTP状态映射留待下一阶段；纯函数不从JSON字符串证明授权或数据库完整性。
+`scripts/exact-context-protocol.js` 提供两个独立wire合同，分别用于 `GET /api/projects/:p/current-labels` 和保留CSRF的只读 `POST /api/projects/:p/context/exact`。服务器沿用cookie身份和实际memz_app的RLS，在只读REPEATABLE READ事务内先检查owner/member/viewer项目权限，再读取数据。纯函数本身不从JSON字符串证明授权或数据库完整性。
 
 标签metadata固定最多512对，HTTP正文上限常量为1MiB；字段严格限定如下：
 
@@ -120,6 +120,8 @@ MIGRATION_TEST_DATABASE_URL="$TEST_DATABASE_URL" node --test test/label-context-
 ```
 
 `validateCurrentLabels(page,{projectId})` 绑定预期项目，拒绝未知字段、非法角色、非boolean完整性标记、重复标签及超限数组。每个label严格只有subject/predicate，各最多100 UTF-16单位，非空、合法Unicode、无NUL，保留原字面文本。metadata不允许value、source、evidence或gold字段。`complete:true,labels:[]` 表示完整空项目；`complete:false` 只能搭配空labels，不能携带前缀。调用者必须在不完整时拒绝规划，而不是将空列表当作完整无匹配。
+
+GET不接受任何query参数或请求体，不能用limit、after或q缩小探测再伪称完整。SQL只从facts投影键与内部排序ID，以version>0选择当前批准记录，最多探测513行；不连接或读取修订value、候选、来源正文。513行返回 `complete:false,labels:[]`。对完整范围中的非法过长键，安全字节守卫只返回无效标记并令整页失败；从不截断成另一合法键。传回的合法标签始终为原串。pending/rejected候选、零版本占位事实不加入词表。1MiB是序列化响应上限，超限失败，不裁剪；数据库内部扫描量不承诺最多513行，仍受原有数据库期限约束。
 
 精确读取的请求只接受 `{"selector":{"subject":"项目","predicate":"截止日"}}`，项目来自路径，不从body改写。`validateExactContextRequest` 和 `validateExactSelector` 不trim、分词、大小写折叠或Unicode归一化，也不接受query、limit等隐含选择条件。响应有自己的selector回执，例如一个授权项目中的无当前记录结果：
 
@@ -139,6 +141,10 @@ MIGRATION_TEST_DATABASE_URL="$TEST_DATABASE_URL" node --test test/label-context-
 
 `validateExactContext(page,{projectId,selector})` 逐字段绑定项目与原选择器，最多接受一条事实。非空事实必须与selector精确相等，并通过与原snapshot共用的完整修订、候选、审批引用、全文来源及来源字典检查。事实存在而依据缺失或错配必须失败，不能被转换为合法空结果。响应不允许旧query、search、limit、after、next_after字段；不能用空query或伪造旧snapshot header冒充exact查询。原snapshot的header、游标和search校验继续保留原合同。
 
+POST同样拒绝所有URL query参数，body必须通过原16KiB JSON对象限制与CSRF检查。selector在checkout前验证，数据库按参数化的project/subject/predicate唯一键精确相等查询；从facts出发LEFT JOIN当前修订，缺依据仍保留为待报错的记录，不因INNER JOIN漏行变成“未找到”。授权、事实、完整修订/候选/来源装配都在同一RR事务内；序列化后再次校验新的wire，保留全文，不截断依据。授权范围内确无当前记录时200空数组；无项目权限403，非法输入400、过大请求体413、完整性失败500。新只读POST的数据库503采用只读故障/超时提示，内部只读标记不能由请求头设置；原来源/候选写入的结果不确定提示不变。
+
+metadata的complete只描述该次事务视图，不冻结之后的项目大小、权限或批准状态。随后单独发起的exact读取建立新事务，两次请求没有共同快照。
+
 `scripts/label-query-plan-v2.js` 的 `planExactLabelQuery({question,labels})` 使用同一固定问句模板，独立限制最多512行。唯一匹配返回 `mode:label_template_exact_v2`、`status:planned`、`selector` 与template，不生成all_terms查询，所以不施加旧八词限制。它不认识别名、代词、历史或多属性问题，仍保留明确拒绝；不接受gold、evidence、value或调用者提供的容量策略。调用者仍负责从单个已授权、完整current-labels响应提供词表，不拼分页快照。v1的 `planLabelQuery` 继续固定25行与八词限制。
 
 ```sh
@@ -147,4 +153,11 @@ node --test test/exact-context-protocol.test.js test/label-query-plan-v2.test.js
   test/search-query.test.js test/context-snapshot.test.js
 ```
 
-第一阶段的原创fixture覆盖512/513完整性、禁止证据字段sentinel、精确Unicode和标点、错误项目/selector、缺失或额外依据、新旧wire互相拒绝，以及原v1字段和失败状态兼容。这里没有真实SQL执行、HTTP授权或大项目查询性能结论。
+第一阶段的原创fixture覆盖512/513完整性、禁止证据字段sentinel、精确Unicode和标点、错误项目/selector、缺失或额外依据、新旧wire互相拒绝，以及原v1字段和失败状态兼容。第一阶段测试不涉及真实SQL或HTTP授权；这些行为由下述第二阶段单独验证，仍没有大项目查询性能结论。
+
+第二阶段的真实本机HTTP/PostgreSQL验证使用独立随机数据库，schema owner直接装入原创合成批准fixture，结束后删除该库。它证明接口与数据库不变量，不代表人工审批质量、模型质量或生产服务：覆盖256/512/513、候选/占位排除、实际应用角色RLS、SQL仅取label、UTF-16正负边界、字面空白/SQL符号、只读POST鉴权/CSRF/503、并发批准时的RR旧视图及新事务新版本。坏数据用例仅在该随机库内暂时移除FK、制造悬空指针或篡改候选/来源后复原，断言500而非合法空结果；超1MiB来源不返回部分正文。没有模型调用、跨分页拼接或索引/性能收益结论。
+
+```sh
+node --test test/exact-context-http.test.js test/request-body.test.js test/database-errors.test.js
+MIGRATION_TEST_DATABASE_URL="$TEST_DATABASE_URL" node --test test/exact-context-postgres.test.js
+```
