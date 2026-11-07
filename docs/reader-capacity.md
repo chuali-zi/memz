@@ -62,6 +62,8 @@ schema 自带种子仍保留并单独统计，不能将512误报为数据库总�
 
 原始目录：`artifacts/reader-capacity/run-1794064899700-b9f1b4b3/`。该次基于提交 `6d30e10bae5bacf821aed4f64ca3ec6182767602` 的 **dirty 工作树**，不是 clean 提交取证或 CI 成绩；报告记录当时脚本及应用源码哈希。Node 24.22.1、PostgreSQL 16.15，512条生成数据的生成/实际内容哈希均为 `564ce2e4d666ff078661606987e1e3870d80b05a2a08bf631691aacc6a69693c`。
 
+可随源码复核的 [原创合成证据小包](../evaluation/evidence/reader-capacity-2026-11-07/README.md) 保存三份原始文件的逐字节副本和 SHA256SUMS；它保留上述 dirty 来源身份，不是当前 main 的 clean 负载报告。
+
 以下测量使用原报告记录的脚本哈希，原报告及原始样本保持原样。测量之后只补强失败路径及源码覆盖元数据：等待所有已启动 worker settled 后汇总、预算检查后才递增 HTTP 分母、清理超时后禁止继续创建连接、等待子进程 stdio/IPC 收尾，以及为未来报告补入实际 gate 依赖 `scripts/server-lifecycle.js` 的哈希。成功测量没有再次运行；不能把历史报告的源码覆盖或哈希改写成当前脚本版本已经完成负载回归。
 
 | 并发 | 有效200/尝试 | 观测 goodput/s | p50 ms | p95 ms | p99=max ms |

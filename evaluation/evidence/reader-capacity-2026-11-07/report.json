@@ -1,0 +1,644 @@
+{
+  "schema": "memz-reader-capacity-v1",
+  "synthetic": true,
+  "status": "passed",
+  "startedAt": "2026-11-07T15:21:39.742Z",
+  "source": {
+    "commit": "6d30e10bae5bacf821aed4f64ca3ec6182767602",
+    "workingTreeDirty": true,
+    "files": {
+      "server.js": "71dd02421652f24cf0b35b653a1a8232cc059d2e2186264fdc309911d6ff32ab",
+      "idempotency.js": "2e1f2d065a75e01ffc08d9ccc278a275bf9824655a582c51bf79b49dcc29b20c",
+      "db/schema.sql": "6dc7b3f3a10f868aa6b1d3f0ba2792c8b615224e6e56a75afa926b81eeb64d0f",
+      "scripts/database.js": "6a609db6139bf9ceea14e856c1c5d18af4bef518ec3be304ff2751adda6640d6",
+      "scripts/session-store.js": "4f2e37fc59849b190bac9123578524508fe835c8a99b7cd68ac7ee581a7e3eba",
+      "scripts/context-snapshot.js": "ddd95b987a78c88186dc26ac1d7a50f2eba2992c6324d0da7c68fba969d62191",
+      "scripts/search-query.js": "3e2288c65d0e2c6ea65a3a83aa161956b38bf4fa2d2f0a8fa7db0902bba40c4e",
+      "evaluation/reader-capacity.js": "cbe6522908a70e1d427b2815648cdb1b1e50d7a6eeeaa60b403d51d840f893a2",
+      "evaluation/fixtures/reader-capacity-child.js": "1d5f5820487bebd7530a7b34497b1d05a5cc11dcb65c9036f9d98f9fdd27348f"
+    }
+  },
+  "method": {
+    "seed": 42,
+    "concurrencies": [
+      1,
+      4,
+      12
+    ],
+    "measuredPerLevel": 80,
+    "closedLoop": true,
+    "timing": "Direct HTTP, full body consumption, JSON parsing and snapshot validation; login/logout excluded from reader timings and counted separately.",
+    "workload": "Same seeded sequence of five first/deeper current-snapshot pages at every level, 25 facts and distinct 1KiB sources per page.",
+    "cache": "Fresh-process first read recorded separately. Fixture creation and ANALYZE have already touched PostgreSQL/OS caches; no cold-cache claim.",
+    "tail": "80 samples per level: nearest-rank p99 is the observed maximum; not a stable tail estimate or SLO.",
+    "load": "Closed-loop workers with no think time; coordinated omission limits tail/load interpretation. Not maximum sustainable capacity.",
+    "resources": "Child-only RSS/cumulative CPU and pool counts sampled at 100ms plus phase boundaries. Sampled maxima are not continuous peaks; PostgreSQL/load-generator memory excluded.",
+    "comparison": "Current stack only; no alternate stack or disabled-protection control, so neither migration gains nor protection overhead are inferred.",
+    "rawFiles": {
+      "requests": "requests.jsonl",
+      "resources": "resources.jsonl"
+    },
+    "limits": {
+      "executionMs": 90000,
+      "cleanupMs": 10000,
+      "httpMs": 8000,
+      "maxResponseBytes": 1048576,
+      "maxHttpRequests": 299
+    },
+    "modelCalls": 0
+  },
+  "environment": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logicalCpus": 5,
+    "loadAverageStart": [
+      0.15,
+      0.14,
+      0.3
+    ],
+    "noiseNote": "Parent coordinated a test quiet window: parent, engine and experience report no active local test workloads; other operating-system activity is not controlled.",
+    "postgres": "16.15 (Debian 16.15-1.pgdg13+2)",
+    "postgresMaxConnections": 100,
+    "otherDatabaseActivityBefore": {
+      "connections": 1,
+      "active": 0
+    },
+    "applicationLimits": {
+      "max": 10,
+      "connectionTimeoutMillis": 5000,
+      "statement_timeout": 10000,
+      "query_timeout": 15000
+    },
+    "otherDatabaseActivityAfter": {
+      "connections": 1,
+      "active": 0
+    },
+    "loadAverageEnd": [
+      0.14,
+      0.14,
+      0.29
+    ],
+    "childDiagnosticBytes": 132
+  },
+  "fixture": {
+    "approval": "Original synthetic records explicitly initialized as approved by schema owner, only in a random temporary database; not real data or automatic extraction.",
+    "generatedRows": 512,
+    "generationSha256": "564ce2e4d666ff078661606987e1e3870d80b05a2a08bf631691aacc6a69693c",
+    "sourceBodyBytes": 524288,
+    "builtinCounts": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 4,
+      "facts": 1,
+      "candidates": 1,
+      "revisions": 1,
+      "audit": 1,
+      "idempotency_requests": 0
+    },
+    "actualTotalCounts": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 516,
+      "facts": 513,
+      "candidates": 513,
+      "revisions": 513,
+      "audit": 513,
+      "idempotency_requests": 0
+    },
+    "actualGeneratedDataSha256": "564ce2e4d666ff078661606987e1e3870d80b05a2a08bf631691aacc6a69693c",
+    "workloadPages": [
+      {
+        "after": 0,
+        "factIds": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26
+        ]
+      },
+      {
+        "after": 51,
+        "factIds": [
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76
+        ]
+      },
+      {
+        "after": 101,
+        "factIds": [
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124,
+          125,
+          126
+        ]
+      },
+      {
+        "after": 151,
+        "factIds": [
+          152,
+          153,
+          154,
+          155,
+          156,
+          157,
+          158,
+          159,
+          160,
+          161,
+          162,
+          163,
+          164,
+          165,
+          166,
+          167,
+          168,
+          169,
+          170,
+          171,
+          172,
+          173,
+          174,
+          175,
+          176
+        ]
+      },
+      {
+        "after": 201,
+        "factIds": [
+          202,
+          203,
+          204,
+          205,
+          206,
+          207,
+          208,
+          209,
+          210,
+          211,
+          212,
+          213,
+          214,
+          215,
+          216,
+          217,
+          218,
+          219,
+          220,
+          221,
+          222,
+          223,
+          224,
+          225,
+          226
+        ]
+      }
+    ]
+  },
+  "phases": [
+    {
+      "name": "fresh_process_first_read",
+      "concurrency": 1,
+      "planned": 1,
+      "startedAtMs": 467.03949600000004,
+      "measurementFinishedAtMs": 501.844324,
+      "finishedAtMs": 502.3200110000001,
+      "attempted": 1,
+      "valid": 1,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 49778688,
+        "sampledMaxPoolTotal": 1,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 21790,
+        "childCpuSystemUs": 0
+      },
+      "statusCounts": {
+        "200": 1
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 28.7316460808254,
+      "valid200PerSecond": 28.7316460808254,
+      "latencyAllMs": {
+        "n": 1,
+        "p50": 34.590104,
+        "p95": 34.590104,
+        "p99": 34.590104,
+        "max": 34.590104
+      },
+      "latencyValid200Ms": {
+        "n": 1,
+        "p50": 34.590104,
+        "p95": 34.590104,
+        "p99": 34.590104
+      }
+    },
+    {
+      "name": "warmup_1",
+      "concurrency": 1,
+      "planned": 1,
+      "startedAtMs": 502.808467,
+      "measurementFinishedAtMs": 513.125991,
+      "finishedAtMs": 513.471592,
+      "attempted": 1,
+      "valid": 1,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 50958336,
+        "sampledMaxPoolTotal": 1,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 3730,
+        "childCpuSystemUs": 4567
+      },
+      "statusCounts": {
+        "200": 1
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 96.92247868771625,
+      "valid200PerSecond": 96.92247868771625,
+      "latencyAllMs": {
+        "n": 1,
+        "p50": 10.181489999999997,
+        "p95": 10.181489999999997,
+        "p99": 10.181489999999997,
+        "max": 10.181489999999997
+      },
+      "latencyValid200Ms": {
+        "n": 1,
+        "p50": 10.181489999999997,
+        "p95": 10.181489999999997,
+        "p99": 10.181489999999997
+      }
+    },
+    {
+      "name": "measured_1",
+      "concurrency": 1,
+      "planned": 80,
+      "startedAtMs": 513.80188,
+      "measurementFinishedAtMs": 1028.2039029999999,
+      "finishedAtMs": 1028.474641,
+      "attempted": 80,
+      "valid": 80,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 8,
+        "sampledMaxRssBytes": 66256896,
+        "sampledMaxPoolTotal": 1,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 180693,
+        "childCpuSystemUs": 39618
+      },
+      "statusCounts": {
+        "200": 80
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 155.52038371357654,
+      "valid200PerSecond": 155.52038371357654,
+      "latencyAllMs": {
+        "n": 80,
+        "p50": 6.119139999999902,
+        "p95": 7.919072000000028,
+        "p99": 9.72654399999999,
+        "max": 9.72654399999999
+      },
+      "latencyValid200Ms": {
+        "n": 80,
+        "p50": 6.119139999999902,
+        "p95": 7.919072000000028,
+        "p99": 9.72654399999999
+      }
+    },
+    {
+      "name": "warmup_4",
+      "concurrency": 4,
+      "planned": 4,
+      "startedAtMs": 1029.089908,
+      "measurementFinishedAtMs": 1053.144935,
+      "finishedAtMs": 1053.450215,
+      "attempted": 4,
+      "valid": 4,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 66387968,
+        "sampledMaxPoolTotal": 4,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 10997,
+        "childCpuSystemUs": 4036
+      },
+      "statusCounts": {
+        "200": 4
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 166.28540886692755,
+      "valid200PerSecond": 166.28540886692755,
+      "latencyAllMs": {
+        "n": 4,
+        "p50": 19.494515999999976,
+        "p95": 23.642585000000054,
+        "p99": 23.642585000000054,
+        "max": 23.642585000000054
+      },
+      "latencyValid200Ms": {
+        "n": 4,
+        "p50": 19.494515999999976,
+        "p95": 23.642585000000054,
+        "p99": 23.642585000000054
+      }
+    },
+    {
+      "name": "measured_4",
+      "concurrency": 4,
+      "planned": 80,
+      "startedAtMs": 1053.702685,
+      "measurementFinishedAtMs": 1263.835558,
+      "finishedAtMs": 1264.2638729999999,
+      "attempted": 80,
+      "valid": 80,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 4,
+        "sampledMaxRssBytes": 81723392,
+        "sampledMaxPoolTotal": 4,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 107807,
+        "childCpuSystemUs": 29875
+      },
+      "statusCounts": {
+        "200": 80
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 380.7114939127111,
+      "valid200PerSecond": 380.7114939127111,
+      "latencyAllMs": {
+        "n": 80,
+        "p50": 9.973727000000054,
+        "p95": 13.778219000000036,
+        "p99": 15.255334000000175,
+        "max": 15.255334000000175
+      },
+      "latencyValid200Ms": {
+        "n": 80,
+        "p50": 9.973727000000054,
+        "p95": 13.778219000000036,
+        "p99": 15.255334000000175
+      }
+    },
+    {
+      "name": "warmup_12",
+      "concurrency": 12,
+      "planned": 12,
+      "startedAtMs": 1264.6459479999999,
+      "measurementFinishedAtMs": 1304.468997,
+      "finishedAtMs": 1304.856962,
+      "attempted": 12,
+      "valid": 12,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 85786624,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 31269,
+        "childCpuSystemUs": 2480
+      },
+      "statusCounts": {
+        "200": 12
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 301.33302952267604,
+      "valid200PerSecond": 301.33302952267604,
+      "latencyAllMs": {
+        "n": 12,
+        "p50": 28.58143199999995,
+        "p95": 37.060024999999996,
+        "p99": 37.060024999999996,
+        "max": 37.060024999999996
+      },
+      "latencyValid200Ms": {
+        "n": 12,
+        "p50": 28.58143199999995,
+        "p95": 37.060024999999996,
+        "p99": 37.060024999999996
+      }
+    },
+    {
+      "name": "measured_12",
+      "concurrency": 12,
+      "planned": 80,
+      "startedAtMs": 1305.232497,
+      "measurementFinishedAtMs": 1445.547526,
+      "finishedAtMs": 1445.866737,
+      "attempted": 80,
+      "valid": 80,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 4,
+        "sampledMaxRssBytes": 93913088,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 100585,
+        "childCpuSystemUs": 11661
+      },
+      "statusCounts": {
+        "200": 80
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 570.1456256692214,
+      "valid200PerSecond": 570.1456256692214,
+      "latencyAllMs": {
+        "n": 80,
+        "p50": 19.298334999999952,
+        "p95": 27.463776999999936,
+        "p99": 32.51740100000006,
+        "max": 32.51740100000006
+      },
+      "latencyValid200Ms": {
+        "n": 80,
+        "p50": 19.298334999999952,
+        "p95": 27.463776999999936,
+        "p99": 32.51740100000006
+      }
+    },
+    {
+      "name": "pool_saturation",
+      "concurrency": 6,
+      "planned": 6,
+      "startedAtMs": 1446.784359,
+      "measurementFinishedAtMs": 6450.585927,
+      "finishedAtMs": 6450.839258,
+      "attempted": 6,
+      "valid": 6,
+      "httpErrors": 6,
+      "resources": {
+        "samples": 52,
+        "sampledMaxRssBytes": 94044160,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 6,
+        "childCpuUserUs": 19870,
+        "childCpuSystemUs": 1163
+      },
+      "statusCounts": {
+        "503": 6
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 1.1990883168451016,
+      "valid200PerSecond": 0,
+      "latencyAllMs": {
+        "n": 6,
+        "p50": 5002.853338999999,
+        "p95": 5003.381375,
+        "p99": 5003.381375,
+        "max": 5003.381375
+      },
+      "latencyValid200Ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null
+      }
+    },
+    {
+      "name": "same_session_recovery",
+      "concurrency": 6,
+      "planned": 12,
+      "startedAtMs": 6451.299301,
+      "measurementFinishedAtMs": 6503.993206,
+      "finishedAtMs": 6504.397185,
+      "attempted": 12,
+      "valid": 12,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 96927744,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 40609,
+        "childCpuSystemUs": 5963
+      },
+      "statusCounts": {
+        "200": 12
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 227.73032289028455,
+      "valid200PerSecond": 227.73032289028455,
+      "latencyAllMs": {
+        "n": 12,
+        "p50": 21.47110900000007,
+        "p95": 32.893943999999465,
+        "p99": 32.893943999999465,
+        "max": 32.893943999999465
+      },
+      "latencyValid200Ms": {
+        "n": 12,
+        "p50": 21.47110900000007,
+        "p95": 32.893943999999465,
+        "p99": 32.893943999999465
+      }
+    }
+  ],
+  "checks": {
+    "fixtureUnchanged": true,
+    "rawRequests": 282,
+    "httpRequests": 282,
+    "readerRequests": 278,
+    "unexpectedSamples": 0,
+    "expected503": 6,
+    "rls403": 2
+  },
+  "cleanup": {
+    "childExited": true,
+    "ownerClosed": true,
+    "temporaryDatabaseDropped": true,
+    "adminClosed": true,
+    "elapsedMs": 34.21306100000038
+  },
+  "executionMs": 6519.136727,
+  "actualHttpRequests": 282,
+  "rawSampleCount": 282,
+  "finishedAt": "2026-11-07T15:21:46.259Z",
+  "resourceSummary": {
+    "samples": 81,
+    "sampledMaxRssBytes": 96927744,
+    "sampledMaxPoolTotal": 10,
+    "sampledMaxPoolWaiting": 6
+  },
+  "rawFiles": {
+    "requests.jsonl": {
+      "bytes": 109602,
+      "sha256": "58eca7eceeb9fd25785541ed312d20097e24b5dac48b00689ad46ac7d2ab948f"
+    },
+    "resources.jsonl": {
+      "bytes": 18753,
+      "sha256": "0dc673e5a236b7000482bd5b14398f1cedc0c758161dceee5d9d3854c7ca22e4"
+    }
+  }
+}
