@@ -36,10 +36,13 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:product:ui
       - run: PGPASSWORD=postgres_demo_only psql -h 127.0.0.1 -U postgres -d memz -v ON_ERROR_STOP=1 -f db/schema.sql
       - run: npm run test:system:evidence
         env:
           SYSTEM_TEST_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz
+          PG_TOOLS_CONTAINER: ${{ job.services.postgres.id }}
       - run: npm run test:memory:integration
         env:
           MEMORY_TEST_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz
@@ -83,7 +86,6 @@ jobs:
           name: query-plan-evidence
           path: artifacts/query-plans.json
           if-no-files-found: ignore
-      - run: npx playwright install --with-deps chromium
       - name: Verify Chinese font availability
         run: |
           test -n "$(fc-list :lang=zh family)"
