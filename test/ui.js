@@ -5,6 +5,70 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {execFileSync}=require('node:child_process');
 
+// Test harness budgets only: real UI oracles stay unchanged. A failed route or
+// 15s observation fails the run; 120s bounds all work, then cleanup has its own
+// 12s budget. Cancellation closes only this run's page/browser, never baseURL.
+const UI_WORK_MS=120000,UI_STAGE_MS=15000,UI_CLEANUP_MS=12000;
+async function uiBounded(promise,label,ms){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label)),ms)})])}finally{clearTimeout(timer)}}
+function createUIControl({workMs=UI_WORK_MS,stageMs=UI_STAGE_MS,onCancel=()=>{}}={}){
+  let cancelled=false,rejectFatal,stage='browser startup',pageClosing;
+  const cancellation=new AbortController(),releases=new Set(),timers=new Set(),fatal=new Promise((_,reject)=>{rejectFatal=reject});fatal.catch(()=>{});
+  const releaseAll=()=>{for(const release of releases)release();releases.clear()};
+  const abort=error=>{if(cancelled)return;cancelled=true;cancellation.abort();releaseAll();try{pageClosing=Promise.resolve(onCancel());pageClosing.catch(()=>{})}catch{}rejectFatal(error)};
+  const workTimer=setTimeout(()=>abort(new Error('UI_WORK_TIMEOUT at '+stage)),workMs);
+  const check=()=>{if(cancelled)throw new Error('UI_CANCELLED')};
+  return {fatal,check,signal:cancellation.signal,get stage(){return stage},get cancelled(){return cancelled},get pageClosing(){return pageClosing},abort,
+    at:label=>{stage=label},
+    hold:assign=>new Promise(resolve=>{releases.add(resolve);assign(resolve)}),
+    watch:(label,promise)=>{stage=label;const timer=setTimeout(()=>abort(new Error('UI_STAGE_TIMEOUT at '+label)),stageMs);timers.add(timer);return Promise.race([promise,fatal]).finally(()=>{clearTimeout(timer);timers.delete(timer)})},
+    route:(label,handler)=>async route=>{try{check();await handler(route);check()}catch{if(!cancelled)abort(new Error('UI_ROUTE_FAILED at '+label));try{await route.abort()}catch{}}},
+    fetch:async route=>{check();const response=await route.fetch();check();return response},
+    stop:()=>{cancelled=true;cancellation.abort();clearTimeout(workTimer);for(const timer of timers)clearTimeout(timer);timers.clear();releaseAll()}
+  };
+}
+async function closeUIResources({page,context,browser,browserServer,work,failureCapture},control){
+  control.stop();const result={errors:[]},end=Date.now()+UI_CLEANUP_MS;
+  const step=async(label,action,ms)=>{try{await uiBounded(Promise.resolve().then(action),'UI_CLEANUP_TIMEOUT '+label,Math.max(1,Math.min(ms,end-Date.now())));result[label]=true}catch{result[label]=false;result.errors.push(label)}};
+  if(failureCapture&&page&&!page.isClosed())try{await uiBounded(page.screenshot({path:failureCapture,timeout:1000}),'UI_FAILURE_CAPTURE_TIMEOUT',Math.max(1,Math.min(1000,end-Date.now())))}catch{}
+  if(control.pageClosing)await step('cancelledPageClosed',()=>control.pageClosing,2000);
+  if(context)await step('requestContextDisposed',()=>context.request.dispose({reason:'UI harness cleanup'}),2000);
+  if(page&&!page.isClosed())await step('routesReleased',()=>page.unrouteAll({behavior:'wait'}),2000);
+  if(context)await step('contextClosed',()=>context.close(),3000);
+  if(browser)await step('browserClosed',()=>browser.close(),3000);
+  const owned=browserServer?.process();
+  if(owned&&owned.exitCode===null&&owned.signalCode===null){await step('browserServerKilled',()=>browserServer.kill(),2000);if(owned.exitCode===null&&owned.signalCode===null){owned.kill('SIGKILL');result.errors.push('browserForcedKill');await step('forcedBrowserExited',()=>owned.exitCode!==null||owned.signalCode!==null?Promise.resolve():new Promise(resolve=>owned.once('exit',resolve)),1000)}}
+  if(work)await step('workSettled',()=>work.then(()=>{},()=>{}),2000);
+  return result;
+}
+
+// Observe the original browser API consumer, not CDP's independently tracked
+// response body. Match once at invocation time and retain no returned data.
+async function armFrontendAPISettlement(page,target){
+  return page.evaluate(target=>{
+    if(!window.__uiApiSettlements){
+      const state={next:0,entries:{}},original=api;window.__uiApiSettlements=state;
+      api=async function(...args){
+        let entry;
+        try{
+          const url=new URL(args[0],location.href),method=(args[1]?.method||'GET').toUpperCase();
+          entry=Object.values(state.entries).find(item=>item.status==='waiting'&&method==='GET'&&url.pathname===item.target.path&&Object.entries(item.target.params).every(([key,value])=>url.searchParams.get(key)===value));
+          if(entry)entry.status='reading';
+        }catch{}
+        try{const value=await Reflect.apply(original,this,args);if(entry)entry.status='success';return value}
+        catch(error){if(entry)entry.status='failed';throw error}
+      };
+    }
+    const state=window.__uiApiSettlements,id=++state.next;state.entries[id]={target,status:'waiting'};return id;
+  },target);
+}
+async function waitFrontendAPISettlement(page,id,control,label){
+  return control.watch(label,(async()=>{
+    const handle=await page.waitForFunction(id=>['success','failed'].includes(window.__uiApiSettlements?.entries[id]?.status),id,{timeout:0});await handle.dispose();
+    const status=await page.evaluate(id=>window.__uiApiSettlements.entries[id].status,id);
+    if(status!=='success')throw new Error('UI_API_SETTLEMENT_FAILED at '+label);
+  })());
+}
+
 async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env.CHROMIUM_PATH||'/usr/bin/chromium',databaseVersion=null,preparePagination=null,prepareSources=null}={}){
   const dir=path.join('artifacts','ui',`run-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`);
   fs.mkdirSync(dir,{recursive:true});
@@ -15,16 +79,23 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
   for(const file of ['server.js','db/schema.sql','public/app.js','public/index.html','public/style.css','test/ui.js','test/ui-evidence.js','idempotency.js','scripts/context-client.js','scripts/source-client.js','scripts/proposal-client.js','scripts/write-client.js','test/agent-handoff.js']){
     report.source.files[file]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   }
-  let browser,page;
+  let browser,browserServer,context,page,work,failure;
+  const control=createUIControl({onCancel:()=>page&&!page.isClosed()?page.close():undefined});
+  const intercept=(pattern,handler)=>page.route(pattern,control.route(pattern,handler));
+  const responseEvent=predicate=>{const pending=page.waitForResponse(predicate);pending.catch(()=>{});return pending};
+  const requestEvent=predicate=>{const pending=page.waitForRequest(predicate);pending.catch(()=>{});return pending};
   async function capture(file,claim,selector=null,viewportOnly=false){
     const target=path.join(dir,file);
-    if(selector)await page.locator(selector).screenshot({path:target});else await page.screenshot({path:target,fullPage:!viewportOnly});
+    control.at('capture '+file);
+    if(selector)await control.watch('capture '+file,page.locator(selector).screenshot({path:target}));else await control.watch('capture '+file,page.screenshot({path:target,fullPage:!viewportOnly}));
     report.screenshots.push({file,claim,viewport:page.viewportSize(),region:selector,sha256:crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex')});
   }
   try{
-    browser=await chromium.launch({...(executablePath?{executablePath}:{}),headless:true,args:['--no-sandbox']});
+    work=(async()=>{
+    browserServer=await chromium.launchServer({...(executablePath?{executablePath}:{}),host:'127.0.0.1',headless:true,args:['--no-sandbox'],timeout:15000});
+    browser=await chromium.connect(browserServer.wsEndpoint(),{timeout:5000});
     report.environment.browser=browser.version();
-    page=await browser.newPage({viewport:report.environment.viewport,locale:'zh-CN',timezoneId:'UTC'});
+    context=await browser.newContext({viewport:report.environment.viewport,locale:'zh-CN',timezoneId:'UTC'});page=await context.newPage();
     page.setDefaultTimeout(15000);
     page.on('pageerror',e=>report.pageErrors.push(e.message));
     await page.goto(baseURL);
@@ -36,12 +107,12 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#loginForm [name=password]').fill('demo-owner');
     const invalidProjectRequests=[];
     page.on('request',request=>{if(/\/api\/projects\/(null|0)\//.test(request.url()))invalidProjectRequests.push(request.url())});
-    await page.route('**/api/projects',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'项目列表测试故障'})}));
+    await intercept('**/api/projects',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'项目列表测试故障'})}));
     await page.getByRole('button',{name:'进入项目'}).click();
     await page.getByText(/503 项目列表测试故障/).waitFor();
     assert.equal(await page.getByRole('button',{name:'提交候选'}).isDisabled(),true);
     await page.unroute('**/api/projects');
-    await page.route('**/api/projects',route=>route.fulfill({status:200,contentType:'application/json',body:'[]'}));
+    await intercept('**/api/projects',route=>route.fulfill({status:200,contentType:'application/json',body:'[]'}));
     await page.getByRole('button',{name:'刷新工作台',exact:true}).click();
     await page.getByText(/当前账号没有可访问的项目/).waitFor();
     assert.equal(await page.locator('#project option').count(),0);
@@ -49,15 +120,15 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     assert.equal(await page.getByRole('button',{name:'提交候选'}).isDisabled(),true);
     await page.unroute('**/api/projects');
     let releaseProject,projectSeen,projectRequests=0;
-    const projectHeld=new Promise(resolve=>{releaseProject=resolve}),projectObserved=new Promise(resolve=>{projectSeen=resolve});
-    await page.route('**/api/projects',async route=>{
-      if(++projectRequests===1){projectSeen();await projectHeld;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'过期项目失败'})})}
+    const projectHeld=control.hold(resolve=>{releaseProject=resolve}),projectObserved=new Promise(resolve=>{projectSeen=resolve});
+    await intercept('**/api/projects',async route=>{
+      if(++projectRequests===1){projectSeen();await projectHeld;control.check();await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'过期项目失败'})})}
       else await route.continue();
     });
-    await page.getByRole('button',{name:'刷新工作台',exact:true}).click();await projectObserved;
+    await page.getByRole('button',{name:'刷新工作台',exact:true}).click();await control.watch('held project list',projectObserved);
     await page.getByRole('button',{name:'刷新工作台',exact:true}).click();
     await page.locator('#facts').getByText('项目 / 截止日：20号',{exact:true}).waitFor();
-    const lateProjectResponse=page.waitForResponse(response=>response.url().endsWith('/api/projects')&&response.status()===503);
+    const lateProjectResponse=responseEvent(response=>response.url().endsWith('/api/projects')&&response.status()===503);
     releaseProject();await lateProjectResponse;
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     assert.equal(await page.locator('#notice').textContent(),'');
@@ -65,7 +136,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     assert.deepEqual(invalidProjectRequests,[]);
     report.checks={...report.checks,projectRecovery:{initialFailure:true,emptyState:true,staleFailureIgnored:true,retryLoadedProject:true,invalidProjectRequests:0}};
     await page.unroute('**/api/projects');
-    await page.route('**/facts/*/provenance?version=*',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'溯源测试故障'})}));
+    await intercept('**/facts/*/provenance?version=*',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'溯源测试故障'})}));
     await page.locator('#facts').getByRole('button',{name:'查看依据',exact:true}).click();
     await page.locator('#facts').getByText(/依据读取失败：503 溯源测试故障/).waitFor();
     await page.unroute('**/facts/*/provenance?version=*');
@@ -73,7 +144,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#facts .provenance-detail').getByText('原计划截止日为20号。',{exact:true}).waitFor();
     await capture('02-workspace.png','初始20号v1及按版本读取的会议纪要原文');
     await page.locator('#sourceSelect').selectOption({label:'#2 负责人更正（合成）'});
-    const creationRequest=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/api/projects/1/candidates'));
+    const creationRequest=requestEvent(r=>r.method()==='POST'&&r.url().endsWith('/api/projects/1/candidates'));
     await page.getByRole('button',{name:'提交候选'}).click();
     assert.match((await creationRequest).headers()['idempotency-key'],/^[A-Za-z0-9._:-]{1,128}$/);
     await page.getByText('候选已提交，等待负责人审批').waitFor();
@@ -135,7 +206,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     assert.equal(await page.locator('#history .entry').count(),0);
     await capture('08-other-project.png','另一项目账号仅看到独立项目，没有第一项目事实候选或历史');
     if(preparePagination){
-      await preparePagination();
+      control.at('prepare pagination fixture');await preparePagination({signal:control.signal});control.check();
       await page.getByRole('button',{name:'切换账号'}).click();
       await page.getByRole('button',{name:'进入项目'}).click();
       await page.getByText('第 1 页 · 50 条',{exact:true}).waitFor();
@@ -158,18 +229,19 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await page.locator('#facts').getByText('分页演示00 / 状态：翻页期间已更新',{exact:true}).waitFor();
       await page.getByText('第 1 页 · 50 条',{exact:true}).waitFor();
       // Hold a real API response, then submit a newer search before releasing it.
-      let release,seen;const held=new Promise(r=>{release=r}),observed=new Promise(r=>{seen=r});
-      await page.route('**/api/projects/1/facts?**',async route=>{
+      let release,seen;const held=control.hold(r=>{release=r}),observed=new Promise(r=>{seen=r});
+      await intercept('**/api/projects/1/facts?**',async route=>{
         if(new URL(route.request().url()).searchParams.get('q')==='分页演示00'){
-          const response=await route.fetch();seen();await held;await route.fulfill({response});
+          const response=await control.fetch(route);seen();await held;control.check();await route.fulfill({response});
         }else await route.continue();
       });
+      const oldFactsAPI=await armFrontendAPISettlement(page,{path:'/api/projects/1/facts',params:{q:'分页演示00'}});
       await page.getByRole('textbox',{name:'检索当前事实'}).fill('分页演示00');
-      await page.getByRole('button',{name:'搜索',exact:true}).click();await observed;
+      await page.getByRole('button',{name:'搜索',exact:true}).click();await control.watch('held facts response',observed);
       await page.getByRole('textbox',{name:'检索当前事实'}).fill('分页演示54');
       await page.getByRole('button',{name:'搜索',exact:true}).click();
       await page.locator('#facts').getByText('分页演示54 / 状态：合成分页事实',{exact:true}).waitFor();
-      const oldResponse=page.waitForResponse(r=>new URL(r.url()).searchParams.get('q')==='分页演示00');release();await (await oldResponse).finished();
+      release();await waitFrontendAPISettlement(page,oldFactsAPI,control,'old facts frontend API');
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       await page.waitForFunction(()=>document.querySelector('#facts').textContent.includes('分页演示54')&&document.querySelector('#facts').getAttribute('aria-busy')==='false');
       await page.unroute('**/api/projects/1/facts?**');
@@ -180,14 +252,14 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await page.getByText('没有匹配的当前事实',{exact:true}).waitFor();
       assert.equal(await page.locator('#factsNext').isDisabled(),true);
       await capture('10-empty-search.png','无匹配搜索清空事实，分页禁用，状态可被辅助技术读取','.card:has(#facts)');
-      await page.route('**/api/projects/1/facts?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'测试故障'})}));
+      await intercept('**/api/projects/1/facts?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'测试故障'})}));
       await page.getByRole('textbox',{name:'检索当前事实'}).fill('分页演示54');
       await page.getByRole('button',{name:'搜索',exact:true}).click();
       await page.getByText(/加载失败：503 测试故障/).waitFor();
       assert.equal(await page.locator('#facts .entry').count(),0);
       assert.equal(await page.locator('#factsNext').isDisabled(),true);
       await page.unroute('**/api/projects/1/facts?**');
-      const contextRequest=page.waitForRequest(r=>r.url().endsWith('/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false'));
+      const contextRequest=requestEvent(r=>r.url().endsWith('/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false'));
       await page.getByRole('button',{name:'刷新工作台',exact:true}).click();await contextRequest;
       await page.locator('#facts').getByText('分页演示54 / 状态：合成分页事实',{exact:true}).waitFor();
       await capture('11-search-recovered.png','注入503后刷新恢复真实检索；聚合请求显式排除事实','.card:has(#facts)');
@@ -202,7 +274,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await capture('13-history-last-page.png','58条真实合成修订分为25/25/8，旧版本末页可读且按钮禁用','.card:has(#history)');
       const factText=await page.locator('#facts').textContent();
       const historyBeforeFailure={text:await page.locator('#history').textContent(),state:await page.evaluate(()=>historyState),previous:await page.locator('#historyPrevious').isDisabled(),next:await page.locator('#historyNext').isDisabled()};
-      await page.route('**/api/projects/1/history?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'历史测试故障'})}));
+      await intercept('**/api/projects/1/history?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'历史测试故障'})}));
       await page.getByRole('button',{name:'刷新历史',exact:true}).click();
       await page.getByText(/历史加载失败：503 历史测试故障/).waitFor();
       assert.equal(await page.locator('#history').textContent(),historyBeforeFailure.text);
@@ -216,17 +288,17 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await page.locator('#history').getByText('分页演示00 / 状态：翻页期间已更新',{exact:true}).waitFor();
       assert.equal(await page.locator('#historyPrevious').isDisabled(),true);
       let releaseHistory,observeHistory;
-      const historyHeld=new Promise(r=>{releaseHistory=r}),historyObserved=new Promise(r=>{observeHistory=r});
-      await page.route('**/api/projects/1/history?**',async route=>{
+      const historyHeld=control.hold(r=>{releaseHistory=r}),historyObserved=new Promise(r=>{observeHistory=r});
+      await intercept('**/api/projects/1/history?**',async route=>{
         if(new URL(route.request().url()).searchParams.has('before')){
-          const response=await route.fetch();observeHistory();await historyHeld;await route.fulfill({response});
+          const response=await control.fetch(route);observeHistory();await historyHeld;control.check();await route.fulfill({response});
         }else await route.continue();
       });
-      await page.getByRole('button',{name:'较旧一页',exact:true}).click();await historyObserved;
+      const oldHistoryAPI=await armFrontendAPISettlement(page,{path:'/api/projects/1/history',params:{before:String(await page.evaluate(()=>historyState.next))}});
+      await page.getByRole('button',{name:'较旧一页',exact:true}).click();await control.watch('held history response',historyObserved);
       await page.getByRole('button',{name:'刷新历史',exact:true}).click();
       await page.getByText('历史第 1 页 · 25 条',{exact:true}).waitFor();
-      const oldHistory=page.waitForResponse(r=>r.url().includes('/history?')&&new URL(r.url()).searchParams.has('before'));
-      releaseHistory();await (await oldHistory).finished();
+      releaseHistory();await waitFrontendAPISettlement(page,oldHistoryAPI,control,'old history frontend API');
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       assert.equal(await page.locator('#historyStatus').textContent(),'历史第 1 页 · 25 条');
       assert.equal(await page.locator('#historyPrevious').isDisabled(),true);
@@ -283,22 +355,22 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       assert.equal(await page.locator('#candidates').getByRole('button',{name:/^(批准|驳回)$/}).count(),0);
       await capture('16-candidates-concurrent-decision.png','另一请求驳回后旧批准请求409，刷新筛选展示两条真实已驳回状态','.card:has(#candidates)');
       let releaseCandidates,observeCandidates;
-      const candidateHeld=new Promise(r=>{releaseCandidates=r}),candidateObserved=new Promise(r=>{observeCandidates=r});
-      await page.route('**/api/projects/1/candidates?**',async route=>{
+      const candidateHeld=control.hold(r=>{releaseCandidates=r}),candidateObserved=new Promise(r=>{observeCandidates=r});
+      await intercept('**/api/projects/1/candidates?**',async route=>{
         if(new URL(route.request().url()).searchParams.get('status')==='approved'){
-          const response=await route.fetch();observeCandidates();await candidateHeld;await route.fulfill({response});
+          const response=await control.fetch(route);observeCandidates();await candidateHeld;control.check();await route.fulfill({response});
         }else await route.continue();
       });
-      await page.getByLabel('筛选候选').selectOption('approved');await candidateObserved;
+      const oldCandidatesAPI=await armFrontendAPISettlement(page,{path:'/api/projects/1/candidates',params:{status:'approved'}});
+      await page.getByLabel('筛选候选').selectOption('approved');await control.watch('held candidate response',candidateObserved);
       await page.getByLabel('筛选候选').selectOption('pending');
       await page.getByText('当前筛选没有候选',{exact:true}).waitFor();
-      const oldCandidates=page.waitForResponse(r=>r.url().includes('/candidates?')&&new URL(r.url()).searchParams.get('status')==='approved');
-      releaseCandidates();await (await oldCandidates).finished();
+      releaseCandidates();await waitFrontendAPISettlement(page,oldCandidatesAPI,control,'old candidates frontend API');
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       assert.equal(await page.locator('#candidates .entry').count(),0);
       assert.equal(await page.locator('#candidateFilter').inputValue(),'pending');
       await page.unroute('**/api/projects/1/candidates?**');
-      await page.route('**/api/projects/1/candidates?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'候选测试故障'})}));
+      await intercept('**/api/projects/1/candidates?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'候选测试故障'})}));
       await page.getByRole('button',{name:'刷新候选',exact:true}).click();
       await page.getByText(/候选加载失败：503 候选测试故障/).waitFor();
       assert.equal(await page.locator('#candidatesNext').isDisabled(),true);
@@ -311,7 +383,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
 
     }
     if(prepareSources){
-      await prepareSources();await page.setViewportSize({width:1440,height:1000});
+      control.at('prepare sources fixture');await prepareSources({signal:control.signal});control.check();await page.setViewportSize({width:1440,height:1000});
       const originalSelection=await page.locator('#sourceSelect').inputValue();
       await page.getByRole('button',{name:'刷新来源',exact:true}).click();
       await page.getByText('来源第 1 页 · 25 条',{exact:true}).waitFor();
@@ -339,7 +411,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       await page.locator('#proposal [name=predicate]').fill('依据');
       await page.locator('#proposal [name=value]').fill('跨页引用');
       await page.locator('#proposal [name=expected_version]').fill('0');
-      const proposalRequest=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/candidates'));
+      const proposalRequest=requestEvent(r=>r.method()==='POST'&&r.url().endsWith('/candidates'));
       await page.getByRole('button',{name:'提交候选',exact:true}).click();
       assert.equal((await proposalRequest).postDataJSON().source_id,selectedId);
       await page.locator('#candidates .entry').filter({hasText:'来源引用测试'}).getByRole('button',{name:'批准',exact:true}).click();
@@ -353,20 +425,21 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
       assert.equal(await page.locator('#sourceSelect').inputValue(),selectedId);
       await capture('19-source-choice-preserved.png','来源检索为空后仍使用已选ID提议并批准，候选与事实溯源经真实接口验证','.card:has(#proposal)');
       let releaseSources,observeSources;
-      const sourceHeld=new Promise(r=>{releaseSources=r}),sourceObserved=new Promise(r=>{observeSources=r});
-      await page.route('**/api/projects/1/sources?**',async route=>{
+      const sourceHeld=control.hold(r=>{releaseSources=r}),sourceObserved=new Promise(r=>{observeSources=r});
+      await intercept('**/api/projects/1/sources?**',async route=>{
         if(new URL(route.request().url()).searchParams.get('q')==='来源演示00'){
-          const response=await route.fetch();observeSources();await sourceHeld;await route.fulfill({response});
+          const response=await control.fetch(route);observeSources();await sourceHeld;control.check();await route.fulfill({response});
         }else await route.continue();
       });
-      await page.getByRole('textbox',{name:'检索来源标题'}).fill('来源演示00');await page.getByRole('button',{name:'查找来源',exact:true}).click();await sourceObserved;
+      const oldSourcesAPI=await armFrontendAPISettlement(page,{path:'/api/projects/1/sources',params:{q:'来源演示00'}});
+      await page.getByRole('textbox',{name:'检索来源标题'}).fill('来源演示00');await page.getByRole('button',{name:'查找来源',exact:true}).click();await control.watch('held source response',sourceObserved);
       await page.getByRole('textbox',{name:'检索来源标题'}).fill('来源演示54');await page.getByRole('button',{name:'查找来源',exact:true}).click();
       await page.getByText('来源第 1 页 · 1 条 · 已到末页',{exact:true}).waitFor();
-      const oldSources=page.waitForResponse(r=>r.url().includes('/sources?')&&new URL(r.url()).searchParams.get('q')==='来源演示00');releaseSources();await (await oldSources).finished();
+      releaseSources();await waitFrontendAPISettlement(page,oldSourcesAPI,control,'old sources frontend API');
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       assert.ok((await page.locator('#sources').textContent()).includes('来源演示54'));assert.equal(await page.locator('#sourceSelect').inputValue(),selectedId);
       await page.unroute('**/api/projects/1/sources?**');
-      await page.route('**/api/projects/1/sources?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'来源测试故障'})}));
+      await intercept('**/api/projects/1/sources?**',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'来源测试故障'})}));
       await page.getByRole('button',{name:'刷新来源',exact:true}).click();await page.getByText(/来源加载失败：503 来源测试故障/).waitFor();
       assert.equal(await page.locator('#sourceSelect').inputValue(),selectedId);assert.equal(await page.locator('#sourcesNext').isDisabled(),true);
       await page.unroute('**/api/projects/1/sources?**');
@@ -383,23 +456,23 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     }
     if(prepareSources){
       const raceTitle='客户端幂等竞态（合成）',keys=[];let releaseOld,releaseLost,oldSeen,lostSeen,committedLostId;
-      const oldHeld=new Promise(r=>{releaseOld=r}),lostHeld=new Promise(r=>{releaseLost=r});
+      const oldHeld=control.hold(r=>{releaseOld=r}),lostHeld=control.hold(r=>{releaseLost=r});
       const oldObserved=new Promise(r=>{oldSeen=r}),lostObserved=new Promise(r=>{lostSeen=r});
-      await page.route('**/api/projects/1/sources',async route=>{
+      await intercept('**/api/projects/1/sources',async route=>{
         if(route.request().method()!=='POST'||route.request().postDataJSON().title!==raceTitle){await route.continue();return}
         const number=keys.length;keys.push(route.request().headers()['idempotency-key']);
-        const response=await route.fetch();assert.equal(response.status(),200);
-        if(number===1){oldSeen();await oldHeld}
-        if(number===2){committedLostId=(await response.json()).id;lostSeen();await lostHeld;await route.abort('failed');return}
+        const response=await control.fetch(route);assert.equal(response.status(),200);
+        if(number===1){oldSeen();await oldHeld;control.check()}
+        if(number===2){committedLostId=(await response.json()).id;lostSeen();await lostHeld;control.check();await route.abort('failed');return}
         await route.fulfill({response});
       });
       await page.evaluate(title=>{
         window.creationRace={body:{title,content:'真实请求竞态合成正文'},outcomes:[]};
         for(const i of [0,1])createRecord('/api/projects/1/sources',window.creationRace.body).then(value=>{window.creationRace.outcomes[i]={ok:true,id:value.id}},()=>{window.creationRace.outcomes[i]={ok:false}});
       },raceTitle);
-      await page.waitForFunction(()=>window.creationRace.outcomes[0]?.ok);await oldObserved;
+      await page.waitForFunction(()=>window.creationRace.outcomes[0]?.ok);await control.watch('overlapping creation response',oldObserved);
       await page.evaluate(()=>{createRecord('/api/projects/1/sources',window.creationRace.body).then(value=>{window.creationRace.outcomes[2]={ok:true,id:value.id}},()=>{window.creationRace.outcomes[2]={ok:false}})});
-      await lostObserved;releaseOld();await page.waitForFunction(()=>window.creationRace.outcomes[1]?.ok);
+      await control.watch('committed lost creation response',lostObserved);releaseOld();await page.waitForFunction(()=>window.creationRace.outcomes[1]?.ok);
       releaseLost();await page.waitForFunction(()=>window.creationRace.outcomes[2]?.ok===false);
       const retried=await page.evaluate(()=>createRecord('/api/projects/1/sources',window.creationRace.body));
       assert.equal(keys.length,4);assert.equal(keys[0],keys[1]);assert.notEqual(keys[0],keys[2]);assert.equal(keys[2],keys[3]);assert.equal(retried.id,committedLostId);
@@ -418,7 +491,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#addSourceShortcut').focus();await page.keyboard.press('Enter');
     assert.equal(await page.locator('#sourceForm [name=title]').evaluate(e=>e===document.activeElement),true);
     await page.locator('#sourceForm [name=title]').fill('首次使用合成来源');await page.locator('#sourceForm [name=content]').fill('项目截止日20号。');
-    await page.route('**/api/projects/1/sources',route=>route.request().method()==='POST'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'保存演练故障'})}):route.continue());
+    await intercept('**/api/projects/1/sources',route=>route.request().method()==='POST'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'保存演练故障'})}):route.continue());
     await page.getByRole('button',{name:'保存来源',exact:true}).click();await page.locator('#sourceFeedback').filter({hasText:'503 保存演练故障'}).waitFor();
     const errorBox=await page.locator('#sourceFeedback').filter({hasText:'503 保存演练故障'}).boundingBox();assert.ok(errorBox.y>=0&&errorBox.y+errorBox.height<=844,'source-save error must be in the viewport, not far above the form');
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'首次使用合成来源');
@@ -436,7 +509,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     }
     const firstStory=await submitStory('20号',0);assert.equal(await page.locator('#facts .entry').count(),0);
     let previewRequests=0;const previewRoute='**/api/projects/1/candidates/*/source';
-    await page.route(previewRoute,route=>++previewRequests===1?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'审核依据测试故障'})}):route.continue());
+    await intercept(previewRoute,route=>++previewRequests===1?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'审核依据测试故障'})}):route.continue());
     await firstStory.getByRole('button',{name:'核对来源原文',exact:true}).click();await firstStory.getByText(/来源读取失败：503 审核依据测试故障/).waitFor();
     await firstStory.getByRole('button',{name:'重试来源原文',exact:true}).click();await firstStory.getByText('项目截止日20号。',{exact:true}).waitFor();
     assert.ok((await firstStory.textContent()).includes(`来源 #${firstSourceId}：首次使用合成来源`));assert.equal(await page.locator('#facts .entry').count(),0);
@@ -462,7 +535,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     const oldEntry=page.locator('#history .entry').filter({hasText:`${storySubject} / 截止日：20号`});
     await oldEntry.waitFor();let historyProofRequests=0;
     const oldProofRoute=`**/api/projects/1/facts/${clientContext.facts[0].id}/provenance?version=1`;
-    await page.route(oldProofRoute,route=>++historyProofRequests===1?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'历史依据测试故障'})}):route.continue());
+    await intercept(oldProofRoute,route=>++historyProofRequests===1?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'历史依据测试故障'})}):route.continue());
     await oldEntry.getByRole('button',{name:'查看依据',exact:true}).click();await oldEntry.getByText(/依据读取失败：503 历史依据测试故障/).waitFor();
     await oldEntry.getByRole('button',{name:'重试依据',exact:true}).click();await oldEntry.getByText('项目截止日20号。',{exact:true}).waitFor();
     assert.ok((await oldEntry.textContent()).includes(`来源 #${firstSourceId}：首次使用合成来源`));
@@ -500,7 +573,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     const beforePrepare=await page.evaluate(()=>api('/api/projects/1/data'));
     const originalInput=await page.locator('#proposal').evaluate(f=>Object.fromEntries(new FormData(f)));
     const retryRoute=`**/api/projects/1/candidates/${compareFixture.first}/source`;
-    await page.route(retryRoute,r=>r.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'重新提议读取故障'})}));
+    await intercept(retryRoute,r=>r.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'重新提议读取故障'})}));
     await review.getByRole('button',{name:'用最新版本填写新候选',exact:true}).click();
     await page.locator('#candidateFeedback').getByText(/503 重新提议读取故障/).waitFor();
     assert.deepEqual(await page.locator('#proposal').evaluate(f=>Object.fromEntries(new FormData(f))),originalInput);
@@ -598,7 +671,7 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.locator('#audit').getByText('初始化合成事实 v1',{exact:false}).waitFor();
     await capture('31-audit-last-page.png','合成演示审计超过100条后仍可翻至初始化记录','section:has(> #auditTitle)');
     const auditBeforeFailure={text:await page.locator('#audit').textContent(),state:await page.evaluate(()=>auditState),previous:await page.locator('#auditPrevious').isDisabled(),next:await page.locator('#auditNext').isDisabled()};
-    await page.route('**/api/projects/*/audit?*',route=>route.abort());
+    await intercept('**/api/projects/*/audit?*',route=>route.abort());
     await page.locator('#auditPrevious').click();await page.locator('#auditStatus').getByText(/审计加载失败/).waitFor();
     assert.equal(await page.locator('#audit').textContent(),auditBeforeFailure.text);
     assert.deepEqual(await page.evaluate(()=>auditState),auditBeforeFailure.state,'failed backward read preserves the oldest accepted page and its navigation');
@@ -606,18 +679,21 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.unroute('**/api/projects/*/audit?*');await page.locator('#refreshAudit').click();await page.locator('#auditStatus').getByText(/审计第 1 页/).waitFor();
     report.checks.auditPagination={rows:auditIds.length,pages:auditPages,oldestReachable:true,failureRecovered:true};
     assert.deepEqual(report.pageErrors,[],'浏览器不能出现未捕获脚本错误');
-    report.passed=true;
+    control.check();report.workPassed=true;
+    })();work.catch(()=>{});await Promise.race([work,control.fatal]);
   }catch(e){
-    report.error=e.message;
-    if(page)try{await capture('failure.png','失败现场，仅用于排查，不是通过证据')}catch{}
-    throw e;
+    failure=e;report.error=e.message;report.failedStage=control.stage;control.abort(e);
+    // Cancellation closes the page immediately; any failure capture is optional
+    // and belongs to the independent cleanup budget below.
   }finally{
-    report.finishedAt=new Date().toISOString();
+    report.cleanup=await closeUIResources({page,context,browser,browserServer,work,failureCapture:failure?path.join(dir,'failure.png'):null},control);
+    if(report.cleanup.errors.length&&!failure){failure=new Error('UI_CLEANUP_FAILED');report.error=failure.message}
+    report.passed=!failure&&report.workPassed===true;report.finishedAt=new Date().toISOString();
     fs.writeFileSync(path.join(dir,'report.json'),JSON.stringify(report,null,2)+'\n');
     console.log(`UI evidence: ${report.passed?'passed':'failed'}; ${dir}`);
-    if(browser)await browser.close();
   }
+  if(failure)throw failure;
   return {dir,report};
 }
 if(require.main===module)runUI().catch(e=>{console.error(e.message);process.exitCode=1});
-module.exports={runUI};
+module.exports={runUI,createUIControl,closeUIResources,armFrontendAPISettlement,waitFrontendAPISettlement};

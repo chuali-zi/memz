@@ -1,0 +1,304 @@
+{
+  "schema": "memz-first-run-cluster-v1",
+  "passed": false,
+  "synthetic": true,
+  "project": "memz-fresh-4127b02d720d0c12",
+  "startedAt": "2026-11-07T23:28:38.443Z",
+  "source": {
+    "before": {
+      "head": "f9020407e9f09d42683ad5f67028774ae4d0e633",
+      "dirty": false,
+      "files": {
+        "compose.yml": "818fb3886639ed668ad9bd04b072c513957d5c32baf552a5cca18cad4e8877ee",
+        "db/schema.sql": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+        "server.js": "09df1f89ef448e7a9bf0bdbe7caa0088f33e9c0b7c581404c5070b8e8f8d356f",
+        "scripts/database.js": "4f8ce0e610e5a43346ee172620d69be0458ce6e641a64107f286d66a4d0a6bf6",
+        "scripts/session-store.js": "4f2e37fc59849b190bac9123578524508fe835c8a99b7cd68ac7ee581a7e3eba",
+        "scripts/http-server.js": "e8f60bb1def87ab56e517a1cfb80e94ae4080266ea3a7d57658a892f57155614",
+        "scripts/server-lifecycle.js": "1649d29d23fa24b8af7d1097605e0c135ee1c4f1773ec5ca10c6b0bb09af4d78",
+        "scripts/check-setup.js": "915f12b45bdfc934469ac8dd176d57511225f65b3091d214f25a1f705c4cdb8f",
+        "scripts/setup-catalog.js": "44a4178795951f347e3f2194bc17864444dfc169ebb1643126617fa6f31c37fa",
+        "scripts/health-probes.js": "9bdfa930eb39b6fbebeab84531853ac7f42a220aee95f78d63fab5246ab0a3a6",
+        "scripts/context-client.js": "4e2d4ad7ca34a092e57cbf90e2e07beb11c6e5ffe61360477371d0647ca9dd02",
+        "scripts/read-session.js": "d78589cb80d62e961eeeba23f5415523d4acc97af644d0f4528d3dadb431fb3b",
+        "scripts/context-snapshot.js": "af9cc7236e09b6a0809f40c141609435a70d78333e46ed5764e8247f69c6aa96",
+        "scripts/search-query.js": "3e2288c65d0e2c6ea65a3a83aa161956b38bf4fa2d2f0a8fa7db0902bba40c4e",
+        "scripts/demo-story.js": "3dc7a84085a1deee3d96dcf539ed70c090f614223a1a9ef4a9ec12e116c10487",
+        "test/first-run-cluster.js": "66aca72b09c99d760b59ffee575d30fca8a77acf6588e4af2bf1201dc6419cfb",
+        "docs/first-run-cluster.md": "19ee7c51ab15321f71820b6498b7f74b31e05d705fbb4c70972c79a48c0661fc"
+      }
+    }
+  },
+  "runtime": {
+    "node": "v24.22.1",
+    "postgresImage": "sha256:ba07bdb15f0f2ac1ba7a88891da731cae65ac36d663fdb7de8f698ea47e0e381",
+    "compose": "2.40.3"
+  },
+  "method": {
+    "scope": "Fresh cached PostgreSQL cluster, actual official initialization, doctor CLI, application CLI, original context/demo modules over actual HTTP. No browser, MCP, external model, install, image pull or production identity claim.",
+    "modifications": "Derived production Compose service: unique project/volume, internal bridge, dynamic loopback publication, exact schema copy and extra read-only pre-schema observer writing a scalar /tmp marker. Not an unchanged invocation of compose.yml.",
+    "bytes": "Command arguments/stdin/stdout/stderr, application CLI output and HTTP request/response bodies. Excludes mounted schema/file IO, server-internal PG traffic, HTTP headers/wire, Docker daemon traffic, heap and JSON serialization overhead. After-materialization accounting is not a hard allocation bound.",
+    "source": "HEAD/dirty plus explicitly listed file hashes; not an independent full repository provenance proof. HTTP wrapper buffers bounded bodies before original client validation; no performance claim."
+  },
+  "limits": {
+    "workMs": 180000,
+    "cleanupMs": 60000,
+    "totalMs": 240000,
+    "applicationBytes": 8388608,
+    "cleanupReserve": 131072,
+    "http": 64,
+    "httpBodyBytes": 1048576,
+    "singleResponseBytes": 65536
+  },
+  "stages": [
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_volumes",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_networks",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "exact_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "cached_image",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 72,
+      "closeObserved": true
+    },
+    {
+      "name": "compose_version",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 7,
+      "closeObserved": true
+    },
+    {
+      "name": "production_config",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 1411,
+      "closeObserved": true
+    },
+    {
+      "name": "compose_up",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 530,
+      "closeObserved": true
+    },
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 13,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_container",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "owned_container_metadata",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 129,
+      "closeObserved": true
+    },
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 13,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_container",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "names_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 33,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "names_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 36,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "compose_down",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 424,
+      "closeObserved": true
+    },
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_volumes",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_networks",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "exact_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "exact_container_id",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    }
+  ],
+  "http": [],
+  "checks": {
+    "preflightNoProjectOrExactResources": true,
+    "schema": {
+      "sha256": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+      "roleDeclarationPreserved": true,
+      "bytes": 8005
+    },
+    "observer": {
+      "sha256": "7df63984d40b2ab1979bab633753aa738e6124783fa3c5a4e4d16bcf95e70a0f",
+      "separateExecutable": true,
+      "readOnlyCatalogQuery": true
+    }
+  },
+  "cleanup": {
+    "cliClosed": true,
+    "commandsSettled": true,
+    "composeDown": true,
+    "labelsAbsent": true,
+    "exactNamesAbsent": true,
+    "fixtureRemoved": true,
+    "failedStages": [],
+    "activeCommands": 0,
+    "creationAttempted": true,
+    "creationAcknowledged": true,
+    "creationOutcome": "ACKNOWLEDGED",
+    "currentResourceChecksAbsent": true,
+    "resourceStatus": "ABSENT_AT_CHECK"
+  },
+  "modelCalls": 0,
+  "resources": {
+    "container": "438147743e16",
+    "volume": "memz-fresh-4127b02d720d0c12_data",
+    "network": "memz-fresh-4127b02d720d0c12_default"
+  },
+  "failure": "LOOPBACK_PUBLICATION_REQUIRED",
+  "failureStage": "fresh-initialization",
+  "accounting": {
+    "workBytes": 4381,
+    "cleanupBytes": 2462,
+    "totalBytes": 6843,
+    "httpBodyBytes": 0
+  },
+  "finishedAt": "2026-11-07T23:28:44.105Z",
+  "durationMs": 5662,
+  "fatal": null
+}

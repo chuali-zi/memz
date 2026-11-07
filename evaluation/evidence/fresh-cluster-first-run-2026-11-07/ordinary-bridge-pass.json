@@ -1,0 +1,791 @@
+{
+  "schema": "memz-first-run-cluster-v1",
+  "passed": true,
+  "synthetic": true,
+  "project": "memz-fresh-6854be1d423c722a",
+  "startedAt": "2026-11-07T23:33:21.071Z",
+  "source": {
+    "before": {
+      "head": "1d630faf7c8500d6cab1ec54a3bd5e73dd39f0b3",
+      "dirty": false,
+      "files": {
+        "compose.yml": "818fb3886639ed668ad9bd04b072c513957d5c32baf552a5cca18cad4e8877ee",
+        "db/schema.sql": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+        "server.js": "09df1f89ef448e7a9bf0bdbe7caa0088f33e9c0b7c581404c5070b8e8f8d356f",
+        "scripts/database.js": "4f8ce0e610e5a43346ee172620d69be0458ce6e641a64107f286d66a4d0a6bf6",
+        "scripts/session-store.js": "4f2e37fc59849b190bac9123578524508fe835c8a99b7cd68ac7ee581a7e3eba",
+        "scripts/http-server.js": "e8f60bb1def87ab56e517a1cfb80e94ae4080266ea3a7d57658a892f57155614",
+        "scripts/server-lifecycle.js": "1649d29d23fa24b8af7d1097605e0c135ee1c4f1773ec5ca10c6b0bb09af4d78",
+        "scripts/check-setup.js": "915f12b45bdfc934469ac8dd176d57511225f65b3091d214f25a1f705c4cdb8f",
+        "scripts/setup-catalog.js": "44a4178795951f347e3f2194bc17864444dfc169ebb1643126617fa6f31c37fa",
+        "scripts/health-probes.js": "9bdfa930eb39b6fbebeab84531853ac7f42a220aee95f78d63fab5246ab0a3a6",
+        "scripts/context-client.js": "4e2d4ad7ca34a092e57cbf90e2e07beb11c6e5ffe61360477371d0647ca9dd02",
+        "scripts/read-session.js": "d78589cb80d62e961eeeba23f5415523d4acc97af644d0f4528d3dadb431fb3b",
+        "scripts/context-snapshot.js": "af9cc7236e09b6a0809f40c141609435a70d78333e46ed5764e8247f69c6aa96",
+        "scripts/search-query.js": "3e2288c65d0e2c6ea65a3a83aa161956b38bf4fa2d2f0a8fa7db0902bba40c4e",
+        "scripts/demo-story.js": "3dc7a84085a1deee3d96dcf539ed70c090f614223a1a9ef4a9ec12e116c10487",
+        "test/first-run-cluster.js": "e8f6b35406f94c68f46f7c57cf7e0a11b982160d429f735f891d25a5ddbeb1a6",
+        "docs/first-run-cluster.md": "462a506c4e08f0d6e875cd90795ba4e3562f05dab39e61cef3f892c3de5eae99"
+      }
+    },
+    "after": {
+      "head": "1d630faf7c8500d6cab1ec54a3bd5e73dd39f0b3",
+      "dirty": false,
+      "files": {
+        "compose.yml": "818fb3886639ed668ad9bd04b072c513957d5c32baf552a5cca18cad4e8877ee",
+        "db/schema.sql": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+        "server.js": "09df1f89ef448e7a9bf0bdbe7caa0088f33e9c0b7c581404c5070b8e8f8d356f",
+        "scripts/database.js": "4f8ce0e610e5a43346ee172620d69be0458ce6e641a64107f286d66a4d0a6bf6",
+        "scripts/session-store.js": "4f2e37fc59849b190bac9123578524508fe835c8a99b7cd68ac7ee581a7e3eba",
+        "scripts/http-server.js": "e8f60bb1def87ab56e517a1cfb80e94ae4080266ea3a7d57658a892f57155614",
+        "scripts/server-lifecycle.js": "1649d29d23fa24b8af7d1097605e0c135ee1c4f1773ec5ca10c6b0bb09af4d78",
+        "scripts/check-setup.js": "915f12b45bdfc934469ac8dd176d57511225f65b3091d214f25a1f705c4cdb8f",
+        "scripts/setup-catalog.js": "44a4178795951f347e3f2194bc17864444dfc169ebb1643126617fa6f31c37fa",
+        "scripts/health-probes.js": "9bdfa930eb39b6fbebeab84531853ac7f42a220aee95f78d63fab5246ab0a3a6",
+        "scripts/context-client.js": "4e2d4ad7ca34a092e57cbf90e2e07beb11c6e5ffe61360477371d0647ca9dd02",
+        "scripts/read-session.js": "d78589cb80d62e961eeeba23f5415523d4acc97af644d0f4528d3dadb431fb3b",
+        "scripts/context-snapshot.js": "af9cc7236e09b6a0809f40c141609435a70d78333e46ed5764e8247f69c6aa96",
+        "scripts/search-query.js": "3e2288c65d0e2c6ea65a3a83aa161956b38bf4fa2d2f0a8fa7db0902bba40c4e",
+        "scripts/demo-story.js": "3dc7a84085a1deee3d96dcf539ed70c090f614223a1a9ef4a9ec12e116c10487",
+        "test/first-run-cluster.js": "e8f6b35406f94c68f46f7c57cf7e0a11b982160d429f735f891d25a5ddbeb1a6",
+        "docs/first-run-cluster.md": "462a506c4e08f0d6e875cd90795ba4e3562f05dab39e61cef3f892c3de5eae99"
+      }
+    }
+  },
+  "runtime": {
+    "node": "v24.22.1",
+    "postgresImage": "sha256:ba07bdb15f0f2ac1ba7a88891da731cae65ac36d663fdb7de8f698ea47e0e381",
+    "compose": "2.40.3",
+    "databasePort": 32768,
+    "applicationPort": 35857
+  },
+  "method": {
+    "scope": "Fresh cached PostgreSQL cluster, actual official initialization, doctor CLI, application CLI, original context/demo modules over actual HTTP. No browser, MCP, external model, install, image pull or production identity claim.",
+    "modifications": "Derived production Compose service: unique project/volume, dedicated ordinary bridge (not egress-isolated), dynamic loopback publication, exact schema copy and extra read-only pre-schema observer writing a scalar /tmp marker. No external connectivity probe. Not an unchanged invocation of compose.yml.",
+    "bytes": "Command arguments/stdin/stdout/stderr, application CLI output and HTTP request/response bodies. Excludes mounted schema/file IO, server-internal PG traffic, HTTP headers/wire, Docker daemon traffic, heap and JSON serialization overhead. After-materialization accounting is not a hard allocation bound.",
+    "source": "HEAD/dirty plus explicitly listed file hashes; not an independent full repository provenance proof. HTTP wrapper buffers bounded bodies before original client validation; no performance claim."
+  },
+  "limits": {
+    "workMs": 180000,
+    "cleanupMs": 60000,
+    "totalMs": 240000,
+    "applicationBytes": 8388608,
+    "cleanupReserve": 131072,
+    "http": 64,
+    "httpBodyBytes": 1048576,
+    "singleResponseBytes": 65536
+  },
+  "stages": [
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_volumes",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_networks",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "exact_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "cached_image",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 72,
+      "closeObserved": true
+    },
+    {
+      "name": "compose_version",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 7,
+      "closeObserved": true
+    },
+    {
+      "name": "production_config",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 1411,
+      "closeObserved": true
+    },
+    {
+      "name": "compose_up",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 530,
+      "closeObserved": true
+    },
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 13,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_container",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "owned_container_metadata",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 168,
+      "closeObserved": true
+    },
+    {
+      "name": "owned_network_metadata",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 37,
+      "closeObserved": true
+    },
+    {
+      "name": "fresh_role_marker",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 2,
+      "closeObserved": true
+    },
+    {
+      "name": "scalar_sql",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 2,
+      "closeObserved": true
+    },
+    {
+      "name": "scalar_sql",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 2,
+      "closeObserved": true
+    },
+    {
+      "name": "scalar_sql",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 140,
+      "closeObserved": true
+    },
+    {
+      "name": "doctor",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 215,
+      "closeObserved": true
+    },
+    {
+      "name": "scalar_sql",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 141,
+      "closeObserved": true
+    },
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 13,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_container",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "names_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 33,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "names_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 36,
+      "closeObserved": true
+    },
+    {
+      "name": "owner_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 28,
+      "closeObserved": true
+    },
+    {
+      "name": "compose_down",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 424,
+      "closeObserved": true
+    },
+    {
+      "name": "list_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_volumes",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "list_networks",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "exact_containers",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "exact_container_id",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_volume",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    },
+    {
+      "name": "names_network",
+      "exitCode": 0,
+      "signal": null,
+      "outputBytes": 0,
+      "closeObserved": true
+    }
+  ],
+  "http": [
+    {
+      "method": "GET",
+      "path": "/health/live",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 18
+    },
+    {
+      "method": "GET",
+      "path": "/health/ready",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 18
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 161
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts/1/provenance",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 362
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 44,
+      "responseBytes": 78
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 75
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/sources",
+      "status": 200,
+      "requestBytes": 81,
+      "responseBytes": 103
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates",
+      "status": 200,
+      "requestBytes": 138,
+      "responseBytes": 235
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 46
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates/2/approve",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 33
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 204
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts/2/provenance",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 408
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/sources",
+      "status": 200,
+      "requestBytes": 90,
+      "responseBytes": 112
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates",
+      "status": 200,
+      "requestBytes": 138,
+      "responseBytes": 235
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates/3/approve",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 33
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 207
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts/2/provenance",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 417
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates",
+      "status": 200,
+      "requestBytes": 138,
+      "responseBytes": 235
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates/4/approve",
+      "status": 409,
+      "requestBytes": 2,
+      "responseBytes": 75
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 207
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts/2/provenance",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 417
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/sources",
+      "status": 200,
+      "requestBytes": 132,
+      "responseBytes": 154
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates",
+      "status": 200,
+      "requestBytes": 138,
+      "responseBytes": 235
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates/5/reject",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 21
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 207
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts/2/provenance",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 417
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts/2/provenance",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 408
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/1/candidates",
+      "status": 403,
+      "requestBytes": 145,
+      "responseBytes": 51
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 200,
+      "requestBytes": 44,
+      "responseBytes": 87
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/1/facts",
+      "status": 403,
+      "requestBytes": 0,
+      "responseBytes": 51
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11
+    }
+  ],
+  "checks": {
+    "preflightNoProjectOrExactResources": true,
+    "schema": {
+      "sha256": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+      "roleDeclarationPreserved": true,
+      "bytes": 8005
+    },
+    "observer": {
+      "sha256": "7df63984d40b2ab1979bab633753aa738e6124783fa3c5a4e4d16bcf95e70a0f",
+      "separateExecutable": true,
+      "readOnlyCatalogQuery": true
+    },
+    "portPublication": {
+      "bindingCount": 1,
+      "onlyLoopback": true,
+      "numericPort": true
+    },
+    "network": {
+      "driver": "bridge",
+      "internal": false,
+      "externalConnectivityTested": false
+    },
+    "roleAbsentBeforeOriginalSchema": true,
+    "doctor": {
+      "ok": true,
+      "code": "BASIC_CHECKS_PASSED"
+    },
+    "health": true,
+    "originalContext": {
+      "facts": 1,
+      "value": "20号",
+      "version": 1,
+      "fullProvenance": true
+    },
+    "demo": {
+      "steps": [
+        {
+          "name": "待审不进入上下文"
+        },
+        {
+          "name": "首次批准"
+        },
+        {
+          "name": "更正进入当前上下文"
+        },
+        {
+          "name": "旧版本请求不能覆盖",
+          "status": 409
+        },
+        {
+          "name": "外部提议驳回后不进入上下文"
+        },
+        {
+          "name": "旧依据仍可回查"
+        },
+        {
+          "name": "权限边界",
+          "viewerWriteStatus": 403,
+          "otherProjectReadStatus": 403
+        }
+      ],
+      "currentValue": "15号",
+      "version": 2,
+      "oldValue": "20号"
+    },
+    "selectedSourcesUnchanged": true
+  },
+  "cleanup": {
+    "cliClosed": true,
+    "commandsSettled": true,
+    "composeDown": true,
+    "labelsAbsent": true,
+    "exactNamesAbsent": true,
+    "fixtureRemoved": true,
+    "failedStages": [],
+    "activeCommands": 0,
+    "creationAttempted": true,
+    "creationAcknowledged": true,
+    "creationOutcome": "ACKNOWLEDGED",
+    "currentResourceChecksAbsent": true,
+    "resourceStatus": "ABSENT_AT_CHECK"
+  },
+  "modelCalls": 0,
+  "resources": {
+    "container": "03edc8458a95",
+    "volume": "memz-fresh-6854be1d423c722a_data",
+    "network": "memz-fresh-6854be1d423c722a_default"
+  },
+  "database": {
+    "before": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 4,
+      "facts": 1,
+      "candidates": 1,
+      "revisions": 1,
+      "audit": 1,
+      "idempotency_requests": 0
+    },
+    "after": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 7,
+      "facts": 2,
+      "candidates": 5,
+      "revisions": 3,
+      "audit": 11,
+      "idempotency_requests": 7
+    }
+  },
+  "cli": {
+    "pid": 212267,
+    "exitCode": 0,
+    "signal": null,
+    "forced": false,
+    "stdoutBytes": 72,
+    "stderrBytes": 0,
+    "closeObserved": true
+  },
+  "accounting": {
+    "workBytes": 14758,
+    "cleanupBytes": 2506,
+    "totalBytes": 17264,
+    "httpBodyBytes": 7450
+  },
+  "finishedAt": "2026-11-07T23:33:28.113Z",
+  "durationMs": 7042,
+  "fatal": null
+}

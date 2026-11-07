@@ -236,3 +236,15 @@ b0afaa0的[双版本CI](https://github.com/chuali-zi/memz/actions/runs/424224018
 最终本地Node24真实HTTP/PG重启回归通过：30HTTP、89117声明应用字节、1678ms；两PID同端口、SIGTERM各exit0、无KILL/stderr，source/audit/receipt仍各1，八表指纹/原键/草稿/选择/同页/新cookie与CSRF/人工重新核权及另一账号403全部保持，0观测错误，独立清理全成功。报告 `artifacts/session-recovery/run-1794093044713-2b686026/report.json` 如实记录HEAD b0af+dirtytrue及明确源码hash；不是clean提交或性能承诺。原失败报告未改，完整CI待本轮提交后核实。
 
 首次新集群扩展仍只是未提交草稿，没有启动Docker或PG；独立审查先指出精确资源名归属及命令总期限问题，未修好不执行，不计入当前成果。本轮优先把实证停机缺口及CI回归闭环。新增模型仍0，LoCoMo字节仍0。
+
+## 2026-11-07 23:40 UTC 首次安装与页面取证收尾
+
+11129b2的[CI](https://github.com/chuali-zi/memz/actions/runs/42424311659)为Node22完整成功、Python成功，Node24在旧UI取证的无界等待达到job期限而cancelled；不能合称全绿。其core565/迁移9、单次真实重启及此前故障修复结果仍有效，完整状态按run/job区分。干净11129本地Node24系统也通过565/565、9/9，system `artifacts/system/run-1794093275578-e15b3ad6`（在 `/workspace/memz-verify`）。
+
+旧UI在本地卡到第16图后，终止本次唯一owned进程后原wrapper写失败并完成finally，临时库目录确认0；/proc cwd读取因权限拒绝而未重试，不借其他接口获取该目录。新增有界控制先在真实PG明确报old history body阶段超时，没有把它当通过；当前4个迟到读取改为动作前登记一次性原api invocation，原HTTP/UTF8/JSON完整消费成功后才继续旧代次/页面断言，不依赖CDP旁路finished、不补发请求。原返回值/error identity透明，141个业务断言及2帧状态检查保留。
+
+UI controller工作120s、stage15s、独立浏览器cleanup12s，所有held释放、取消后不发新业务动作，失败及清理状态最后写报告。wrapper的自有server在runUI结束后关闭所有fixture sockets，分页准备每轮检查取消signal，不声称撤销已发事务。常驻纯controller4项在Node22/24各通过，无Chrome/HTTP/PG/模型；真实Chromium共享harness各正常+三故障均按预期，原api消费探针各正常+四坏body/403均正确失败且每case仅一GET。第二次真正PG UI已通过，31屏，目录 `artifacts/ui/run-1794094692337-b36b11e1`；这是dirty开发树回归，不拼为clean材料包。提交后CI另行核实。
+
+新增显式first-run-cluster验收已有两次真实、独立清理的记录，见[原字节归档](../evaluation/evidence/fresh-cluster-first-run-2026-11-07/README.md)。首次干净f902040 internal草稿在端口条件处失败，0HTTP/6843bytes/5662ms，未到doctor/应用阶段。专属普通bridge恢复原Compose连接方式后，干净1d630fa一次通过47HTTP（44×200、2×403、1×409）、17264声明bytes=14758work+2506cleanup、HTTP正文7450bytes、7042ms。原schema8005bytes/CREATEROLE完整，额外只读observer实测建角色前0，app角色及4active成员正确；doctor/live/ready、原context20v1与原demo七步15v2/旧20v1/409/两403全通过，八表14→41行，CLI正常退出、标签+精确标识双查全清。未下载镜像、未外网探测，使用已有锁定依赖链接和缓存镜像，非空机npm安装、未改Compose原样执行、生产认证或性能SLO；普通bridge并非egress隔离。此opt-in不进默认core/CI，不把静态配置当每轮真实执行。
+
+本轮待推送合入first-run两个本地提交与UI/证据归档。模型本夜间新增0，LoCoMo0字节；原历史351请求不改。新云仍为唯一执行环境，同一Library报告将保留完整历史更新终态，最终CI及材料包按最新实际结果记录。

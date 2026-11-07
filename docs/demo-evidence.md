@@ -94,3 +94,9 @@ CI上传整个新生成目录为 `ui-evidence` artifact。报告不保存会话c
 28-candidate-version-comparison.png展示真实并发批准后的审核对照：20号提议基于v0，另一请求批准21号v1后刷新核对，显示当前值、来源和不一致提示；随后旧候选审批409，没有覆盖当前事实。此处没有用伪造响应模拟版本变化。
 
 审计分页新增31-audit-last-page.png：合成操作超过100条后，浏览器翻至初始化记录；report.checks.auditPagination记录实际行数、页数和断网后刷新恢复。参见[审计分页](audit-pagination.md)。
+
+## 有界等待与故障现场
+
+页面取证的工作阶段最多120秒，手动响应屏障及前端消费等待各15秒，浏览器清理另有12秒预算。失败保留阶段及未通过报告，释放所有held路由、取消后续动作并关闭本次自有page/context/API request/browser；不因超时给通过，也不停止外部baseURL服务。随机PG wrapper仅在runUI结束后关闭其自有server/socket、pool及库，取消后的分页fixture不再排下一条事务，已发事务仍按原数据库期限完成。
+
+四个迟到读取用例直接观察原前端api完整HTTP/UTF8/JSON消费成功，再执行原页面代次/内容断言，避免依赖CDP旁路response.finished可用性。测试轻包装保留原调用、返回值及错误，不增加请求或重试；消费成功本身不是页面schema接纳证明，后面的原状态断言仍必须通过。原141个业务断言保留，`test/ui-control.test.js`以明确缩短的测试参数验证取消/首错/清timer，无浏览器或真实PG。

@@ -12,4 +12,4 @@
 
 2026-11-07 首次干净执行对应 `f9020407e9f09d42683ad5f67028774ae4d0e633`，当时草稿使用 internal 网络。Compose 返回初始化成功且容器健康，但端口元数据未满足必需的 loopback 发布条件；测试以 `LOOPBACK_PUBLICATION_REQUIRED` 停止，未到达 doctor 或应用 HTTP。该次 0 HTTP、6,843 字节、5.662 秒，全部自有资源经双重核查清理。它不是应用通过证据，也不能仅凭此结果断言 internal 网络是原因。失败原报告保留，后续普通 bridge 版本另行执行，不覆盖失败记录。
 
-接入状态：普通 bridge 版本正在静态审查，尚未重新执行。旧 `compose-first-start.js` 的初始化健康门槛证据与 `first-run.md` 的历史上手记录不代替本测试；本文件也不把待执行项当作通过。
+普通 bridge 版本已在干净 `1d630faf7c8500d6cab1ec54a3bd5e73dd39f0b3` 实际通过：Node24.22.1、Compose2.40.3，47次HTTP（44个200、2个403、1个409），声明范围内17264字节，HTTP正文7450字节，7042ms。观察脚本确认建角色前计数0，随后原8005字节schema完整执行，应用角色与4个active成员初始化，doctor/live/ready及原context/demo七步骤全部符合预期；当前15号v2、旧20号v1均可回查。CLI正常SIGTERM退出，标签及精确标识双查无剩余容器、卷、网络和命令进程。前后明确源码hash及HEAD/dirty完全一致。使用当前云已有锁定依赖的逐项链接和已缓存镜像，不是空机器安装、冷缓存性能或生产认证验收；无模型、浏览器、MCP或外网探测。两次原报告与限制见[证据归档](../evaluation/evidence/fresh-cluster-first-run-2026-11-07/README.md)。旧 `compose-first-start.js` 的初始化健康门槛证据与 `first-run.md` 的历史上手记录不代替本测试；本文件也不把待执行项当作通过。
