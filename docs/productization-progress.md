@@ -211,3 +211,14 @@ CI已另提交91f4735扩为Node22/24相同集成链，每job原15min且fail-fast
 独立审查先发现并修正测试harness失败路径：超cleanup计量不能阻止已知owned DROP，已过deadline不启动操作且执行cancel，cleanup独立最多60s并受总660s约束。常驻mock故障6项通过；另在临时内存注入副本人工耗尽cleanup计数器，实际0HTTP/1库的流程预期exit1/CLEANUP_BYTE_LIMIT，native DROP/同名catalog0及全部关闭成功。该故意失败不计正常通过；原报告/注入元数据保留 `/tmp/memz-session-cleanup-fault/`，没有改写首次green。计量只覆盖声明应用字节，排除wire、服务内部PG、控制协议、文件IO和heap；超量仍记录失败，不把终端清理例外称严格内存硬界。
 
 测试别名与Node22/24 CI显式重启步骤已整合，旧18个artifact名不变，新session-recovery[-node24]共20名唯一。新增[分层测试索引](testing.md)准确区分纯/合成/真实PG/浏览器/备份/材料包/模型；纠正专用测试管理员还需管理随机角色，清理以实测记录为准，不要求重置已有业务库。上一67b1f29完整双版本CI已成功；本轮提交及其远端结果待下一记录。真实模型新增0、LoCoMo仍无字节，22:34只读实例观测仍无合理GLM变量名/绑定，Vault已保存事实不变，最新草稿发布及下载服务恢复仍unknown。
+
+
+## 2026-11-07 22:49 UTC API缓存边界
+
+[6fc013d完整双版本CI](https://github.com/chuali-zi/memz/actions/runs/42421924037)已成功：Node22/24各core558/558、迁移9/9、产品119/119、响应式6/6、真实服务合成adapter12/12，新增真实同页面CLI重启各30HTTP/89117应用字节且清理全成功；Python离线99/99及检索/计划/停机/UI/材料包全部后续步骤通过。20个独立artifact确认上传。远端Node22 system `artifacts/system/run-1794091485658-32f34e67`、UI `artifacts/ui/run-1794091632794-fd60050c`；Node24 system `artifacts/system/run-1794091502868-77b88186`、UI `artifacts/ui/run-1794091638686-c07ae33e`，不是已下载本机目录。
+
+独立原生Chromium探针发现API响应可进入HTTP缓存：退出、换账号和合成撤权后，显式force-cache能0次服务端请求重用旧owner正文；现有UI默认fetch对照仍到达服务端并正确401/新账号/403，未证明默认UI已泄漏。现仅在API挂载最前设置no-store，先于Host、JSON、停机和会话闩；不改认证/项目权限、全局ETag或静态策略，不声称追溯清旧条目、BFCache、页面内存或任意外部代理行为。
+
+新opt-in `test:http-cache` 以实际Express/session/login/me/projects/facts、明确fake pool与真正loopback/Chromium原生缓存验证，不用Playwright route（它会禁HTTP cache）。正式先红18HTTP/5067正文bytes，4个目标断言失败、其余10个对照通过；修复后Node22/24各14/14、23HTTP/5321正文bytes、25次fake SQL/真实PG和模型0，所有浏览器/服务/socket/pool清理成功。报告只计数/身份匹配布尔值，不保存cookie/CSRF/正文原值；四个明确源码hash前后相等。原始red与两green在 `/tmp/memz-http-cache-regression-{red-6fc013d,green-node22-09df1f8,green-node24-09df1f8}/report.json`，不把scope hash称整仓库attestation。
+
+既有request-body/actual-health用例顺带检查API 400/413/415/401/403/404、Host优先和大小写GET/HEAD的drain503均no-store；健康探针无ETag语义保留。Node22/24各17/17；consumer合同/DB错误/headers后日志相关各24/24也通过。没有增加镜像helper或新的生产故障接口。独立脚本24HTTP/512KiB、4min work+1min cleanup；字节非wire/heap硬界。两个CI job显式运行并上传http-cache[-node24]，旧20个名保留、共22名唯一；配置不等于远端已过。本轮正式提交/CI在后续核实，所有模型和LoCoMo限制不变。详见[缓存边界](http-cache.md)。

@@ -24,6 +24,7 @@ MEMZ_TEST_ADMIN_URL='postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz'
 | HTTP消费者合同漂移 | `node --test test/consumer-contract.test.js` | 真本机HTTP、合成pool/fake transport及CLI；无PG。核对[8入口OpenAPI子集](consumer-contract.md)，不等于通用OpenAPI验证器或真实RLS验收 |
 | 完整核心＋迁移隔离取证 | `SYSTEM_TEST_DATABASE_URL="$MEMZ_TEST_ADMIN_URL" npm run test:system:evidence` | 随机库/部分随机角色；含真实SQL、HTTP/客户端/MCP、提交故障及custom备份恢复。需PG16 dump/restore工具；保存 `artifacts/system/run-*/` |
 | 单独迁移回归 | `MIGRATION_TEST_DATABASE_URL="$MEMZ_TEST_ADMIN_URL" npm run test:migrations` | 原始旧schema及新schema的随机库；不是在用户库直接执行升级。详见[数据库证据](database-evidence.md) |
+| API HTTP缓存边界 | `npm run test:http-cache` | 真Chromium原生HTTP缓存与Express路由、明确合成pool，无PG；退出/切账号/合成撤权后的显式缓存与默认fetch对照。见[缓存范围](http-cache.md)，不证明BFCache、旧缓存清除或生产身份 |
 | 浏览器交互、响应式 | `npm run test:product:ui`；`npm run test:responsive:ui` | 真Chromium/静态页面、明确合成API回执，无PG。需可执行浏览器、系统库及中文字体；不证明数据库提交或重启 |
 | 完整真实PG界面取证 | `UI_TEST_DATABASE_URL="$MEMZ_TEST_ADMIN_URL" npm run test:ui:evidence` | 随机 `memz_ui_*` 库与自建服务，真Chromium；保存 `artifacts/ui/run-*/`。不要用会修改现有3000端口服务的旧 `test:ui` 代替 |
 | 新增同页面会话恢复集成 | `SESSION_RECOVERY_DATABASE_URL="$MEMZ_TEST_ADMIN_URL" npm run test:session-recovery` | 显式opt-in脚本；随机PG库、真实Node CLI重启与Chromium，复用现有app角色。独立报告在 `artifacts/session-recovery/run-*/`；不属于默认 `*.test.js` core；当前两个Node CI job分别运行并归档 |
@@ -54,7 +55,7 @@ CI里的Python与合成adapter通过都不触发真实provider推理。仓库不
 
 ## CI矩阵与同提交证据
 
-以[当前工作流](../.github/workflows/ci.yml)为准：一个Python3.12离线job；Node22、24两个同内容集成job，`fail-fast: false`，各自15分钟。Node参数是major版本，实际patch以该次日志/报告为准。每个Node job依次做依赖/浏览器准备、合成UI、隔离system、同页面重启恢复、合成adapter、检索/上下文/两类计划、Docker停机、真实PG UI及材料包；配置存在不等于某次执行成功。
+以[当前工作流](../.github/workflows/ci.yml)为准：一个Python3.12离线job；Node22、24两个同内容集成job，`fail-fast: false`，各自15分钟。Node参数是major版本，实际patch以该次日志/报告为准。每个Node job依次做依赖/浏览器准备、API缓存对照、合成UI、隔离system、同页面重启恢复、合成adapter、检索/上下文/两类计划、Docker停机、真实PG UI及材料包；配置存在不等于某次执行成功。
 
 Node22保留原产物名，Node24追加 `-node24`，例如 `system-test-evidence` / `system-test-evidence-node24`、`ui-evidence` / `ui-evidence-node24`、`competition-evidence` / `competition-evidence-node24`。`if: always()` 上传只说明保存了现场；看同提交、同job的完整终态、TAP、报告passed与清理，不能混拼两个runtime或旧提交的文件。会话恢复另上传 `session-recovery` / `session-recovery-node24`；它由工作流显式调用，不是被npm test自动发现。其他opt-in入口不自动等于默认CI步骤。
 

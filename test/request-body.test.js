@@ -18,8 +18,9 @@ async function login(){
   const r=await request('/api/login',{body:credentials,headers:{'content-type':'application/json'}});
   assert.equal(r.status,200);return {cookie:r.headers.get('set-cookie').split(';')[0],csrf:r.json().csrf};
 }
-function rejected(r,status){
+function rejected(r,status,{api=true}={}){
   assert.equal(r.status,status);assert.match(r.headers.get('content-type'),/application\/json/);
+  if(api)assert.equal(r.headers.get('cache-control'),'no-store','API errors must remain non-cacheable before authentication, media and parser gates');
   const json=r.json();assert.deepEqual(Object.keys(json),['error']);assert.equal(typeof json.error,'string');
   assert.equal(r.headers.get('x-content-type-options'),'nosniff');assert.ok(r.headers.get('content-security-policy'));
   assert.equal(r.headers.get('set-cookie'),null,'拒绝请求不能创建会话');
@@ -98,7 +99,7 @@ test('foreign Host cannot read assets or bypass checks with forwarded headers or
   const auth=await login();
   for(const host of ['localhost.synthetic.invalid','127.0.0.1.synthetic.invalid','localhost@synthetic.invalid','0.0.0.0','127.1','localhost:65536','localhost:0']){
     for(const path of ['/','/api/me']){
-      const response=await hostRequest(host,path,{method:'GET',headers:{cookie:auth.cookie,'x-forwarded-host':'localhost','x-forwarded-proto':'http'}});rejected(response,403);assert.equal(response.json().error,'仅支持本机演示地址');assert.ok(!response.text.includes(host));
+      const response=await hostRequest(host,path,{method:'GET',headers:{cookie:auth.cookie,'x-forwarded-host':'localhost','x-forwarded-proto':'http'}});rejected(response,403,{api:path.startsWith('/api/')});assert.equal(response.json().error,'仅支持本机演示地址');assert.ok(!response.text.includes(host));
     }
   }
   rejected(await hostRequest('synthetic.invalid','/api/login',{body:'not json',headers:{origin:'http://synthetic.invalid'}}),403);

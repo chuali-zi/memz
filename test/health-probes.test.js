@@ -66,11 +66,14 @@ test('actual app mounting keeps Host and drain gates ahead of both probes, inclu
     service=require('../server');lifecycle.createShutdownGate=factory;originalConnect=service.pool.connect;
     service.pool.connect=async()=>{calls++;throw new Error('synthetic-private-unavailable')};
     server=service.app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));const base='http://127.0.0.1:'+server.address().port;
-    const live=await fetch(base+'/health/live');assert.equal(live.status,200);assert.deepEqual(await live.json(),{status:'alive'});assert.equal(calls,0);
-    const notReady=await fetch(base+'/health/ready');assert.equal(notReady.status,503);assert.deepEqual(await notReady.json(),{status:'not_ready'});assert.equal(calls,1);
+    const live=await fetch(base+'/health/live');assert.equal(live.status,200);assert.equal(live.headers.get('cache-control'),'no-store');assert.equal(live.headers.get('etag'),null);assert.deepEqual(await live.json(),{status:'alive'});assert.equal(calls,0);
+    const notReady=await fetch(base+'/health/ready');assert.equal(notReady.status,503);assert.equal(notReady.headers.get('cache-control'),'no-store');assert.equal(notReady.headers.get('etag'),null);assert.deepEqual(await notReady.json(),{status:'not_ready'});assert.equal(calls,1);
     gate.beginDrain();
-    const forbidden=await new Promise((resolve,reject)=>{const request=http.get(base+'/health/live',{headers:{host:'synthetic.invalid'}},response=>{response.resume();response.on('end',()=>resolve(response.statusCode))});request.on('error',reject)});assert.equal(forbidden,403,'the original Host boundary must still run before the stopping gate');
-    for(const endpoint of ['/health/live','/health/ready','/HEALTH/LIVE/','/HEALTH/READY/'])for(const method of ['GET','HEAD']){
+    for(const endpoint of ['/health/live','/api/projects','/API/PROJECTS/']){
+      const forbidden=await new Promise((resolve,reject)=>{const request=http.get(base+endpoint,{headers:{host:'synthetic.invalid'}},response=>{response.resume();response.on('end',()=>resolve({status:response.statusCode,cacheControl:response.headers['cache-control']}))});request.on('error',reject)});
+      assert.equal(forbidden.status,403,'the original Host boundary must still run before the stopping gate');if(endpoint.toLowerCase().startsWith('/api/'))assert.equal(forbidden.cacheControl,'no-store');
+    }
+    for(const endpoint of ['/health/live','/health/ready','/HEALTH/LIVE/','/HEALTH/READY/','/api/projects','/API/PROJECTS/'])for(const method of ['GET','HEAD']){
       const response=await fetch(base+endpoint,{method,headers:{'if-none-match':'*'}});assert.equal(response.status,503);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('connection'),'close');assert.equal(response.headers.get('set-cookie'),null);await response.text();
     }
     assert.equal(calls,1,'the actual stopping gate must not start another checkout');

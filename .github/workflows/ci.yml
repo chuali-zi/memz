@@ -41,6 +41,13 @@ jobs:
           python-version: '3.12'
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:http-cache
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: http-cache${{ matrix.node == 24 && '-node24' || '' }}
+          path: artifacts/browser-http-cache/
+          if-no-files-found: ignore
       - run: npm run test:product:ui
         timeout-minutes: 2
       - run: npm run test:responsive:ui

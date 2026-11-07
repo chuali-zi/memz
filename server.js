@@ -20,6 +20,9 @@ pool.on('error',()=>console.error('Database idle connection lost; future request
 const accounts={owner:{id:1,password:'demo-owner',name:'负责人'},member:{id:2,password:'demo-member',name:'成员'},viewer:{id:3,password:'demo-viewer',name:'只读者'},other:{id:4,password:'demo-other',name:'另一项目用户'}};
 const sessions=new SessionStore();
 app.disable('x-powered-by');
+// Private API bodies and authentication errors must not enter the HTTP cache.
+// Run before host/body/shutdown gates so their API responses obey this too.
+app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next()});
 app.use((req,res,next)=>{res.set('X-Content-Type-Options','nosniff');res.set('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"); next()});
 // The public-account demo accepts only literal loopback host names, independent of Origin.
 app.use((req,res,next)=>{
