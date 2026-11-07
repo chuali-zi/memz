@@ -34,6 +34,14 @@ async function main(){
       const passed=exitCode===0&&signal===null&&summary!==null&&summary.tests===summary.pass&&['fail','cancelled','skipped','todo'].every(field=>summary[field]===0);
       report.suites.push({name,testFiles,exitCode,signal,passed,stdout:`${name}.tap`,stderr:`${name}.stderr.txt`,stdoutSha256:hash(stdout),stderrSha256:hash(stderr),summary,...(parseError?{parseError}:{})});
       console.log(`${name}: ${passed?'passed':'failed'}${summary?` (${summary.pass}/${summary.tests})`:''}`);
+      // CI logs must identify failures even when artifact transfer is unavailable.
+      // Print only bounded, already-redacted TAP titles; assertion values and
+      // provider/connection diagnostics remain in the original saved reports.
+      if(!passed){
+        const titles=stdout.split('\n').filter(line=>/^\s*not ok \d+\b/.test(line)).slice(0,20);
+        for(const title of titles)console.error('Failed TAP case:',title.trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,300));
+        if(!titles.length)console.error('No failing TAP title available; inspect saved suite diagnostics.');
+      }
     }
     if(!report.suites.every(suite=>suite.passed))throw new Error('One or more system test suites failed; inspect the saved TAP reports.');
     report.passed=true;
