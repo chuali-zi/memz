@@ -113,7 +113,17 @@ df320d8完整远端[CI成功](https://github.com/chuali-zi/memz/actions/runs/423
 
 预算代码最终全部Python99/99、22文件内存编译、原提示AST对照通过；独立审查另验证20个回显/边界探针、并发与halt反例及1280组Fraction精确金额对照。整合烟测还先发现共享helper破坏包路径导入，已修复并增加空环境包导入/两条原脚本CLI回归。全部验证使用空合成环境/阻网或明确fake transport，新增真实模型调用0。实际计数器和价格仍需独立核实；CLI没有默认counter loader，缺依赖在读凭据/transport前停止。金额是按配置预约，不是账单；每实例各自账本，已admit在途请求不可撤销，不检测任意编码秘密。
 
-2dbe346与d2ef85d的完整CI待推送后核实。当前继续有测量依据的CLI入站资源保护：Node22/24默认header60s、完整请求300s、检查间隔30s且无连接上限；低值实验确认检查是周期性的，连接满直接断开而非503，server.close还会清除入站检查timer。因此计划保持现有独立20s排空，另设置明确的CLI入站边界，尚未完成的实现另行记录。LoCoMo下载状态未变，夜间窗口继续。
+包含2dbe346与d2ef85d的[ba18f0e完整CI](https://github.com/chuali-zi/memz/actions/runs/42404960861)已成功：core401/401、migrations9/9、Python99/99、产品UI87/87、响应式4/4、adapter12/12及完整后续步骤通过。Node22远端system `artifacts/system/run-1794078735317-45e81e55`、UI `artifacts/ui/run-1794078853288-d599fa9d`。
+
+同一ba18f0e在本云干净验证工作树、默认Node24.22.1独立通过core401/401、migrations9/9、完整真实PG UI、合成retrieval19/19并生成同提交材料包：system `artifacts/system/run-1794078691370-8c8d4140`、UI `artifacts/ui/run-1794078705238-cb9ac795`、材料包 `artifacts/submission/ba18f0e31a3f-1794078804272-c715a3`（均在 `/workspace/memz-verify`）。没有把跨提交或dirty源码报告拼包，Node22与24验证均不代表模型质量实验。
+
+## 2026-11-07 19:20 UTC 检查点
+
+- e123c17：CLI专用HTTP服务器在构造时固定headers10s、完整请求15s、检查1s及最多128TCP连接，保留keep-alive属性/原生buffer、socket inactivity0、16KiB正文和独立20s排空。先只读测量Node22/24默认60s/300s/check30s及连接满的原生直接关闭，再实现，不把拒绝连接称503。导入app仍由宿主管理server/信号/策略，native listen启动与运行时错误路径保留。
+
+真实生产默认回归在Node22和24各3/3，持续滴入慢header约10997ms、慢body约16001/16003ms原生408，零会话/DB checkout；正常完整请求及后续恢复通过。原启动/运行时错误/排空13/13保持原断言。新连接满恢复用例在独立审查后改为等待实际getConnections归零，避免固定20ms稳定性假设，目标1/1重跑。另一独立Node24测试让完整POST入站后处理16200ms，仍返回200及完整正文，中途健康请求也200，仅最多2个owned socket；据此支持不误伤已完成入站后的业务处理。
+
+e123c17的完整CI待推送后核实。Node关闭会清除入站检查timer，因此不以新15s期限替代旧20s排空；测试和文档明确周期检查、事件循环与非SLO边界。当前继续核实首次Compose启动健康检查是否会早于初始化完成；未证实前不改配置。LoCoMo下载状态未变，外部模型新增请求仍0，夜间窗口继续。
 
 ## 技术栈决定与主要缺口
 
