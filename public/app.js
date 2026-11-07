@@ -123,8 +123,18 @@ function validateCandidateComparison(proof,expected){
   if(current?.candidate_id===candidate.id)valid(candidate.status==='approved'&&current.version===candidate.expected_version+1&&current.value===candidate.value&&current.source_id===candidate.source_id);
 }
 
+function validateLoginReceipt(result){
+  // CSRF is opaque. Accept graphic ASCII unchanged as a header value, without
+  // coupling the browser to the server's present 48-hex implementation.
+  if(!receiptRecord(result,['name','csrf'])||!receiptText(result.name)||!result.name.trim()||typeof result.csrf!=='string'||!(/^[\x21-\x7e]+$/).test(result.csrf))throw new Error('登录回执格式异常，请重试登录');
+  return {name:result.name,csrf:result.csrf};
+}
+function validateLogoutReceipt(result){
+  if(!receiptRecord(result,['ok'])||result.ok!==true)throw new Error('退出回执格式异常，尚未确认退出，请重试');
+}
+
 async function switchAccount(){
-  try{await api('/api/logout',{method:'POST'})}
+  try{validateLogoutReceipt(await api('/api/logout',{method:'POST'}))}
   catch(error){if(error.status!==401)throw error}
   // An expired session is already logged out; let the user authenticate again.
   location.reload();
@@ -445,14 +455,18 @@ async function submitOnce(target,fn,{feedback=null,progress='正在提交…'}={
   }finally{
     busyActions.delete(target);root.setAttribute('aria-busy','false');button.textContent=label;
     if(p===projectId&&workspace===workspaceGeneration&&$(feedback||'#notice').textContent===progress)message('',feedback||'#notice');
-    if(target==='#loginForm')button.disabled=false;else writeControls();
+    if(target==='#loginForm')button.disabled=false;
+    else if(target==='#switchAccount'){
+      button.disabled=false;
+      if(p===projectId&&workspace===workspaceGeneration&&document.activeElement===document.body&&button.isConnected)button.focus();
+    }else writeControls();
   }
 }
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
 $('#loginForm').onsubmit=e=>{e.preventDefault();submitOnce('#loginForm',async()=>{
-  const f=new FormData(e.target),x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});
+  const f=new FormData(e.target),x=validateLoginReceipt(await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))}));
   csrf=x.csrf;message('');if($('#login').contains(document.activeElement))document.activeElement.blur();$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));
-  const b=el('button','切换账号');b.onclick=()=>perform(switchAccount);$('#identity').append(b);
+  const b=el('button','切换账号');b.id='switchAccount';b.onclick=()=>submitOnce('#switchAccount',switchAccount,{progress:'正在退出当前账号…'});$('#identity').append(b);
   const projects=loadProjects(),workspace=workspaceGeneration;await projects;
   // Hiding the login form leaves keyboard focus on BODY; respect any later user focus.
   if(workspace===workspaceGeneration&&document.activeElement===document.body)(projectId===null||!data?$('#refreshWorkspace'):$('#project')).focus();

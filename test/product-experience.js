@@ -1026,3 +1026,92 @@ test('strict decoding accepts a valid multi-byte character split across real HTT
     assert.deepEqual(await page.evaluate(()=>api('/__test__/split-utf8')),{text:'😀'});assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
+
+test('a malformed successful login cannot alter authentication state or hide the form',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let projectRequests=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/api/projects')projectRequests++});
+    await page.route('**/api/login',route=>route.fulfill({json:{csrf:'synthetic-sensitive-opaque-canary'}}));
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    assert.equal(await page.locator('#login').isVisible(),true);assert.equal(await page.locator('#workspace').isHidden(),true);
+    assert.equal(await page.evaluate(()=>csrf===''),true);assert.equal(await page.locator('#identity').textContent(),'');assert.equal(projectRequests,0);
+    assert.match(await page.locator('#notice').textContent(),/登录回执格式异常/);assert.ok(!(await page.locator('body').textContent()).includes('synthetic-sensitive-opaque-canary'));assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a malformed successful logout cannot reload or discard the current draft',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await settled(page,'#loginForm');await page.locator('#proposal [name=value]').fill('退出未确认时保留的草稿');
+    await page.route('**/api/logout',route=>route.fulfill({json:{}}));
+    await page.locator('#identity button').click();
+    await page.waitForFunction(()=>document.querySelector('#login').hidden===false||document.querySelector('#notice').textContent.includes('退出回执格式异常'));
+    assert.equal(await page.locator('#workspace').isVisible(),true);assert.equal(await page.locator('#proposal [name=value]').inputValue(),'退出未确认时保留的草稿');
+    assert.match(await page.locator('#notice').textContent(),/退出回执格式异常/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('login receipts reject malformed names or unsafe header values and accept an unchanged opaque token',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const marker='synthetic-sensitive-opaque-canary',name='synthetic-private-name',opaque='Opaque.Token-_/:+=~';let receipt={},projectRequests=0,headerPreserved=false;
+    page.on('request',request=>{if(new URL(request.url()).pathname==='/api/projects'){projectRequests++;headerPreserved=request.headers()['x-csrf-token']===opaque}});
+    await page.route('**/api/login',route=>route.fulfill({json:receipt}));
+    const invalid=[null,[],{}, {name}, {csrf:marker}, {name:42,csrf:marker}, {name:'   ',csrf:marker}, {name:'前\ud800后',csrf:marker}, {name,csrf:''}, {name,csrf:12}, ...[' '+marker,marker+' ',marker+'\r\n',marker+'\0','非ASCII','\t',marker+'\u007f'].map(csrf=>({name,csrf}))];
+    for(const value of invalid){
+      receipt=value;await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+      assert.equal(await page.locator('#login').isVisible(),true);assert.equal(await page.locator('#workspace').isHidden(),true);
+      assert.equal(await page.evaluate(()=>csrf===''),true);assert.equal(await page.locator('#identity').textContent(),'');assert.equal(projectRequests,0);
+      assert.match(await page.locator('#notice').textContent(),/登录回执格式异常/);
+      const shown=await page.locator('body').textContent();assert.ok(!shown.includes(marker)&&!shown.includes(name));
+      assert.equal(await page.locator('#loginForm [name=password]').inputValue(),'demo-owner');assert.equal(await page.locator('#loginForm button').isEnabled(),true);
+    }
+    receipt={name:'合成显示名😀',csrf:opaque,unused:'not rendered'};
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    assert.equal(projectRequests,1);assert.equal(headerPreserved,true);assert.match(await page.locator('#identity').textContent(),/合成显示名😀/);
+    assert.equal(await page.evaluate(token=>csrf===token&&![...document.querySelectorAll('input,select,textarea')].some(node=>node.value===token)&&!document.documentElement.outerHTML.includes(token)&&localStorage.length===0&&sessionStorage.length===0,opaque),true);
+    assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('logout accepts only an explicit acknowledgement, preserving identity and drafts until a valid retry',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await settled(page,'#loginForm');await page.locator('#proposal [name=value]').fill('退出确认前的草稿');
+    const identity=await page.locator('#identity').textContent();let receipt={},navigations=0;
+    page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++});
+    await page.route('**/api/logout',route=>route.fulfill({json:receipt}));
+    for(const value of [null,[],{}, {ok:false}, {ok:'true'}, {ok:1}, {name:'synthetic-private-name',csrf:'synthetic-sensitive-opaque-canary'}]){
+      receipt=value;await page.locator('#switchAccount').click();await settled(page,'#switchAccount');
+      assert.equal(navigations,0);assert.equal(await page.locator('#workspace').isVisible(),true);assert.equal(await page.locator('#identity').textContent(),identity);
+      assert.equal(await page.locator('#proposal [name=value]').inputValue(),'退出确认前的草稿');assert.match(await page.locator('#notice').textContent(),/尚未确认退出/);
+      assert.equal(await page.locator('#switchAccount').isEnabled(),true);assert.equal(await page.locator('#switchAccount').evaluate(node=>document.activeElement===node),true);
+      assert.ok(!(await page.locator('#notice').textContent()).includes('synthetic-'));
+    }
+    receipt={ok:true,unused:'ignored'};const reloaded=page.waitForNavigation({waitUntil:'domcontentloaded'});await page.locator('#switchAccount').click();await reloaded;
+    assert.equal(navigations,1);assert.equal(await page.locator('#login').isVisible(),true);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('account switching is single-flight and a failed acknowledgement does not steal draft focus',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await settled(page,'#loginForm');const pending=await hold(page,'**/api/logout');
+    await page.locator('#switchAccount').focus();await page.keyboard.press('Enter');await pending.observed;
+    await page.evaluate(()=>{document.querySelector('#switchAccount').onclick();document.querySelector('#switchAccount').onclick()});
+    assert.equal(pending.requests.length,1);assert.equal(await page.locator('#switchAccount').isDisabled(),true);assert.equal(await page.locator('#switchAccount').getAttribute('aria-busy'),'true');
+    await page.locator('#proposal [name=value]').fill('退出等待期间主动编辑');pending.release({ok:false});await settled(page,'#switchAccount');
+    assert.equal(await page.locator('#proposal [name=value]').evaluate(node=>document.activeElement===node),true);
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),'退出等待期间主动编辑');assert.equal(await page.locator('#switchAccount').isEnabled(),true);
+    assert.match(await page.locator('#notice').textContent(),/尚未确认退出/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a complete known logout 401 still returns to the login screen',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await settled(page,'#loginForm');await page.route('**/api/logout',route=>route.fulfill({status:401,json:{error:'请先登录'}}));
+    const reloaded=page.waitForNavigation({waitUntil:'domcontentloaded'});await page.locator('#switchAccount').click();await reloaded;
+    assert.equal(await page.locator('#login').isVisible(),true);assert.equal(await page.locator('#workspace').isHidden(),true);assert.equal(await page.evaluate(()=>csrf===''),true);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
