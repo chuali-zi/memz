@@ -1,0 +1,22 @@
+{
+  "synthetic": true,
+  "modelCalls": 0,
+  "helperSha256": "b77c774b04a7d5e84b09fbea6aacba21acb67204bacabb5ba142f2927062e2cb",
+  "realPostgres": true,
+  "noHostPorts": true,
+  "backupBytes": 34921,
+  "backupMode": "0o600",
+  "directoryMode": "0o700",
+  "backupSha256": "ca51ad594e9ce99171cdb2010f0a4fdd20f1087a3cbeccb31315ba1bdb8fddd9",
+  "failedCommand": "psql",
+  "exitCode": 3,
+  "diagnosticMarkers": [
+    "does not exist"
+  ],
+  "stderrBytes": 177,
+  "status": "failed",
+  "error": "RuntimeError",
+  "ownedBackupRemoved": true,
+  "ownedComposeRemoved": true,
+  "driverOutputBytes": 570
+}
