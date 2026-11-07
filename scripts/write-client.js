@@ -2,28 +2,38 @@
 const fail=(code,outcome='not_attempted',status)=>Object.assign(new Error(code),{code,outcome,...(status?{status}:{})});
 const check=(condition,code)=>{if(!condition)throw fail(code)};
 const integer=(value,min=1)=>Number.isInteger(value)&&value>=min&&value<=2147483647;
-async function writeRecord({baseURL='http://127.0.0.1:3000',username='member',password='demo-member',projectId,operation,body,idempotencyKey,receiptResult,fetchImpl=fetch}){
+async function writeRecord({baseURL='http://127.0.0.1:3000',username='member',password='demo-member',projectId,operation,body,idempotencyKey,receiptResult,fetchImpl=fetch,signal}){
   let base;try{base=new URL(baseURL)}catch{throw fail('INVALID_BASE_URL')}
   check(base.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(base.hostname)&&base.pathname==='/'&&!base.username&&!base.password&&!base.search&&!base.hash,'LOCAL_DEMO_URL_REQUIRED');
   check(typeof username==='string'&&username&&typeof password==='string'&&password,'INVALID_CREDENTIALS');
   check(['sources','candidates'].includes(operation)&&integer(projectId),'INVALID_OPERATION');
   check(typeof idempotencyKey==='string'&&/^[A-Za-z0-9._:-]{1,128}$/.test(idempotencyKey),'INVALID_IDEMPOTENCY_KEY');
   check(Buffer.byteLength(JSON.stringify(body),'utf8')<=16384,'REQUEST_TOO_LARGE');
+  check(signal===undefined||signal instanceof AbortSignal,'INVALID_SIGNAL');
   let cookie='',csrf='',writeAttempted=false,result,problem;const deadline=Date.now()+15000;
   async function request(path,body,{write=false,logout=false}={}){
+    // Check before marking the write attempted. Once fetch starts, interruption
+    // cannot establish whether the server committed; never retry automatically.
+    if(!logout&&signal?.aborted)throw fail('REQUEST_CANCELLED',writeAttempted?'unknown':'not_attempted');
     const remaining=logout?5000:Math.min(5000,deadline-Date.now());if(remaining<=0)throw fail('TOTAL_TIMEOUT',writeAttempted?'unknown':'not_attempted');
+    const timeout=AbortSignal.timeout(remaining),requestSignal=!logout&&signal?AbortSignal.any([timeout,signal]):timeout;
     if(write)writeAttempted=true;
     let response;
-    try{response=await fetchImpl(new URL(path,base),{method:'POST',redirect:'error',signal:AbortSignal.timeout(remaining),headers:{'content-type':'application/json',...(cookie?{cookie,'x-csrf-token':csrf}:{}),...(write?{'Idempotency-Key':idempotencyKey}:{})},body:JSON.stringify(body)})}
-    catch{throw fail('REQUEST_FAILED',writeAttempted?'unknown':'not_attempted')}
-    if(logout&&response.status===401)return null;
-    if(!response.ok){await response.body?.cancel();throw fail(`HTTP_${response.status}`,write?(response.status<500?'rejected':'unknown'):'not_attempted',response.status)}
+    try{response=await fetchImpl(new URL(path,base),{method:'POST',redirect:'error',signal:requestSignal,headers:{'content-type':'application/json',...(cookie?{cookie,'x-csrf-token':csrf}:{}),...(write?{'Idempotency-Key':idempotencyKey}:{})},body:JSON.stringify(body)})}
+    catch{throw fail(!logout&&signal?.aborted?'REQUEST_CANCELLED':'REQUEST_FAILED',writeAttempted?'unknown':'not_attempted')}
+    if(logout&&response.status===401){await response.body?.cancel();return null}
+    if(!response.ok){
+      // A received rejection retains its status even if cancelling the unused
+      // body fails; never expose a transport exception or cancellation reason.
+      try{await response.body?.cancel()}catch{}
+      throw fail(`HTTP_${response.status}`,write?(response.status<500?'rejected':'unknown'):'not_attempted',response.status);
+    }
     let data;
     try{
       const reader=response.body.getReader(),chunks=[];let size=0;
       try{while(true){const part=await reader.read();if(part.done)break;size+=part.value.byteLength;if(size>65536){await reader.cancel();throw new Error('limit')}chunks.push(Buffer.from(part.value))}}finally{reader.releaseLock()}
       data=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks,size)));
-    }catch{throw fail('INVALID_RESPONSE',writeAttempted?'unknown':'not_attempted')}
+    }catch{throw fail(!logout&&signal?.aborted?'REQUEST_CANCELLED':'INVALID_RESPONSE',writeAttempted?'unknown':'not_attempted')}
     if(path==='/api/login'){
       cookie=(response.headers.getSetCookie?.()||[response.headers.get('set-cookie')||'']).map(h=>h.split(';')[0]).find(h=>/^sid=[^;]+$/.test(h))||'';
       if(!cookie||typeof data?.csrf!=='string'||!data.csrf)throw fail('INVALID_LOGIN_RESPONSE');csrf=data.csrf;

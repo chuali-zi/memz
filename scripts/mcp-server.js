@@ -33,13 +33,14 @@ async function main(){
     requireReady();if(request.params?.cursor!==undefined)invalid();
     return {tools:settings.allowProposals?[readTool,proposalTool]:[readTool]};
   });
-  server.setRequestHandler(CallToolRequestSchema,async request=>{
+  server.setRequestHandler(CallToolRequestSchema,async(request,extra)=>{
     requireReady();const {name,arguments:args={},task}=request.params;
     if(task||!object(args))invalid();
     if(name!=='memz_read_context'&&(name!=='memz_submit_proposal'||!settings.allowProposals))throw new McpError(ErrorCode.InvalidParams,'UNKNOWN_TOOL');
     if(busy)return {isError:true,content:[{type:'text',text:JSON.stringify({code:'BUSY',outcome:'not_attempted'})}]};
     busy=true;
     try{
+      if(extra.signal.aborted)throw Object.assign(new Error('REQUEST_CANCELLED'),{code:'REQUEST_CANCELLED',outcome:name==='memz_read_context'?'read_failed':'not_attempted'});
       let value;
       if(name==='memz_read_context'){
         if(Object.keys(args).some(k=>!['query','limit','after','maxOutputBytes'].includes(k)))invalid();
@@ -48,7 +49,7 @@ async function main(){
         value=await readContext({...settings,...args,limit,maxOutputBytes});
       }else{
         if(Object.keys(args).some(k=>!['sourceId','subject','predicate','value','expectedVersion','idempotencyKey'].includes(k)))invalid();
-        value=await submitProposal({...settings,proposal:{...args,projectId:settings.projectId}});
+        value=await submitProposal({...settings,proposal:{...args,projectId:settings.projectId},signal:extra.signal});
       }
       return {content:[{type:'text',text:JSON.stringify(value)}],isError:false};
     }catch(e){
