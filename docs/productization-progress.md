@@ -123,7 +123,17 @@ df320d8完整远端[CI成功](https://github.com/chuali-zi/memz/actions/runs/423
 
 真实生产默认回归在Node22和24各3/3，持续滴入慢header约10997ms、慢body约16001/16003ms原生408，零会话/DB checkout；正常完整请求及后续恢复通过。原启动/运行时错误/排空13/13保持原断言。新连接满恢复用例在独立审查后改为等待实际getConnections归零，避免固定20ms稳定性假设，目标1/1重跑。另一独立Node24测试让完整POST入站后处理16200ms，仍返回200及完整正文，中途健康请求也200，仅最多2个owned socket；据此支持不误伤已完成入站后的业务处理。
 
-e123c17的完整CI待推送后核实。Node关闭会清除入站检查timer，因此不以新15s期限替代旧20s排空；测试和文档明确周期检查、事件循环与非SLO边界。当前继续核实首次Compose启动健康检查是否会早于初始化完成；未证实前不改配置。LoCoMo下载状态未变，外部模型新增请求仍0，夜间窗口继续。
+包含e123c17的[da399ae完整CI](https://github.com/chuali-zi/memz/actions/runs/42405747977)已成功，core404/404、迁移9/9、Python99/99及全部后续步骤通过；远端system `artifacts/system/run-1794079328522-213aa26f`、UI `artifacts/ui/run-1794079467328-4f3d1ce7`。Node关闭会清除入站检查timer，因此不以新15s期限替代旧20s排空；测试和文档明确周期检查、事件循环与非SLO边界。
+
+## 2026-11-07 19:39 UTC 检查点
+
+- b2245ac：先在独立新Compose项目中复现Unix socket健康检查早于初始化完成，再仅将生产命令改为显式TCP的CMD argv，原2s/3s/30配置保留。新增离线配置回归与原通用checker合计9/9；新opt-in真实冷启动脚本不进入默认核心测试，不要求原生PG用户安装Docker。
+
+独立root运行原始报告已保留在[冷启动证据目录](../evaluation/evidence/compose-first-start-2026-11-07/README.md)：旧检查在6443ms为healthy，但TCP exit2、init marker不存在；新检查在16266ms为healthy且TCP/marker均真，旧服务随后也完成初始化。运行总16878ms，owned容器/卷/网络全部确认为0；无发布端口、network none、缓存镜像且禁pull、仅合成4秒gate。报告含与b2245ac相同的runner/compose SHA，不将初始化观察时间称作启动性能保证或app schema/权限验收。初次探索fixture非零退出的原因仍未定位，未当作产品缺陷证据。
+
+原Space报告已在同一文件身份上更新为第3版，保留11月6日完整历史原文并前置19:25检查点；本地版本metadata同步成功，没有创建副本或上传截图。历史阶段的“模型0/未push/旧HEAD”只适用于当时；当前报告明确区分仓库既有351次真实原创合成请求和本夜间阶段新增0次。
+
+当前继续两项有依据的开发：把既有批准历史读取通过显式opt-in MCP暴露，并补native取消；为Node22/24准备固定loadgen、相同小profile与应用字节预算的成对工程smoke。原n80/page25测量合并HTTP与driver读取超过16MiB，因此不原样重跑；新样本不会用于稳定尾延迟、真实模型或换栈结论。尚未提交/运行部分按后续记录说明。LoCoMo下载未恢复，外部模型新增请求仍0，夜间窗口继续。
 
 ## 技术栈决定与主要缺口
 

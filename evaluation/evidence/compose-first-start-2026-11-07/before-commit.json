@@ -1,0 +1,313 @@
+{
+  "schema": "memz-compose-first-start-v1",
+  "ok": true,
+  "project": "memz-first-start-f56e6a4ebdf1150e",
+  "node": "v22.23.4",
+  "fixture": {
+    "synthetic": true,
+    "gateSeconds": 4,
+    "portsPublished": false,
+    "networkMode": "none",
+    "pullPolicy": "never"
+  },
+  "runnerSha256": "c1652b0bf93d8968d00f0b1edb22ce472fbbef0eba415b899b4ad684eee52eae",
+  "composeSha256": "818fb3886639ed668ad9bd04b072c513957d5c32baf552a5cca18cad4e8877ee",
+  "stages": [
+    {
+      "stage": "preflight_absence_containers",
+      "startedMs": 1,
+      "elapsedMs": 20,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "preflight_absence_volumes",
+      "startedMs": 21,
+      "elapsedMs": 16,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "preflight_absence_networks",
+      "startedMs": 38,
+      "elapsedMs": 14,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "cached_image",
+      "startedMs": 52,
+      "elapsedMs": 17,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "compose_version",
+      "startedMs": 69,
+      "elapsedMs": 60,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "production_config",
+      "startedMs": 129,
+      "elapsedMs": 65,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_wait",
+      "startedMs": 194,
+      "elapsedMs": 4162,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_container",
+      "startedMs": 4356,
+      "elapsedMs": 65,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_ownership",
+      "startedMs": 4421,
+      "elapsedMs": 16,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_health",
+      "startedMs": 4437,
+      "elapsedMs": 13,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_tcp",
+      "startedMs": 4450,
+      "elapsedMs": 82,
+      "exitCode": 2,
+      "signal": null,
+      "outcome": "EXIT_NONZERO",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_gate",
+      "startedMs": 4532,
+      "elapsedMs": 80,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "current_wait",
+      "startedMs": 4612,
+      "elapsedMs": 7704,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "current_container",
+      "startedMs": 12316,
+      "elapsedMs": 68,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "current_ownership",
+      "startedMs": 12384,
+      "elapsedMs": 21,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "current_health",
+      "startedMs": 12405,
+      "elapsedMs": 18,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "current_tcp",
+      "startedMs": 12423,
+      "elapsedMs": 78,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "current_gate",
+      "startedMs": 12501,
+      "elapsedMs": 84,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_container",
+      "startedMs": 12585,
+      "elapsedMs": 67,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_ownership",
+      "startedMs": 12652,
+      "elapsedMs": 22,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_health",
+      "startedMs": 12674,
+      "elapsedMs": 17,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_tcp",
+      "startedMs": 12691,
+      "elapsedMs": 77,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "original_gate",
+      "startedMs": 12768,
+      "elapsedMs": 79,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "cleanup_down",
+      "startedMs": 12847,
+      "elapsedMs": 385,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "cleanup_absence_containers",
+      "startedMs": 13232,
+      "elapsedMs": 18,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "cleanup_absence_volumes",
+      "startedMs": 13250,
+      "elapsedMs": 15,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    },
+    {
+      "stage": "cleanup_absence_networks",
+      "startedMs": 13265,
+      "elapsedMs": 14,
+      "exitCode": 0,
+      "signal": null,
+      "outcome": "OK",
+      "reasonCodes": []
+    }
+  ],
+  "observations": [
+    {
+      "case": "original",
+      "observedMs": 4612,
+      "health": "healthy",
+      "tcpExitCode": 2,
+      "tcpReady": false,
+      "initComplete": false
+    },
+    {
+      "case": "current",
+      "observedMs": 12585,
+      "health": "healthy",
+      "tcpExitCode": 0,
+      "tcpReady": true,
+      "initComplete": true
+    },
+    {
+      "case": "original",
+      "observedMs": 12847,
+      "health": "healthy",
+      "tcpExitCode": 0,
+      "tcpReady": true,
+      "initComplete": true
+    }
+  ],
+  "cleanup": {
+    "passed": true,
+    "failures": [],
+    "remaining": {
+      "containers": 0,
+      "volumes": 0,
+      "networks": 0
+    }
+  },
+  "imageId": "sha256:ba07bdb15f0f2ac1ba7a88891da731cae65ac36d663fdb7de8f698ea47e0e381",
+  "composeVersion": "2.40.3",
+  "productionHealthcheck": {
+    "test": [
+      "CMD",
+      "pg_isready",
+      "-h",
+      "127.0.0.1",
+      "-U",
+      "postgres",
+      "-d",
+      "memz"
+    ],
+    "interval": "2s",
+    "timeout": "3s",
+    "retries": 30
+  },
+  "elapsedMs": 13281
+}
