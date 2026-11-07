@@ -1,0 +1,490 @@
+{
+  "schema": "memz-selected-core-mutation-v1",
+  "pin": "947b416de6ac2327fafc6f54d1c28b61646100bc",
+  "node": "v22.23.4",
+  "started": "2026-11-07T21:50:34.454Z",
+  "worktree": "/workspace/memz-mutation-mw6xt9dy_437d48",
+  "evidence": "/tmp/memz-mutation-audit-mw6xt9dy_437d48",
+  "models": 0,
+  "baselines": [
+    {
+      "label": "baseline_A",
+      "group": "A",
+      "selectedTests": [
+        "explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write",
+        "concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version"
+      ],
+      "target": "test/approval-intent-postgres.test.js",
+      "filtering": "Only listed names execute; all other tests are intentionally not selected/omitted, never counted as passes",
+      "syntaxValid": true,
+      "command": [
+        "/workspace/.memz-toolchains/node22/bin/node",
+        "--require",
+        "/tmp/memz-mutation-audit-mw6xt9dy_437d48/preload.js",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        "^(explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write|concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version)$",
+        "test/approval-intent-postgres.test.js"
+      ],
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "metrics": {
+        "processes": 2,
+        "applicationBytes": 33195,
+        "httpRequests": 18,
+        "violations": [],
+        "unsupported": 0
+      },
+      "owned": [
+        "memz_approval_intent_ef1775424b1084bb"
+      ],
+      "nativeDropped": [
+        "memz_approval_intent_ef1775424b1084bb"
+      ],
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failedNames": [],
+      "assertionFailure": false,
+      "hookFailure": false,
+      "resourcesCleaned": true
+    },
+    {
+      "label": "baseline_B",
+      "group": "B",
+      "selectedTests": [
+        "sources: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once",
+        "candidates: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once"
+      ],
+      "target": "test/membership-write-revocation-postgres.test.js",
+      "filtering": "Only listed names execute; all other tests are intentionally not selected/omitted, never counted as passes",
+      "syntaxValid": true,
+      "command": [
+        "/workspace/.memz-toolchains/node22/bin/node",
+        "--require",
+        "/tmp/memz-mutation-audit-mw6xt9dy_437d48/preload.js",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        "^(sources: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once|candidates: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once)$",
+        "test/membership-write-revocation-postgres.test.js"
+      ],
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "metrics": {
+        "processes": 2,
+        "applicationBytes": 44845,
+        "httpRequests": 12,
+        "violations": [],
+        "unsupported": 0
+      },
+      "owned": [
+        "memz_write_revoke_b647a8d45916796d",
+        "memz_write_revoke_be63308c45dda7e6"
+      ],
+      "nativeDropped": [
+        "memz_write_revoke_b647a8d45916796d",
+        "memz_write_revoke_be63308c45dda7e6"
+      ],
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failedNames": [],
+      "assertionFailure": false,
+      "hookFailure": false,
+      "resourcesCleaned": true
+    },
+    {
+      "label": "baseline_C",
+      "group": "C",
+      "selectedTests": [
+        "a callback that catches its SQL failure cannot turn an aborted PostgreSQL transaction into a success receipt"
+      ],
+      "target": "test/database-reliability.test.js",
+      "filtering": "Only listed names execute; all other tests are intentionally not selected/omitted, never counted as passes",
+      "syntaxValid": true,
+      "command": [
+        "/workspace/.memz-toolchains/node22/bin/node",
+        "--require",
+        "/tmp/memz-mutation-audit-mw6xt9dy_437d48/preload.js",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        "^(a callback that catches its SQL failure cannot turn an aborted PostgreSQL transaction into a success receipt)$",
+        "test/database-reliability.test.js"
+      ],
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "metrics": {
+        "processes": 2,
+        "applicationBytes": 908,
+        "httpRequests": 0,
+        "violations": [],
+        "unsupported": 0
+      },
+      "owned": [],
+      "nativeDropped": [],
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failedNames": [],
+      "assertionFailure": false,
+      "hookFailure": false,
+      "resourcesCleaned": true
+    }
+  ],
+  "mutants": [
+    {
+      "id": "M1",
+      "file": "server.js",
+      "beforeSha256": "350cabef4a09dbe2f16c6514774e689bfe1675f43f3eb767b6c7c58e7a6fc169",
+      "mutantSha256": "5eb06595936f13b50e7fd0811ca526c2700f852ac03a8afe874d7aeb99f05270",
+      "expression": {
+        "from": "if(v!==ca.expected_version)",
+        "to": "if(false&&v!==ca.expected_version)"
+      },
+      "label": "M1",
+      "group": "A",
+      "selectedTests": [
+        "explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write",
+        "concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version"
+      ],
+      "target": "test/approval-intent-postgres.test.js",
+      "filtering": "Only listed names execute; all other tests are intentionally not selected/omitted, never counted as passes",
+      "syntaxValid": true,
+      "command": [
+        "/workspace/.memz-toolchains/node22/bin/node",
+        "--require",
+        "/tmp/memz-mutation-audit-mw6xt9dy_437d48/preload.js",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        "^(explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write|concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version)$",
+        "test/approval-intent-postgres.test.js"
+      ],
+      "exit": {
+        "code": 1,
+        "signal": null
+      },
+      "timedOut": false,
+      "metrics": {
+        "processes": 2,
+        "applicationBytes": 28597,
+        "httpRequests": 15,
+        "violations": [],
+        "unsupported": 0
+      },
+      "owned": [
+        "memz_approval_intent_6bc66cea8d42d145"
+      ],
+      "nativeDropped": [
+        "memz_approval_intent_6bc66cea8d42d145"
+      ],
+      "counts": {
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failedNames": [
+        "explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write",
+        "concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version"
+      ],
+      "assertionFailure": true,
+      "hookFailure": false,
+      "resourcesCleaned": true,
+      "classification": "KILLED",
+      "restoredSha256": "350cabef4a09dbe2f16c6514774e689bfe1675f43f3eb767b6c7c58e7a6fc169",
+      "restoreMatches": true
+    },
+    {
+      "id": "M2",
+      "file": "idempotency.js",
+      "beforeSha256": "2e1f2d065a75e01ffc08d9ccc278a275bf9824655a582c51bf79b49dcc29b20c",
+      "mutantSha256": "82e9da46e49ad46ebab10d604194aec680b921d9084ef2edb21a1db20465320d",
+      "expression": {
+        "from": "if(previous.request_hash!==hash)",
+        "to": "if(false&&previous.request_hash!==hash)"
+      },
+      "label": "M2",
+      "group": "A",
+      "selectedTests": [
+        "explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write",
+        "concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version"
+      ],
+      "target": "test/approval-intent-postgres.test.js",
+      "filtering": "Only listed names execute; all other tests are intentionally not selected/omitted, never counted as passes",
+      "syntaxValid": true,
+      "command": [
+        "/workspace/.memz-toolchains/node22/bin/node",
+        "--require",
+        "/tmp/memz-mutation-audit-mw6xt9dy_437d48/preload.js",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        "^(explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write|concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version)$",
+        "test/approval-intent-postgres.test.js"
+      ],
+      "exit": {
+        "code": 1,
+        "signal": null
+      },
+      "timedOut": false,
+      "metrics": {
+        "processes": 2,
+        "applicationBytes": 27320,
+        "httpRequests": 14,
+        "violations": [],
+        "unsupported": 0
+      },
+      "owned": [
+        "memz_approval_intent_b6130cbe2d437c60"
+      ],
+      "nativeDropped": [
+        "memz_approval_intent_b6130cbe2d437c60"
+      ],
+      "counts": {
+        "tests": 2,
+        "pass": 1,
+        "fail": 1,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failedNames": [
+        "concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version"
+      ],
+      "assertionFailure": true,
+      "hookFailure": false,
+      "resourcesCleaned": true,
+      "classification": "KILLED",
+      "restoredSha256": "2e1f2d065a75e01ffc08d9ccc278a275bf9824655a582c51bf79b49dcc29b20c",
+      "restoreMatches": true
+    },
+    {
+      "id": "M3",
+      "file": "db/schema.sql",
+      "beforeSha256": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+      "mutantSha256": "dc579397457ae25b32a05773155948b8cb465bd468a720a19168dfd9a4ba8a41",
+      "expression": {
+        "from": "AND active IS TRUE",
+        "to": "AND TRUE"
+      },
+      "label": "M3",
+      "group": "B",
+      "selectedTests": [
+        "sources: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once",
+        "candidates: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once"
+      ],
+      "target": "test/membership-write-revocation-postgres.test.js",
+      "filtering": "Only listed names execute; all other tests are intentionally not selected/omitted, never counted as passes",
+      "syntaxValid": true,
+      "command": [
+        "/workspace/.memz-toolchains/node22/bin/node",
+        "--require",
+        "/tmp/memz-mutation-audit-mw6xt9dy_437d48/preload.js",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        "^(sources: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once|candidates: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once)$",
+        "test/membership-write-revocation-postgres.test.js"
+      ],
+      "exit": {
+        "code": 1,
+        "signal": null
+      },
+      "timedOut": false,
+      "metrics": {
+        "processes": 2,
+        "applicationBytes": 24443,
+        "httpRequests": 4,
+        "violations": [],
+        "unsupported": 0
+      },
+      "owned": [
+        "memz_write_revoke_f124099174f538aa",
+        "memz_write_revoke_5a34acdce20b1dfe"
+      ],
+      "nativeDropped": [
+        "memz_write_revoke_f124099174f538aa",
+        "memz_write_revoke_5a34acdce20b1dfe"
+      ],
+      "counts": {
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failedNames": [
+        "sources: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once",
+        "candidates: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once"
+      ],
+      "assertionFailure": true,
+      "hookFailure": false,
+      "resourcesCleaned": true,
+      "classification": "KILLED",
+      "restoredSha256": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+      "restoreMatches": true
+    },
+    {
+      "id": "M4",
+      "file": "scripts/database.js",
+      "beforeSha256": "4f8ce0e610e5a43346ee172620d69be0458ce6e641a64107f286d66a4d0a6bf6",
+      "mutantSha256": "96c86526cf12da26d1032fcd3f31286712a648c718e48da32cacb7e4fc8a18b2",
+      "expression": {
+        "from": "if(committed?.command!=='COMMIT')",
+        "to": "if(false&&committed?.command!=='COMMIT')"
+      },
+      "label": "M4",
+      "group": "C",
+      "selectedTests": [
+        "a callback that catches its SQL failure cannot turn an aborted PostgreSQL transaction into a success receipt"
+      ],
+      "target": "test/database-reliability.test.js",
+      "filtering": "Only listed names execute; all other tests are intentionally not selected/omitted, never counted as passes",
+      "syntaxValid": true,
+      "command": [
+        "/workspace/.memz-toolchains/node22/bin/node",
+        "--require",
+        "/tmp/memz-mutation-audit-mw6xt9dy_437d48/preload.js",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        "^(a callback that catches its SQL failure cannot turn an aborted PostgreSQL transaction into a success receipt)$",
+        "test/database-reliability.test.js"
+      ],
+      "exit": {
+        "code": 1,
+        "signal": null
+      },
+      "timedOut": false,
+      "metrics": {
+        "processes": 2,
+        "applicationBytes": 225,
+        "httpRequests": 0,
+        "violations": [],
+        "unsupported": 0
+      },
+      "owned": [],
+      "nativeDropped": [],
+      "counts": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failedNames": [
+        "a callback that catches its SQL failure cannot turn an aborted PostgreSQL transaction into a success receipt"
+      ],
+      "assertionFailure": true,
+      "hookFailure": false,
+      "resourcesCleaned": true,
+      "classification": "KILLED",
+      "restoredSha256": "4f8ce0e610e5a43346ee172620d69be0458ce6e641a64107f286d66a4d0a6bf6",
+      "restoreMatches": true
+    }
+  ],
+  "ownedDatabases": [
+    "memz_approval_intent_ef1775424b1084bb",
+    "memz_write_revoke_b647a8d45916796d",
+    "memz_write_revoke_be63308c45dda7e6",
+    "memz_mutation_mw6xt9dy_437d48_baseline_c",
+    "memz_approval_intent_6bc66cea8d42d145",
+    "memz_approval_intent_b6130cbe2d437c60",
+    "memz_write_revoke_f124099174f538aa",
+    "memz_write_revoke_5a34acdce20b1dfe",
+    "memz_mutation_mw6xt9dy_437d48_m4"
+  ],
+  "cleanup": [
+    {
+      "database": "memz_mutation_mw6xt9dy_437d48_baseline_c",
+      "dropped": true
+    },
+    {
+      "database": "memz_mutation_mw6xt9dy_437d48_m4",
+      "dropped": true
+    },
+    {
+      "database": "memz_approval_intent_ef1775424b1084bb",
+      "dropped": true
+    },
+    {
+      "database": "memz_write_revoke_b647a8d45916796d",
+      "dropped": true
+    },
+    {
+      "database": "memz_write_revoke_be63308c45dda7e6",
+      "dropped": true
+    },
+    {
+      "database": "memz_approval_intent_6bc66cea8d42d145",
+      "dropped": true
+    },
+    {
+      "database": "memz_approval_intent_b6130cbe2d437c60",
+      "dropped": true
+    },
+    {
+      "database": "memz_write_revoke_f124099174f538aa",
+      "dropped": true
+    },
+    {
+      "database": "memz_write_revoke_5a34acdce20b1dfe",
+      "dropped": true
+    }
+  ],
+  "limit": {
+    "wallMs": 900000,
+    "runMs": 90000,
+    "http": 100,
+    "applicationBytes": 16777216,
+    "cleanupReserve": 65536,
+    "scope": "SQL UTF8 + JSON parameters/result.rows + HTTP request/response bodies; measured after materialization, not a hard allocation, wire, or heap bound"
+  },
+  "mainBefore": "",
+  "baselineHashes": {
+    "server.js": "350cabef4a09dbe2f16c6514774e689bfe1675f43f3eb767b6c7c58e7a6fc169",
+    "idempotency.js": "2e1f2d065a75e01ffc08d9ccc278a275bf9824655a582c51bf79b49dcc29b20c",
+    "db/schema.sql": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+    "scripts/database.js": "4f8ce0e610e5a43346ee172620d69be0458ce6e641a64107f286d66a4d0a6bf6"
+  },
+  "applicationBytes": 175727,
+  "httpRequests": 63,
+  "elapsedMs": 3220,
+  "finished": "2026-11-07T21:50:37.674Z",
+  "finalDiff": "",
+  "worktreeRemoved": true,
+  "mainAfter": "",
+  "mainFilesUnchanged": true
+}

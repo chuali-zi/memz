@@ -1,0 +1,13 @@
+diff --git a/scripts/database.js b/scripts/database.js
+index c14eb3f..d1c894d 100644
+--- a/scripts/database.js
++++ b/scripts/database.js
+@@ -55,7 +55,7 @@ async function runTransaction(pool,user,fn,{snapshot=false}={}){
+     const committed=await client.query('COMMIT');
+     // An aborted transaction accepts COMMIT but reports ROLLBACK. This can
+     // happen when fn catches a SQL error; its return value is not a receipt.
+-    if(committed?.command!=='COMMIT')throw new Error('Database transaction did not commit');
++    if(false&&committed?.command!=='COMMIT')throw new Error('Database transaction did not commit');
+     return result;
+   }catch(error){
+     if(connectionError||discardConnection(error))discard=connectionError||error;

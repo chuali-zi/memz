@@ -1,0 +1,14 @@
+{
+  "rawSummaryUnchanged": true,
+  "childMetricFiles": 14,
+  "observedChildBytes": 159533,
+  "observedRunnerAggregateBytes": 175727,
+  "derivedObservedParentControlBytes": 16194,
+  "parentControlScope": "Two CREATE DATABASE plus two db/schema.sql executions, each charged for SQL UTF8, JSON parameters and result.rows in original runner control(); parent subtotal derived from aggregate minus observed child counters, not a separate original per-call trace",
+  "reconstructedUnmeteredParentTerminalBytes": 688,
+  "reconstruction": "Nine acknowledged DROP DATABASE IF EXISTS owned_name WITH (FORCE), SQL UTF8 plus [] parameter and [] result.rows JSON (4 bytes); no extra business data queried",
+  "observedFinalVerificationBytes": 442,
+  "totalAccountedBytes": 176857,
+  "httpRequests": 63,
+  "excluded": "Connection/startup protocol, wire framing, headers, PG errors, driver internal allocations and heap; counters are after materialization, not a hard allocation bound"
+}

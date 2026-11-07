@@ -1,0 +1,13 @@
+diff --git a/idempotency.js b/idempotency.js
+index ee12a64..362d6af 100644
+--- a/idempotency.js
++++ b/idempotency.js
+@@ -16,7 +16,7 @@ async function createOnce(c,{project,user,operation,key,payload},create){
+   const previous=(await c.query(`SELECT request_hash,response FROM idempotency_requests
+     WHERE project_id=$1 AND actor_id=$2 AND operation=$3 AND request_key=$4`,scope)).rows[0];
+   if(previous){
+-    if(previous.request_hash!==hash)throw fail(409,'幂等键已用于不同的创建内容');
++    if(false&&previous.request_hash!==hash)throw fail(409,'幂等键已用于不同的创建内容');
+     return previous.response;
+   }
+   const response=await create();

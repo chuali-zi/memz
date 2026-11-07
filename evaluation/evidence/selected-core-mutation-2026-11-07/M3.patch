@@ -1,0 +1,13 @@
+diff --git a/db/schema.sql b/db/schema.sql
+index b20cc77..1217d03 100644
+--- a/db/schema.sql
++++ b/db/schema.sql
+@@ -2,7 +2,7 @@
+ CREATE ROLE memz_app LOGIN PASSWORD 'memz_demo_only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+ CREATE TABLE projects (id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY, name text NOT NULL);
+ CREATE TABLE memberships (project_id int REFERENCES projects, user_id int NOT NULL, role text NOT NULL CHECK(role IN ('owner','member','viewer')), active boolean NOT NULL DEFAULT true, PRIMARY KEY(project_id,user_id));
+-CREATE FUNCTION member_role(p int) RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$SELECT role FROM public.memberships WHERE project_id=p AND user_id=nullif(pg_catalog.current_setting('app.user_id',true),'')::pg_catalog.int4 AND active IS TRUE$$;
++CREATE FUNCTION member_role(p int) RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$SELECT role FROM public.memberships WHERE project_id=p AND user_id=nullif(pg_catalog.current_setting('app.user_id',true),'')::pg_catalog.int4 AND TRUE$$;
+ COMMENT ON FUNCTION member_role(integer) IS 'memz:member-role-active-v1';
+ REVOKE ALL ON FUNCTION member_role(int) FROM PUBLIC;
+ GRANT EXECUTE ON FUNCTION member_role(int) TO memz_app;

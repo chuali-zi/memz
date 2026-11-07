@@ -167,6 +167,17 @@ readiness/doctor只查目录，检查active普通列及受支持的精确成员�
 
 独立纯故障审查发现并修复两个测试harness清理问题：work计量超限不能再次阻断DROP；CREATE已成功但结果计量失败前须登记owned归属。两个测试文件从原1MiB中预留4KiB给限定ROLLBACK/精确owned DROP，不放宽总量。纯4/4和真实两个小fixture故意预算失败均确认清理；真实故障TAP按预期exit1、2fail，但2created/2dropped，不能把它们计入normal通过。最终正常2+9通过且数据库前缀无残留；不声称验证未知网络CREATE结果的回收。这些是测试基础设施改进，不是新增生产权限或任意在途撤权取消保证。
 
+## 2026-11-07 21:58 UTC 检查点
+
+- d356777：浏览器在清除创建键和进入成功分支前，按实际发送JSON快照核对来源/候选的项目、ID、trim文本、十进制整数引用及pending状态。异常2xx仍属未知，曾未知的同键不因后来403/409释放；fresh4xx与旧响应身份保护保留。独立VM在Node22/24各36/36，Chromium产品111/111、响应式4/4，本云真实PG UI31屏通过；完整CI core534/534及全部后续步骤成功。
+- 947b416：审批回执先核对动作状态及expected_version+1/int32版本，再读取刷新和宣称成功；拒绝状态不消费unused版本。异常明确未确认、要求刷新核对，无自动重试或创建键。Node22/24实际app VM各8/8，新增实际Chromium2项先红后绿，完整产品113/113；草稿、caret、旧页、503、409和workspace边界保留。
+
+[947b416完整远端CI](https://github.com/chuali-zi/memz/actions/runs/42416987480)成功：Node22核心542/542、迁移9/9、Python99/99、产品113/113、响应式4/4、真实服务合成adapter12/12、retrieval19/19及所有后续SQL计划/真实停启/UI/包步骤。远端system `artifacts/system/run-1794087730373-881a485a`、UI `artifacts/ui/run-1794087882395-f327dc09`，不冒充本机已下载。相同干净947b416在本云Node24独立通过core542/542、迁移9/9、真实PG UI31屏与合成retrieval19/19；验证工作树system `artifacts/system/run-1794087673039-e4efc148`、UI `artifacts/ui/run-1794087673477-152af19a`，材料包 `artifacts/submission/947b416de6ac-1794087831987-ae6fc3` 均属于该干净提交。
+
+[四项定向引擎突变证据](../evaluation/evidence/selected-core-mutation-2026-11-07/README.md)固定947b416与Node22，先通过选定A2/B2/C1基线，再独立移除过期版本、异参幂等、active过滤及COMMIT回执检查。4项均由真实目标行为断言失败发现，非源码文本、初始化/语法或超时失败；M4只声明第一division分支被发现。63HTTP，原计量175727字节，再加明确重建的终末DROP及最后metadata检查为176857字节，不是heap/wire硬界；计量分量、stale诊断副本与限制均在README/parent-ledger。9个已知自建库确认不存在，独占worktree已移除，4目标源码哈希恢复且main当前干净。原始摘要/全TAP/patch/metrics/脚本均原字节保留，53个文件含校验清单；不将4项选定检查称为全局覆盖率、安全证明或性能实验。
+
+原Space报告已在同一身份更新第5版（21:29UTC检查点），保留11月6日11760字节历史及真实Node配对证据。该版的已确认HEAD为30619f7，后续创建/审批回执阶段另按此处记录，不把旧报告当实时main。LoCoMo仍未取得，外部模型本夜间新增0次，历史351次请求的范围不变；不以工程/检索检查代替回答正确率或token/费用结论。
+
 ## 技术栈决定与主要缺口
 
 目前继续Node/Express/PostgreSQL。现有测量是特定fixture的HTTP传输和真实模型小样本，不是语言/框架横向基准，没有证据说明更换语言能消除主要瓶颈。保留RLS、不可变revision、审批和幂等语义比立即重写更重要。若后续测量显示明确瓶颈，再在固定数据/硬件/并发和冷热条件下比较p50/p95/p99、吞吐、错误率、内存、读写成本；候选栈必须先实现相同接口合同和影子对照，再提供保留数据迁移、备份恢复、回退和分阶段切流方案。

@@ -1,0 +1,23 @@
+TAP version 13
+# Subtest: explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write
+ok 1 - explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write
+  ---
+  duration_ms: 293.945999
+  type: 'test'
+  ...
+# Subtest: concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version
+ok 2 - concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version
+  ---
+  duration_ms: 75.903759
+  type: 'test'
+  ...
+# Synthetic approval intent database cleanup: passed
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 447.489084

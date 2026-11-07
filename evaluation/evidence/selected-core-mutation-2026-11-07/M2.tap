@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write
+ok 1 - explicit approval commits exactly once, retains full source and immutable prior revisions, and stale versions do not write
+  ---
+  duration_ms: 287.16321
+  type: 'test'
+  ...
+# Subtest: concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version
+not ok 2 - concurrent creation replays one pending receipt and competing explicit approvals preserve one fact/version
+  ---
+  duration_ms: 32.640099
+  type: 'test'
+  location: '/workspace/memz-mutation-mw6xt9dy_437d48/test/approval-intent-postgres.test.js:54:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    200 !== 409
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 409
+  actual: 200
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/memz-mutation-mw6xt9dy_437d48/test/approval-intent-postgres.test.js:58:51)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Synthetic approval intent database cleanup: passed
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 396.487044

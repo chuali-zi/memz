@@ -1,0 +1,27 @@
+TAP version 13
+# Request failed: 42501
+# Subtest: sources: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once
+ok 1 - sources: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once
+  ---
+  duration_ms: 285.185413
+  type: 'test'
+  ...
+# {"synthetic":true,"operation":"sources","isolation":"read committed","nativeInsertCompleted":true,"revocationCommittedBeforeRelease":true,"auditSqlstate":"42501","rollbackObserved":true,"sequenceGapsAllowed":true,"reactivatedCreationRows":1,"modelCalls":0}
+# Request failed: 42501
+# Synthetic write-revocation resources: {"sqlUtf8":33653,"parameterJson":2340,"resultRowsJson":6784,"httpRequestBody":1028,"httpResponseBody":1040,"httpRequests":12,"totalApplicationBytes":44845,"workBytes":44667,"cleanupBytes":178,"cleanupReserve":4096,"temporaryDatabasesCreated":2,"temporaryDatabasesDropped":2,"modelCalls":0,"scope":"SQL UTF8 + parameter/result.rows JSON (all results) + HTTP request/response bodies; not wire, headers, PG errors or heap"}
+# Subtest: candidates: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once
+ok 2 - candidates: revoke after actual HTTP INSERT rolls back the whole creation; explicit reactivation uses the same key once
+  ---
+  duration_ms: 187.425226
+  type: 'test'
+  ...
+# {"synthetic":true,"operation":"candidates","isolation":"read committed","nativeInsertCompleted":true,"revocationCommittedBeforeRelease":true,"auditSqlstate":"42501","rollbackObserved":true,"sequenceGapsAllowed":true,"reactivatedCreationRows":1,"modelCalls":0}
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 530.743974

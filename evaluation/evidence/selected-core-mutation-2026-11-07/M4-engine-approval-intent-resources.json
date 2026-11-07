@@ -1,0 +1,16 @@
+{
+  "synthetic": true,
+  "modelCalls": 0,
+  "driverBytes": 3361,
+  "temporaryDatabaseDropped": true,
+  "observations": [
+    {
+      "scenario": "explicit-approvals",
+      "versions": [
+        1,
+        2
+      ],
+      "priorRevisionUnchanged": true
+    }
+  ]
+}

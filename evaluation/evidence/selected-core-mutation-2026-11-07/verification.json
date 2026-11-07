@@ -1,0 +1,12 @@
+{
+  "checked": "2026-11-07T21:53:06.895Z",
+  "ownedDatabases": 9,
+  "remainingOwnedDatabases": [],
+  "worktreeAbsent": true,
+  "mainStatus": "",
+  "observedRunnerApplicationBytes": 175727,
+  "reconstructedTerminalBytes": 688,
+  "verificationBytes": 442,
+  "totalAccountedApplicationBytes": 176857,
+  "scope": "SQL UTF8 + JSON parameters/result.rows + HTTP bodies, not wire, errors, headers, heap, or a hard allocation bound; reconstructed terminal bytes separately identified"
+}
