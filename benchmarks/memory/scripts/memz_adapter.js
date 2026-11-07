@@ -16,11 +16,70 @@ const number=x=>Number.isInteger(x)&&x>0&&x<=2147483647;
 const text=(x,max,empty=false)=>typeof x==='string'&&x.length<=max&&x.isWellFormed()&&!x.includes('\0')&&(empty||x.trim().length>0);
 function immutable(value){for(const x of Object.values(value))if(x&&typeof x==='object')immutable(x);return Object.freeze(value)}
 function seal(body){return immutable({...body,sha256:hash(body)})}
+// Stage-specific input snapshots, not a general JavaScript serializer. Inspect
+// every own descriptor before values; never run a caller's getter/toJSON. The
+// finite artifact shapes also reject cycles without rejecting shared sources.
+function dataRecord(value,keys,code){
+  check(value&&typeof value==='object'&&!Array.isArray(value),code);
+  const descriptors=Object.getOwnPropertyDescriptors(value),own=Reflect.ownKeys(descriptors);
+  check(own.length===keys.length&&own.every(key=>keys.includes(key))
+    &&keys.every(key=>Object.hasOwn(descriptors,key)&&Object.hasOwn(descriptors[key],'value')&&descriptors[key].enumerable),code);
+  return Object.fromEntries(own.map(key=>[key,descriptors[key].value]));
+}
+function scalarValues(value,code){
+  check(Object.values(value).every(item=>item===null||['string','number','boolean'].includes(typeof item)),code);return value;
+}
+function dataArray(value,max,copy,code,sizeCode=code){
+  check(Array.isArray(value),code);
+  const descriptors=Object.getOwnPropertyDescriptors(value),own=Reflect.ownKeys(descriptors),length=descriptors.length?.value;
+  check(Number.isInteger(length)&&length>=0&&length<=max,sizeCode);
+  check(own.length===length+1&&own.every(key=>key==='length'||typeof key==='string'&&/^(0|[1-9][0-9]*)$/.test(key)&&Number(key)<length&&Object.hasOwn(descriptors[key],'value')&&descriptors[key].enumerable),code);
+  return Array.from({length},(_,index)=>copy(descriptors[index].value));
+}
+function documentSnapshot(value){
+  const record=scalarValues(dataRecord(value,['id','session_id','date','text'],'INVALID_HISTORY_DOCUMENT'),'INVALID_HISTORY_DOCUMENT');
+  check(id(record.id)&&id(record.session_id)&&(record.date===null||text(record.date,100,true))&&text(record.text,4000),'INVALID_HISTORY_DOCUMENT');return record;
+}
+function historyDocuments(value){return dataArray(value,100,documentSnapshot,'INVALID_HISTORY_DOCUMENT','HISTORY_SIZE_LIMIT')}
+function preparedSnapshot(value){
+  const record=dataRecord(value,['kind','scope','documents','sha256'],'INVALID_ARTIFACT');
+  const {documents,...scalars}=record;scalarValues(scalars,'INVALID_ARTIFACT');
+  return {...record,documents:historyDocuments(documents)};
+}
+function bindingSnapshot(value){
+  const record=dataRecord(value,['baseURL','projectId'],'INVALID_BINDING');
+  check(typeof record.baseURL==='string'&&number(record.projectId),'INVALID_BINDING');return record;
+}
+function ingestedSnapshot(value){
+  const record=dataRecord(value,['kind','prepared','binding','sources','sha256'],'INVALID_ARTIFACT');
+  const {prepared,binding,sources,...scalars}=record;scalarValues(scalars,'INVALID_ARTIFACT');
+  return {...record,prepared:preparedSnapshot(prepared),binding:bindingSnapshot(binding),
+    sources:dataArray(sources,100,source=>scalarValues(dataRecord(source,['documentId','sourceId','sourceSha256'],'INVALID_SOURCE_MAP'),'INVALID_SOURCE_MAP'),'INVALID_SOURCE_MAP')};
+}
+function sourceSnapshot(value){
+  const record=scalarValues(dataRecord(value,['id','title','content'],'INVALID_FROZEN_SNAPSHOT'),'INVALID_FROZEN_SNAPSHOT');
+  check(number(record.id)&&text(record.title,150)&&text(record.content,4000),'INVALID_FROZEN_SNAPSHOT');return record;
+}
+function factSnapshot(value){
+  const record=dataRecord(value,['id','subject','predicate','value','version','revisionId','source','candidateId','proposedBy','approvedBy'],'INVALID_FROZEN_SNAPSHOT');
+  const {source,...scalars}=record;scalarValues(scalars,'INVALID_FROZEN_SNAPSHOT');
+  check(['id','version','revisionId','candidateId','proposedBy','approvedBy'].every(key=>number(record[key]))
+    &&['subject','predicate','value'].every(key=>text(record[key],key==='value'?1000:100,true)),'INVALID_FROZEN_SNAPSHOT');
+  return {...record,source:sourceSnapshot(source)};
+}
+function frozenSnapshot(value){
+  const record=dataRecord(value,['kind','ingested','readerPrincipal','snapshot','sha256'],'INVALID_ARTIFACT');
+  const {ingested,snapshot,...scalars}=record;scalarValues(scalars,'INVALID_ARTIFACT');
+  const page=dataRecord(snapshot,['facts','sources'],'INVALID_FROZEN_SNAPSHOT');
+  return {...record,ingested:ingestedSnapshot(ingested),snapshot:{facts:dataArray(page.facts,25,factSnapshot,'INVALID_FROZEN_SNAPSHOT'),sources:dataArray(page.sources,100,sourceSnapshot,'INVALID_FROZEN_SNAPSHOT')}};
+}
 function verify(value,keys,kind){
   check(fields(value,[...keys,'sha256'])&&value.kind===kind,'INVALID_ARTIFACT');
   const {sha256,...body}=value;check(sha256===hash(body),'ARTIFACT_HASH_MISMATCH');return body;
 }
 function prepareHistory(history){
+  history=dataRecord(history,['scope','documents'],'INVALID_HISTORY_FIELDS');
+  history={...history,documents:historyDocuments(history.documents)};
   check(fields(history,['scope','documents'])&&id(history.scope)&&Array.isArray(history.documents),'INVALID_HISTORY_FIELDS');
   check(history.documents.length>0&&history.documents.length<=100,'HISTORY_SIZE_LIMIT');
   const ids=new Set();
@@ -33,10 +92,13 @@ function prepareHistory(history){
   return seal({kind:'memz-history-v1',scope:history.scope,documents});
 }
 function validatePrepared(value){
+  value=preparedSnapshot(value);
+  const expected=prepareHistory({scope:value.scope,documents:value.documents});
   const b=verify(value,['kind','scope','documents'],'memz-history-v1');
-  check(prepareHistory({scope:b.scope,documents:b.documents}).sha256===value.sha256,'INVALID_PREPARED');return b;
+  check(expected.sha256===value.sha256,'INVALID_PREPARED');return b;
 }
 function binding(value){
+  value=bindingSnapshot(value);
   check(fields(value,['baseURL','projectId'])&&number(value.projectId),'INVALID_BINDING');
   let u;try{u=new URL(value.baseURL)}catch{throw fail('INVALID_BINDING')}
   check(u.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(u.hostname)
@@ -45,7 +107,8 @@ function binding(value){
 }
 function expectedSources(prepared){return prepared.documents.map(d=>({documentId:d.id,title:`memz history ${d.id}`,content:d.text.trim()}))}
 function validateIngest(value){
-  const b=verify(value,['kind','prepared','binding','sources'],'memz-ingested-v1');
+  value=ingestedSnapshot(value);
+  const b=value;
   validatePrepared(b.prepared);binding(b.binding);
   check(Array.isArray(b.sources)&&b.sources.length===b.prepared.documents.length,'INVALID_SOURCE_MAP');
   const seen=new Set(),expected=expectedSources(b.prepared);
@@ -53,7 +116,7 @@ function validateIngest(value){
     check(fields(s,['documentId','sourceId','sourceSha256'])&&number(s.sourceId)&&!seen.has(s.sourceId)
       &&s.documentId===expected[i].documentId&&s.sourceSha256===hash({id:s.sourceId,title:expected[i].title,content:expected[i].content}),'INVALID_SOURCE_MAP');
     seen.add(s.sourceId);
-  });return b;
+  });return verify(value,['kind','prepared','binding','sources'],'memz-ingested-v1');
 }
 function safeError(e){
   const code=typeof e?.code==='string'&&/^[A-Z][A-Z0-9_]{1,80}$/.test(e.code)?e.code:'ADAPTER_FAILED';
@@ -61,8 +124,8 @@ function safeError(e){
     ...(e?.outcome&&['not_attempted','unknown','rejected'].includes(e.outcome)?{outcome:e.outcome}:{})};
 }
 async function ingestHistory(prepared,target,writer={}){
+  prepared=preparedSnapshot(prepared);validatePrepared(prepared);target=binding(target);
   prepared=immutable(JSON.parse(canonical(prepared)));
-  validatePrepared(prepared);target=binding(target);
   const start=performance.now(),sources=[];
   try{
     for(const d of expectedSources(prepared)){
@@ -77,6 +140,7 @@ async function ingestHistory(prepared,target,writer={}){
     elapsedMs:performance.now()-start,autoApproved:false,candidatesCreated:0}};
 }
 function readerOptions(reader){
+  reader=dataRecord(reader,['username','password'],'INVALID_READER');
   check(fields(reader,['username','password'])&&text(reader.username,100)&&text(reader.password,8192),'INVALID_READER');
   return {...reader};
 }
@@ -126,7 +190,8 @@ async function state(ingested,reader,spans,prefix,fetchImpl){
 async function freezeApproved(ingested,reader,{fetchImpl=fetch}={}){
   const start=performance.now(),spans=[];
   try{
-    ingested=immutable(JSON.parse(canonical(ingested)));validateIngest(ingested);reader=readerOptions(reader);
+    ingested=ingestedSnapshot(ingested);validateIngest(ingested);reader=readerOptions(reader);
+    ingested=immutable(JSON.parse(canonical(ingested)));
     const first=await state(ingested,reader,spans,'freeze_first',fetchImpl);
     const second=await state(ingested,reader,spans,'freeze_confirm',fetchImpl);
     check(hash(first)===hash(second),'FREEZE_DRIFT');
@@ -135,10 +200,11 @@ async function freezeApproved(ingested,reader,{fetchImpl=fetch}={}){
   }catch(e){return {status:'error',error:safeError(e),spans,elapsedMs:performance.now()-start,modelCalls:0}}
 }
 function validateFrozen(frozen,reader){
-  const b=verify(frozen,['kind','ingested','readerPrincipal','snapshot'],'memz-frozen-v1');validateIngest(b.ingested);
-  readerOptions(reader);check(b.readerPrincipal===reader.username,'READER_BINDING_MISMATCH');
+  frozen=frozenSnapshot(frozen);reader=readerOptions(reader);
+  const b=frozen;validateIngest(b.ingested);
+  check(b.readerPrincipal===reader.username,'READER_BINDING_MISMATCH');
   check(fields(b.snapshot,['facts','sources'])&&Array.isArray(b.snapshot.facts)&&Array.isArray(b.snapshot.sources),'INVALID_FROZEN_SNAPSHOT');
-  return b;
+  return verify(frozen,['kind','ingested','readerPrincipal','snapshot'],'memz-frozen-v1');
 }
 function queryRecord(q){
   check(q&&typeof q==='object'&&!Array.isArray(q),'INVALID_QUERY_FIELDS');
@@ -174,8 +240,9 @@ async function queryFrozen(frozen,query,reader,{method='memz_current',maxContext
     inputTokens:null,outputTokens:null,generationMs:null,answerE2EMs:null,context:null,retrievedDocumentIds:[],provenance:[],spans};
   try{
     query=queryRecord(query);
-    frozen=immutable(JSON.parse(canonical(frozen)));reader=readerOptions(reader);
+    frozen=frozenSnapshot(frozen);reader=readerOptions(reader);
     const b=validateFrozen(frozen,reader);validateQuery(query,b.ingested.prepared.scope);
+    frozen=immutable(JSON.parse(canonical(frozen)));
     check(['memz_current','flat_same_facts'].includes(method),'INVALID_METHOD');
     check(Number.isInteger(maxContextBytes)&&maxContextBytes>0&&maxContextBytes<=1048576,'INVALID_CONTEXT_BUDGET');
     row.scope=query.scope;row.frozenSha256=frozen.sha256;row.querySha256=hash(query);

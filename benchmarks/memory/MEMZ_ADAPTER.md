@@ -13,6 +13,10 @@
 
 程序化 query 在序列化和读取字段值前先检查全部自有字段及其描述符：未知字段（含不可枚举字段）和 accessor 均拒绝，不调用 gold、evidence、id 或 question getter。错误行的可选 id 也只从自有 data property 取得。随后仅复制允许的字段并验证字符串/scope；不会通过 `toJSON` 或 getter 把标签变成问题。此保护针对模块的普通对象输入，不是恶意 JavaScript Proxy 的执行沙箱，也无法识别藏在合法问题文本中的答案；CLI JSON隔离及独立gold挂载要求仍保留。
 
+同样的边界现覆盖 prepare 历史、ingest 的 prepared、freeze 的 ingested，以及 query 的 frozen artifact：先按各阶段现有有限 schema 检查全部自有字段描述符，再复制白名单 data property 和数组索引，最后才做 canonical clone/hash。未知 own 字段（包括隐藏字段、Symbol、own `toJSON`）和 accessor 在取值前拒绝；数组不能靠额外属性、索引 getter 或 toJSON 混入标签。嵌套 document、来源映射、binding、冻结事实/来源也遵循同一顺序；baseURL 必须先是字符串才会交给 URL 解析，不能执行对象的 toString。非法输入不会先被 JSON 丢字段再进入来源写入，查询仍保留固定错误行和 modelCalls=0。
+
+快照仅按明确的 artifact 结构复制，没有通用递归序列化器或全局“已见对象”去重；普通 JSON 可表达的共享来源引用仍可接受，并与独立副本保持相同字节/hash，真正的循环结构在有限 schema/类型检查处拒绝。正常 JSON 的产物、来源哈希、幂等键和认证/HTTP 请求顺序保持；公共 `canonical/hash/seal` 工具原样保留，调用者应只把已验证的可信数据交给这些工具。writer、fetchImpl 等运行配置仍是可信调用控制面；这里不承诺抵御恶意 Proxy、全局 prototype 修改或同进程任意 JavaScript 执行，也不替代 gold 挂载隔离。
+
 ## 冻结边界
 
 首版要求每个 scope 使用**专用项目和停止写入的隔离实验服务**。服务需要事先配置项目与 membership；适配器不借管理员凭据自动创建项目。一个项目最多 25 个获批事实、100 个来源，来源集合必须精确对应导入清单。普通客户端源文本不可修改，但 adapter 仍检测来源内容变化、新来源、新事实及版本／溯源漂移。
