@@ -4,8 +4,9 @@ const {requestKey,createOnce}=require('./idempotency');
 const {parseSearchQuery}=require('./scripts/search-query');
 const {SNAPSHOT_MAX_BYTES,snapshotReceipt}=require('./scripts/context-snapshot');
 const {SessionStore,SESSION_TTL_MS}=require('./scripts/session-store');
+const {databasePoolOptions,databaseErrorKind,safeErrorCode,runTransaction}=require('./scripts/database');
 const app=express();
-const pool=new Pool({connectionString:process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz',max:10});
+const pool=new Pool(databasePoolOptions(process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz'));
 // pg removes failed idle clients before emitting this event; later requests reconnect.
 // Do not log the error/client object: it can contain connection credentials.
 pool.on('error',()=>console.error('Database idle connection lost; future requests will reconnect.'));
@@ -32,7 +33,7 @@ app.post('/api/login',requireJsonObject,(req,res)=>{
 app.use('/api',(req,res,next)=>{req.user=sessions.get(req.cookies.sid);if(!req.user)return res.status(401).json({error:'请先登录'});if(!['GET','HEAD'].includes(req.method)&&req.get('x-csrf-token')!==req.user.csrf)return res.status(403).json({error:'请求校验失败'});next()});
 app.post('/api/logout',(req,res)=>{sessions.delete(req.cookies.sid);res.clearCookie('sid');res.json({ok:true})});
 app.get('/api/me',(req,res)=>res.json({name:req.user.name,csrf:req.user.csrf}));
-async function tx(user,fn,{snapshot=false}={}){const c=await pool.connect();try{await c.query(snapshot?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');await c.query("SELECT set_config('app.user_id',$1,true)",[String(user)]);const out=await fn(c);await c.query('COMMIT');return out}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}
+const tx=(user,fn,options)=>runTransaction(pool,user,fn,options);
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 // Required only where a JSON object carries business input. Decisions and
 // logout intentionally remain valid without a request body.
@@ -295,10 +296,10 @@ app.use((err,req,res,next)=>{
     'request.aborted':[400,'请求体不完整'],
     'request.size.invalid':[400,'请求体长度无效']
   };
-  const databaseUnavailable=['ECONNREFUSED','ECONNRESET','ETIMEDOUT','EPIPE','57P01','57P02','57P03'].includes(err.code)||/^08[A-Z0-9]{3}$/.test(err.code||'')||err.message==='Connection terminated unexpectedly';
-  const unavailableMessage=['GET','HEAD'].includes(req.method)?'数据库暂时不可用，请稍后重试':'数据库连接中断，写入结果可能不确定；请先核实，创建重试请复用原幂等键';
-  const [status,message]=parseErrors[err.type]||(databaseUnavailable?[503,unavailableMessage]:null)||(['Z_DATA_ERROR','Z_BUF_ERROR'].includes(err.code)?[400,'压缩请求体无效']:[err.status||500,err.status&&err.status<500?err.message:'请求无法处理']);
-  if(status>=500)console.error('Request failed:',err.code||err.name);
+  const databaseFailure=databaseErrorKind(err);
+  const unavailableMessage=['GET','HEAD'].includes(req.method)?(databaseFailure==='timeout'?'数据库请求超时，请稍后重试':'数据库暂时不可用，请稍后重试'):'数据库连接中断，写入结果可能不确定；请先核实，创建重试请复用原幂等键';
+  const [status,message]=parseErrors[err.type]||(databaseFailure?[503,unavailableMessage]:null)||(['Z_DATA_ERROR','Z_BUF_ERROR'].includes(err.code)?[400,'压缩请求体无效']:[err.status||500,err.status&&err.status<500?err.message:'请求无法处理']);
+  if(status>=500)console.error('Request failed:',safeErrorCode(err));
   if(res.headersSent)return next(err);
   res.status(status).json({error:message});
 });
