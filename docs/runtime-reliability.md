@@ -68,3 +68,13 @@ HTTP静态资源固定取自应用自身的 `public/`，不随启动工作目录
 期限依赖事件循环可运行，不能抢占同步死循环；外部进程监督仍需要自己的最终停止期限。卡住handler、卡住pool.end和真实PG锁等待已分别设计合成回归，不把连接排空称为任意故障下无数据损失保证。
 
 直接Node子进程的正向回归见 `node --test test/server-shutdown.test.js test/startup-validation.test.js`：信号测试通过与CLI相同的生命周期模块覆盖在途HTTP完成、重复信号、连接门禁及实际20秒期限；启动校验直接执行 `server.js`。它们不把npm包装进程当作应用，也不验证任何实际supervisor配置。
+
+## CLI HTTP入站边界
+
+CLI使用 `scripts/http-server.js` 构造HTTP服务器，在监听前固定接收完整headers的期限10秒、接收整个请求的期限15秒、未完成请求检查间隔1秒，同时最多接受128条TCP连接。它们是本机演示的资源保护阈值，不是并发容量或精确响应时间承诺，没有环境变量覆盖。keepAliveTimeout配置仍为5秒（本轮Node版本另有原生1秒关闭缓冲），socket inactivity timeout仍为0；完整请求进入数据库等处理后，不因这些入站接收期限而被当作慢上传中止。JSON大小仍限制为16KiB。导入 `app` 不创建服务器，宿主用 `app.listen()` 时仍自行负责入站策略。
+
+慢headers或不完整body到期时，由Node原生HTTP解析器关闭连接；尚未发送响应时返回408及 `Connection: close`，不是应用JSON错误。检查按间隔运行，事件循环繁忙还会推迟执行；持续滴入少量字节不会重置整个请求期限。headers不完整时不会进入request listener；对经JSON解析器的登录/业务请求，headers完整但JSON body不完整时已经进入listener，却仍在JSON解析阶段，未进入登录/业务处理。连接达到128条时，Node直接关闭新连接，不保证有HTTP响应，不能把它描述成503或登录会话/数据库池拒绝。
+
+入站期限与20秒独立排空期限分别生效。Node的 `server.close()` 会停止上述接收检查定时器，因此排空不能依赖10/15秒期限自行清理所有未完成请求；现有20秒期限继续覆盖HTTP与pool关闭。外部监督器仍需自己的最终停止期限，不把关闭连接等同于数据库操作回滚。
+
+`node --test test/http-ingress.test.js` 使用真实CLI及生产10/15秒默认值，每250ms向两个owned loopback socket滴入少量合成数据，验证408、零会话创建/数据库checkout、正常完整请求与后续请求仍可用；另以本次服务器的原生连接上限临时设为2，用三条连接验证无HTTP响应的拒绝和恢复，不创建129条连接。测试还覆盖import宿主保留原生默认策略，以及重复信号排空在owned不完整请求断开后只关闭池一次；不启用生产测试模式或访问真实数据库。

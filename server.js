@@ -7,6 +7,7 @@ const {SNAPSHOT_MAX_BYTES,snapshotReceipt}=require('./scripts/context-snapshot')
 const {SessionStore,SESSION_TTL_MS}=require('./scripts/session-store');
 const {databasePoolOptions,databaseErrorKind,safeErrorCode,runTransaction}=require('./scripts/database');
 const {listenPort,createShutdownGate,installShutdown}=require('./scripts/server-lifecycle');
+const {createCliHttpServer}=require('./scripts/http-server');
 const {assertLegacyScope,assertLegacyJSONBudget}=require('./scripts/legacy-view-budget');
 const {createHealthProbes}=require('./scripts/health-probes');
 const {MAX_CURRENT_LABELS,CURRENT_LABELS_MAX_BYTES,EXACT_CONTEXT_MAX_BYTES,currentLabelsReceipt,exactContextReceipt,validateCurrentLabels,validateExactContextRequest,validateExactSelector,validateExactContext}=require('./scripts/exact-context-protocol');
@@ -391,9 +392,9 @@ if(require.main===module){
   const startupFailure=message=>{if(startupFailed)return;startupFailed=true;console.error(message);process.exitCode=1;pool.end().catch(()=>{})};
   try{port=listenPort(process.env.PORT)}catch{startupFailure('Memz startup failed: invalid PORT.')}
   if(port!==undefined){
-    const server=app.listen(port,'127.0.0.1',error=>{
-      // Express forwards listen errors to its callback as well as the event.
-      if(error)return startupFailure('Memz startup failed: cannot listen.');
+    const server=createCliHttpServer(app);
+    // Native listen reports failure through 'error', not its success callback.
+    server.listen(port,'127.0.0.1',()=>{
       started=true;
       console.log(`Memz http://127.0.0.1:${server.address().port}`);
     });
