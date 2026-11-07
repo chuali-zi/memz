@@ -1271,3 +1271,95 @@ test('an older detail response cannot restore focus ahead of a newer keyboard de
     next.release(secondProof);const newest=page.locator('#facts .entry').nth(1).getByRole('button',{name:'收起依据',exact:true});await newest.waitFor();assert.equal(await newest.evaluate(node=>node===document.activeElement),true);assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
+
+const mutationSelectors=['#proposal button','#sourceForm button','#stale','#injection'];
+async function settledLists(page){await page.waitForFunction(()=>['facts','history','candidates','sources','audit'].every(root=>document.querySelector('#'+root).getAttribute('aria-busy')==='false'))}
+test('a refreshed viewer role disables all writes, safely updates its role cue and blocks scripted submits',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const name='<img src=x onerror=alert(1)> · owner';await page.route('**/api/projects',route=>route.fulfill({json:[{id:1,name,role:'owner'}]}));
+    const {proof}=await conflictFixture(page);await settled(page,'#loginForm');await page.locator('#proposal [name=value]').fill('降权后保留的草稿');await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('保留的来源草稿');await page.locator('#sourceForm [name=content]').fill('保留的原文');
+    await page.route('**/api/projects/1/data?*',route=>route.fulfill({json:{role:'viewer',sourceTextIsUntrusted:true}}));
+    await page.route('**/api/projects/1/candidates?*',route=>route.fulfill({json:{role:'viewer',candidates:[{...proof.candidate,source:proof.source.title}],next_before:null}}));
+    await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await settledLists(page);await page.waitForFunction(()=>data?.role==='viewer');
+    for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true,selector);
+    assert.match(await page.locator('#projectAccess').textContent(),/只读/);assert.equal(await page.locator('#projectAccess').getAttribute('role'),'status');assert.equal(await page.locator('#project option').textContent(),name+' · 只读 viewer');assert.equal(await page.locator('.intro img').count(),0);
+    const writes=[];page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname.startsWith('/api/projects/'))writes.push(request.url())});
+    for(const form of ['proposal','sourceForm']){await page.evaluate(form=>document.querySelector('#'+form).requestSubmit(),form);await settled(page,'#'+form)}await page.evaluate(()=>document.querySelector('#stale').onclick());await settled(page,'#stale');
+    assert.deepEqual(writes,[]);assert.match(await page.locator('#proposalFeedback').textContent(),/只读/);assert.equal(await page.locator('#proposal [name=value]').inputValue(),'降权后保留的草稿');assert.equal(await page.locator('#sourceForm [name=content]').inputValue(),'保留的原文');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('a current project read 403 locks retained owner mutations without removing accepted pages or drafts',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);await settled(page,'#loginForm');await page.locator('#proposal [name=value]').fill('撤权时保留的草稿');const before=await acceptedPage(page,pagedLists[2]),original=await draft(page);
+    await page.route('**/api/projects/1/candidates?*',route=>route.fulfill({status:403,json:{error:'合成成员资格已停用'}}));
+    await page.locator('#refreshCandidates').focus();await page.keyboard.press('Enter');await page.locator('#candidatesStatus').getByText(/403 合成成员资格已停用/).waitFor();
+    for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true,selector);
+    for(const name of ['批准','驳回','用最新版本填写新候选'])assert.equal(await page.getByRole('button',{name,exact:true}).isDisabled(),true,name);
+    assert.deepEqual(await acceptedPage(page,pagedLists[2]),before);assert.deepEqual(await draft(page),original);assert.equal(await page.locator('#candidates .provenance-detail').isVisible(),true);assert.match(await page.locator('#projectAccess').textContent(),/读取被拒绝/);
+    let projects=0;page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/projects/'))projects++});
+    await page.locator('#proposal [name=value]').focus();await page.evaluate(()=>[...document.querySelectorAll('#candidates button')].find(button=>button.textContent==='批准').onclick());await page.locator('#candidateFeedback').getByText(/读取被拒绝/).waitFor();
+    assert.equal(projects,0);assert.equal(await page.locator('#proposal [name=value]').evaluate(node=>node===document.activeElement),true);assert.deepEqual(await draft(page),original);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a project read denial survives late owner bootstrap and automatic loads until a fresh explicit refresh',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);await settled(page,'#loginForm');await page.locator('#proposal [name=value]').fill('混合失败保留的草稿');const original=await draft(page);
+    const owner=await hold(page,'**/api/projects/1/data?*','GET');await page.route('**/api/projects/1/history?*',route=>route.fulfill({status:403,json:{error:'合成历史权限拒绝'}}));
+    await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await owner.observed;await page.locator('#historyStatus').getByText(/403 合成历史权限拒绝/).waitFor();
+    owner.release({sourceTextIsUntrusted:true,role:'owner'});await settledLists(page);await page.waitForFunction(()=>data===null);
+    for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true);assert.equal(await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).isDisabled(),true);assert.match(await page.locator('#projectAccess').textContent(),/读取被拒绝/);
+    await page.unroute('**/api/projects/1/history?*');await page.evaluate(()=>load());assert.equal(await page.evaluate(()=>data.role),'owner');assert.equal(await page.locator('#proposal button').isDisabled(),true,'automatic read completion cannot clear an access denial');
+    await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);await settledLists(page);
+    assert.equal(await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).isEnabled(),true);assert.doesNotMatch(await page.locator('#projectAccess').textContent(),/读取被拒绝/);assert.deepEqual(await draft(page),original);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('late owner prepare, page and detail receipts cannot re-enable mutations after a current data 403',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,prepare}=await conflictFixture(page);await settled(page,'#loginForm');await page.locator('#proposal [name=value]').fill('迟到回执不能替换的草稿');const original=await draft(page);
+    const prepared=await hold(page,'**/api/projects/1/candidates/10/source','GET');await prepare.focus();await page.keyboard.press('Enter');await prepared.observed;
+    const candidates=await hold(page,'**/api/projects/1/candidates?*','GET');await page.route('**/api/projects/1/data?*',route=>route.fulfill({status:403,json:{error:'合成当前项目读取拒绝'}}));
+    await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await candidates.observed;await page.locator('#notice').getByText(/403 合成当前项目读取拒绝/).waitFor();
+    prepared.release(proof);await page.locator('#candidateFeedback').getByText(/读取被拒绝/).waitFor();assert.equal(await prepare.isDisabled(),true);assert.deepEqual(await draft(page),original);
+    candidates.release({role:'owner',candidates:[{...proof.candidate,source:proof.source.title}],next_before:null});await page.locator('#candidates').getByRole('button',{name:'核对来源原文',exact:true}).waitFor();
+    await keyboardDetailTrigger(page,'candidates');await page.keyboard.press('Enter');await page.locator('#candidates').getByRole('button',{name:'收起来源原文',exact:true}).waitFor();
+    for(const name of ['批准','驳回','用最新版本填写新候选'])assert.equal(await page.getByRole('button',{name,exact:true}).isDisabled(),true,name);for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true);assert.deepEqual(await draft(page),original);assert.deepEqual(errors,[]);
+    const notice=await page.locator('#notice').textContent();await page.unroute('**/api/projects/1/data?*');await page.evaluate(()=>load());assert.equal(await page.locator('#notice').textContent(),notice,'an automatic owner read must not clear the unresolved project-access error');
+  }finally{await closePage(page)}
+});
+test('an in-flight approval finally cannot unlock retained actions after a read denial',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);await settled(page,'#loginForm');const approval=await hold(page,'**/api/projects/1/candidates/10/approve');await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).focus();await page.keyboard.press('Enter');await approval.observed;
+    await page.route('**/api/projects/1/candidates?*',route=>route.fulfill({status:403,json:{error:'合成成员已撤权'}}));await page.locator('#refreshCandidates').focus();await page.keyboard.press('Enter');await page.locator('#candidatesStatus').getByText(/403 合成成员已撤权/).waitFor();
+    approval.release({error:'合成写入权限拒绝'},403);await page.locator('#candidateFeedback').getByText(/403 合成写入权限拒绝/).waitFor();
+    const button=page.locator('#candidates').getByRole('button',{name:'批准',exact:true});assert.equal(await button.getAttribute('aria-busy'),'false');assert.equal(await button.isDisabled(),true);assert.match(await page.locator('#projectAccess').textContent(),/读取被拒绝/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('write 403 and transient read 503 do not create a project-access denial',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);await settled(page,'#loginForm');await page.route('**/api/projects/1/candidates/10/approve',route=>route.fulfill({status:403,json:{error:'合成审批或CSRF拒绝'}}));
+    await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).focus();await page.keyboard.press('Enter');await page.locator('#candidateFeedback').getByText(/403 合成审批或CSRF拒绝/).waitFor();
+    assert.equal(await page.locator('#proposal button').isEnabled(),true);assert.equal(await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).isEnabled(),true);assert.doesNotMatch(await page.locator('#projectAccess').textContent(),/读取被拒绝/);
+    await page.route('**/api/projects/1/data?*',route=>route.fulfill({status:503,json:{error:'合成暂时无法读取权限'}}));await page.route('**/api/projects/1/candidates?*',route=>route.fulfill({status:503,json:{error:'合成候选读取失败'}}));
+    await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await page.locator('#notice').getByText(/503 合成暂时无法读取权限/).waitFor();await settledLists(page);
+    assert.equal(await page.locator('#proposal button').isDisabled(),true);for(const name of ['批准','用最新版本填写新候选'])assert.equal(await page.getByRole('button',{name,exact:true}).isEnabled(),true);assert.doesNotMatch(await page.locator('#projectAccess').textContent(),/读取被拒绝/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+for(const kind of ['data','detail'])test(`a stale ${kind} 403 cannot deny a newer A to B to A workspace`,async()=>{
+  const {page,errors}=await openPage();let release;
+  try{
+    if(kind==='data')await conflictFixture(page);else await provenanceFixture(page);await settled(page,'#loginForm');
+    const pattern=kind==='data'?'**/api/projects/1/data?*':'**/api/projects/1/facts/41/provenance?version=2',seen=(()=>{let resolve;const promise=new Promise(r=>{resolve=r});return {promise,resolve}})(),gate=new Promise(resolve=>{release=resolve});pageCleanups.get(page).add(release);
+    await page.route(pattern,async route=>{seen.resolve();await gate;await route.fulfill({status:403,json:{error:'旧工作区合成拒绝'}})},{times:1});
+    if(kind==='data'){await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter')}else{await keyboardDetailTrigger(page,'facts');await page.keyboard.press('Enter')}await bounded(seen.promise,'waiting for old access read');
+    await page.locator('#project').focus();for(const key of ['ArrowDown','ArrowUp']){await page.keyboard.press(key);await settledLists(page);await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled)}
+    const response=page.waitForResponse(r=>new URL(r.url()).pathname===(kind==='data'?'/api/projects/1/data':'/api/projects/1/facts/41/provenance')&&r.status()===403);release();await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.locator('#project').inputValue(),'1');assert.equal(await page.locator('#proposal button').isEnabled(),true);assert.doesNotMatch(await page.locator('#projectAccess').textContent(),/读取被拒绝/);assert.equal(await page.locator('#project').evaluate(node=>node===document.activeElement),true);assert.deepEqual(errors,[]);
+  }finally{release?.();await closePage(page)}
+});

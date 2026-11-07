@@ -141,6 +141,7 @@ async function switchAccount(){
 }
 // Project IDs can repeat after navigation; bind mutations to this workspace visit.
 let projectGeneration=0,workspaceGeneration=0,proposalSubmissionGeneration=0;
+let projectReadEpoch=0,deniedWorkspace=null,roleWorkspace=null,acceptedRole=null;
 async function loadProjects(){
   const generation=++projectGeneration;workspaceGeneration++;
   projectId=null;data=null;selectedSource=null;sourcePage=[];for(const id of ['#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);
@@ -160,7 +161,7 @@ async function loadProjects(){
     if(generation!==projectGeneration)return;
     validateProjects(projects);
     const options=document.createDocumentFragment();
-    projects.forEach(p=>{const o=el('option',`${p.name} · ${p.role}`);o.value=p.id;options.append(o)});
+    projects.forEach(p=>{const o=el('option',`${p.name} · ${p.role}`);o.value=p.id;o.dataset.projectName=p.name;options.append(o)});
     select.replaceChildren(options);
     if(!projects.length){message('当前账号没有可访问的项目。请切换账号或刷新工作台重试。');return}
     projectId=Number(select.value);message('');await load();
@@ -185,7 +186,7 @@ function appendProvenance(d,f,p){
   button.onclick=async()=>{
     const focusGeneration=++detailFocusGeneration;
     if(loaded){panel.hidden=!panel.hidden;button.textContent=panel.hidden?'查看依据':'收起依据';button.setAttribute('aria-expanded',String(!panel.hidden));return}
-    const request=++requestGeneration;
+    const request=++requestGeneration,access=projectReadEpoch;
     panel.hidden=false;button.disabled=true;button.setAttribute('aria-expanded','true');panel.textContent='正在读取该版本依据…';
     try{
       const proof=await api(`/api/projects/${p}/facts/${f.id}/provenance?version=${f.version}`);
@@ -193,7 +194,7 @@ function appendProvenance(d,f,p){
       validateProvenance(proof,f);
       panel.replaceChildren(el('p',`版本 v${proof.revision.version} · 修订 #${proof.revision.id} · 候选 #${proof.candidate.id}`,'meta'),el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`提议用户 ${proof.candidate.proposed_by} · 批准用户 ${proof.revision.approved_by}`,'meta'));
       loaded=true;button.textContent='收起依据';
-    }catch(error){if(request===requestGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`依据读取失败：${error.message}。可点击重试。`;button.textContent='重试依据'}}
+    }catch(error){if(request===requestGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected){noteProjectRead403(error,p,workspace,access);panel.textContent=`依据读取失败：${error.message}。可点击重试。`;button.textContent='重试依据'}}
     finally{
       if(request===requestGeneration){
         button.disabled=false;
@@ -208,7 +209,7 @@ async function loadFacts({reset=false,index=factState.index,focus=false}={}){
   if(factState.project!==projectId||factState.workspace!==workspaceGeneration){$('#facts').replaceChildren();factState={project:projectId,workspace:workspaceGeneration,query:'',cursors:[0],index:0,next:null};}
   const requested=reset?{project:projectId,workspace:workspaceGeneration,query:$('#searchForm').q.value,cursors:[0],index:0,next:null}:factState;
   if(reset)index=0;
-  const generation=++factGeneration,p=projectId,query=requested.query,after=requested.cursors[index];
+  const generation=++factGeneration,p=projectId,query=requested.query,after=requested.cursors[index],workspace=workspaceGeneration,access=projectReadEpoch;
   factControls(true);$('#factsStatus').textContent='正在加载当前事实…';
   try{
     const page=await api(`/api/projects/${p}/facts?q=${encodeURIComponent(query)}&limit=50&after=${after}`);
@@ -222,6 +223,7 @@ async function loadFacts({reset=false,index=factState.index,focus=false}={}){
     factControls();if(focus)$('#factsTitle').focus();
   }catch(e){
     if(generation!==factGeneration||p!==projectId)return;
+    noteProjectRead403(e,p,workspace,access);
     $('#factsStatus').textContent=`加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新工作台重试。`;
     factControls();
   }
@@ -237,7 +239,7 @@ async function loadHistory({reset=false,index=historyState.index,focus=false}={}
   if(historyState.project!==projectId||historyState.workspace!==workspaceGeneration){$('#history').replaceChildren();historyState={project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null};}
   const requested=reset?{project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null}:historyState;
   if(reset)index=0;
-  const generation=++historyGeneration,p=projectId,before=requested.cursors[index];
+  const generation=++historyGeneration,p=projectId,before=requested.cursors[index],workspace=workspaceGeneration,access=projectReadEpoch;
   historyControls(true);$('#historyStatus').textContent='正在加载版本历史…';
   try{
     const page=await api(`/api/projects/${p}/history?limit=25${before===null?'':`&before=${before}`}`);
@@ -254,6 +256,7 @@ async function loadHistory({reset=false,index=historyState.index,focus=false}={}
     historyControls();if(focus)$('#historyTitle').focus();
   }catch(e){
     if(generation!==historyGeneration||p!==projectId)return;
+    noteProjectRead403(e,p,workspace,access);
     $('#historyStatus').textContent=`历史加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新历史重试。`;
     historyControls();
   }
@@ -269,7 +272,7 @@ async function loadAudit({reset=false,index=auditState.index,focus=false}={}){
   if(auditState.project!==projectId||auditState.workspace!==workspaceGeneration){$('#audit').replaceChildren();auditState={project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null};}
   const requested=reset?{project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null}:auditState;
   if(reset)index=0;
-  const generation=++auditGeneration,p=projectId,before=requested.cursors[index];
+  const generation=++auditGeneration,p=projectId,before=requested.cursors[index],workspace=workspaceGeneration,access=projectReadEpoch;
   auditControls(true);$('#auditStatus').textContent='正在加载操作审计…';
   try{
     const page=await api(`/api/projects/${p}/audit?limit=25${before===null?'':`&before=${before}`}`);
@@ -283,6 +286,7 @@ async function loadAudit({reset=false,index=auditState.index,focus=false}={}){
     auditControls();if(focus)$('#auditTitle').focus();
   }catch(e){
     if(generation!==auditGeneration||p!==projectId)return;
+    noteProjectRead403(e,p,workspace,access);
     $('#auditStatus').textContent=`审计加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新审计重试。`;
     auditControls();
   }
@@ -301,7 +305,7 @@ function renderCandidate(d,c,role,p){
   preview.onclick=async event=>{
     const focusGeneration=++detailFocusGeneration,refreshFocus=event?.refreshFocus===true;
     if(loaded){panel.hidden=!panel.hidden;preview.textContent=panel.hidden?'核对来源原文':'收起来源原文';preview.setAttribute('aria-expanded',String(!panel.hidden));return}
-    const request=++requestGeneration;
+    const request=++requestGeneration,access=projectReadEpoch;
     panel.hidden=false;preview.disabled=true;preview.setAttribute('aria-expanded','true');panel.textContent='正在读取候选绑定的来源…';
     try{
       const proof=await api(`/api/projects/${p}/candidates/${c.id}/source`);
@@ -314,15 +318,19 @@ function renderCandidate(d,c,role,p){
       panel.replaceChildren(el('strong',`提议值：${proof.candidate.value}`),el('p',proof.current?`读取时当前值：${proof.current.value} · v${proof.current.version} · 批准候选 #${proof.current.candidate_id} · 来源 #${proof.current.source_id}：${proof.current.source_title}`:'读取时暂无已批准事实（v0）'),el('p',status,'hint'),refresh,el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`候选 #${proof.candidate.id} · 基于 v${proof.candidate.expected_version} · 读取时${({pending:'待审批',approved:'已批准',rejected:'已驳回'})[proof.candidate.status]}`,'meta'),el('p','原文仅供人工核查，不是审批结论。','hint'));
       if(proof.candidate.status==='pending'&&!sameContent&&!comparison.matches&&['owner','member'].includes(proof.role)){
         const prepare=el('button','用最新版本填写新候选','secondary');
+        prepare.dataset.mutation='write';
         panel.append(el('p','将替换候选表单内容；不会自动提交或删除原提案。','hint'),prepare);
         prepare.onclick=()=>perform(async()=>{
-          prepare.disabled=true;
+          prepare.disabled=true;prepare.setAttribute('aria-busy','true');
           const form=$('#proposal'),draft=JSON.stringify(Object.fromEntries(new FormData(form))),submission=proposalSubmissionGeneration;
           try{
+            const problem=writeProblem(false,p,workspace,true);if(problem)throw new Error(problem);
             if(busyActions.has('#proposal'))throw new Error('候选正在提交，表单内容已保留；请等待结果后再填写新候选');
-            const latest=await api(`/api/projects/${p}/candidates/${c.id}/source`);
+            let latest;const access=projectReadEpoch;
+            try{latest=await api(`/api/projects/${p}/candidates/${c.id}/source`)}catch(error){if(p===projectId&&workspace===workspaceGeneration&&d.isConnected)noteProjectRead403(error,p,workspace,access);throw error}
             if(p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
             validateCandidateComparison(latest,c);
+            const currentProblem=writeProblem(false,p,workspace,true);if(currentProblem)throw new Error(currentProblem);
             if(!['owner','member'].includes(latest.role)||latest.candidate.status!=='pending'||latest.comparison.matches)throw new Error('候选状态或权限已变化，请刷新核对后再操作');
             if(latest.current?.value===latest.candidate.value&&latest.current?.source_id===latest.candidate.source_id)throw new Error('当前事实已采用相同值与同一来源，请刷新核对；原候选仍待处理');
             if(busyActions.has('#proposal')||submission!==proposalSubmissionGeneration)throw new Error('读取期间候选发生提交，原表单内容已保留；请先核对提交结果后再操作');
@@ -332,11 +340,11 @@ function renderCandidate(d,c,role,p){
             selectSource(latest.source);
             message(`已用读取时 v${latest.comparison.currentVersion} 填写新候选；尚未提交。原候选 #${c.id} 保留，请确认内容和依据后提交。`,'#proposalFeedback');
             form.elements.value.focus();
-          }finally{prepare.disabled=false}
+          }finally{prepare.setAttribute('aria-busy','false');writeControls()}
         },'#candidateFeedback');
       }
-      loaded=true;preview.textContent='收起来源原文';
-    }catch(error){if(request===requestGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
+      loaded=true;preview.textContent='收起来源原文';writeControls();
+    }catch(error){if(request===requestGeneration&&p===projectId&&workspace===workspaceGeneration&&d.isConnected){noteProjectRead403(error,p,workspace,access);panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
     finally{
       if(request===requestGeneration){
         preview.disabled=false;
@@ -350,9 +358,10 @@ function renderCandidate(d,c,role,p){
   const actions=el('div',undefined,'actions');
   for(const [label,action] of [['批准','approve'],['驳回','reject']]){
     const b=el('button',label,action==='reject'?'secondary':'');
+    b.dataset.mutation='owner';
     b.onclick=()=>perform(async()=>{
-      const workspace=workspaceGeneration;
-      for(const button of actions.querySelectorAll('button'))button.disabled=true;
+      const problem=writeProblem(true,p,workspace,true);if(problem)throw new Error(problem);
+      for(const button of actions.querySelectorAll('button')){button.disabled=true;button.setAttribute('aria-busy','true')}
       try{
         const result=await api(`/api/projects/${p}/candidates/${c.id}/${action}`,{method:'POST'});
         if(p===projectId&&workspace===workspaceGeneration){
@@ -362,7 +371,7 @@ function renderCandidate(d,c,role,p){
       }catch(e){
         if(e.status===409&&p===projectId&&workspace===workspaceGeneration)await load();
         throw e;
-      }finally{for(const button of actions.querySelectorAll('button'))button.disabled=false}
+      }finally{for(const button of actions.querySelectorAll('button'))button.setAttribute('aria-busy','false');writeControls()}
     },'#candidateFeedback');actions.append(b);
   }
   d.append(actions);
@@ -372,7 +381,7 @@ async function loadCandidates({reset=false,index=candidateState.index,focus=fals
   if(candidateState.project!==projectId||candidateState.workspace!==workspaceGeneration){$('#candidates').replaceChildren();candidateState={project:projectId,workspace:workspaceGeneration,status:'all',cursors:[null],index:0,next:null};}
   const requested=reset?{project:projectId,workspace:workspaceGeneration,status:$('#candidateFilter').value,cursors:[null],index:0,next:null}:candidateState;
   if(reset)index=0;
-  const generation=++candidateGeneration,p=projectId,before=requested.cursors[index],status=requested.status;
+  const generation=++candidateGeneration,p=projectId,before=requested.cursors[index],status=requested.status,workspace=workspaceGeneration,access=projectReadEpoch;
   candidateControls(true);$('#candidatesStatus').textContent='正在加载候选…';
   try{
     const page=await api(`/api/projects/${p}/candidates?status=${status}&limit=25${before===null?'':`&before=${before}`}`);
@@ -383,18 +392,37 @@ async function loadCandidates({reset=false,index=candidateState.index,focus=fals
     candidateState.cursors=candidateState.cursors.slice(0,index+1);
     if(page.next_before!==null)candidateState.cursors.push(page.next_before);
     $('#candidatesStatus').textContent=page.candidates.length?`候选第 ${index+1} 页 · ${page.candidates.length} 条${page.next_before===null?' · 已到末页':''}`:(index===0?'当前筛选没有候选':'本页已无候选，请返回或刷新候选');
-    candidateControls();if(focus)$('#candidatesTitle').focus();
+    candidateControls();writeControls();if(focus)$('#candidatesTitle').focus();
   }catch(e){
     if(generation!==candidateGeneration||p!==projectId)return;
+    noteProjectRead403(e,p,workspace,access);
     $('#candidatesStatus').textContent=`候选加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新候选重试。`;
     $('#candidateFilter').value=candidateState.status;candidateControls();
   }
 }
 let sourceGeneration=0,sourceState={project:null,workspace:null,query:'',cursors:[0],index:0,next:null},sourcePage=[],selectedSource=null;
+function writeProblem(ownerOnly=false,p=projectId,workspace=workspaceGeneration,retained=false){
+  if(p===null||p!==projectId||workspace!==workspaceGeneration)return '工作区已变化，请重新核对后操作';
+  if(deniedWorkspace===workspace)return '本次项目读取被拒绝，变更操作已暂停，草稿已保留；请刷新工作台重新确认';
+  const role=roleWorkspace===workspace?acceptedRole:null;
+  if(role==='viewer')return '当前项目为只读，草稿已保留；不能提交或审批';
+  if((!data&&!retained)||!(ownerOnly?role==='owner':['owner','member'].includes(role)))return '当前角色或权限尚未确认，请刷新工作台后再操作';
+  return '';
+}
+function noteProjectRead403(error,p,workspace,access){
+  if(error.status!==403||p!==projectId||workspace!==workspaceGeneration||access!==projectReadEpoch)return;
+  deniedWorkspace=workspace;projectReadEpoch++;data=null;writeControls();
+}
 function writeControls(){
-  $('#sourceForm button').disabled=!data||busyActions.has('#sourceForm');
-  for(const id of ['#stale','#injection'])$(id).disabled=!data||busyActions.has(id);
-  $('#proposal button').disabled=!data||!selectedSource||selectedSource.project!==projectId||busyActions.has('#proposal');
+  const problem=writeProblem();
+  $('#sourceForm button').disabled=!!problem||busyActions.has('#sourceForm');
+  for(const id of ['#stale','#injection'])$(id).disabled=!!problem||busyActions.has(id);
+  $('#proposal button').disabled=!!problem||!selectedSource||selectedSource.project!==projectId||busyActions.has('#proposal');
+  for(const button of document.querySelectorAll('#candidates button[data-mutation]'))button.disabled=button.getAttribute('aria-busy')==='true'||!!writeProblem(button.dataset.mutation==='owner',projectId,workspaceGeneration,true);
+  let cue=$('#projectAccess');if(!cue){cue=el('span','','hint');cue.id='projectAccess';cue.setAttribute('role','status');$('#project').parentElement.append(cue)}
+  const role=roleWorkspace===workspaceGeneration?acceptedRole:null,denied=deniedWorkspace===workspaceGeneration,option=$('#project').selectedOptions[0];
+  cue.textContent=projectId===null?'':denied?'本次项目读取被拒绝；旧页面和草稿已保留，变更入口已暂停。请刷新工作台重新确认。':role==='viewer'?'上次确认角色：只读 viewer。草稿已保留，不能提交或审批。':role?`上次确认角色：${role}。权限由服务端逐次核查。`:'正在确认当前项目权限…';
+  if(option)option.textContent=`${option.dataset.projectName} · ${denied?'读取被拒绝':role==='viewer'?'只读 viewer':role||'权限待确认'}`;
 }
 function sourceOptions(){
   const select=$('#sourceSelect');select.replaceChildren();
@@ -416,7 +444,7 @@ async function loadSources({reset=false,index=sourceState.index,focus=false}={})
   if(sourceState.project!==projectId||sourceState.workspace!==workspaceGeneration){$('#sources').replaceChildren();sourceState={project:projectId,workspace:workspaceGeneration,query:'',cursors:[0],index:0,next:null};sourcePage=[];sourceOptions();}
   const requested=reset?{project:projectId,workspace:workspaceGeneration,query:$('#sourceSearchForm').q.value,cursors:[0],index:0,next:null}:sourceState;
   if(reset)index=0;
-  const generation=++sourceGeneration,p=projectId,query=requested.query,after=requested.cursors[index];
+  const generation=++sourceGeneration,p=projectId,query=requested.query,after=requested.cursors[index],workspace=workspaceGeneration,access=projectReadEpoch;
   sourceControls(true);$('#sourcesStatus').textContent='正在加载来源…';
   try{
     const page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(query)}&limit=25&after=${after}`);
@@ -438,25 +466,32 @@ async function loadSources({reset=false,index=sourceState.index,focus=false}={})
     sourceControls();if(focus)$('#sourcesTitle').focus();
   }catch(e){
     if(generation!==sourceGeneration||p!==projectId)return;
+    noteProjectRead403(e,p,workspace,access);
     $('#sourcesStatus').textContent=`来源加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新来源重试。`;
     sourceControls();
   }
 }
-async function load(){
+async function load({recoverAccess=false}={}){
   if(projectId===null)return loadProjects();
-  const generation=++contextGeneration,p=projectId;
-  data=null;
-  for(const b of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))b.disabled=true;
+  if(recoverAccess)projectReadEpoch++;
+  const generation=++contextGeneration,p=projectId,workspace=workspaceGeneration,access=projectReadEpoch;
+  data=null;writeControls();
   const facts=loadFacts({reset:true}),history=loadHistory({reset:true}),candidates=loadCandidates({reset:true}),sources=loadSources({reset:true}),audit=loadAudit({reset:true});
   try{
     const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false`);
     if(generation!==contextGeneration||p!==projectId)return;
-    data=validateWorkspaceBootstrap(result);
-    // A resolved read failure cannot clear a newer message from another action.
-    if(workspaceProblem?.workspace===workspaceGeneration&&workspaceProblem.project===p&&workspaceProblem.notice===noticeGeneration)message('');
-    workspaceProblem=null;
-    writeControls();
-  }catch(e){if(generation===contextGeneration&&p===projectId)workspaceProblem={project:p,workspace:workspaceGeneration,notice:message(`工作台加载失败：${e.message}。请刷新重试。`)}}
+    if(access===projectReadEpoch){
+      data=validateWorkspaceBootstrap(result);acceptedRole=data.role;roleWorkspace=workspace;
+      if(recoverAccess)deniedWorkspace=null;
+      // An automatic read cannot resolve an access denial or erase its error;
+      // a resolved read failure also cannot clear a newer action's message.
+      if(deniedWorkspace!==workspace){
+        if(workspaceProblem?.workspace===workspaceGeneration&&workspaceProblem.project===p&&workspaceProblem.notice===noticeGeneration)message('');
+        workspaceProblem=null;
+      }
+      writeControls();
+    }
+  }catch(e){if(generation===contextGeneration&&p===projectId){noteProjectRead403(e,p,workspace,access);workspaceProblem={project:p,workspace:workspaceGeneration,notice:message(`工作台加载失败：${e.message}。请刷新重试。`)}}}
   await Promise.all([facts,history,candidates,sources,audit]);
 }
 async function perform(fn,feedback=null){
@@ -501,7 +536,7 @@ $('#loginForm').onsubmit=e=>{e.preventDefault();submitOnce('#loginForm',async()=
 $('#project').onchange=e=>{workspaceGeneration++;for(const id of ['#notice','#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
 $('#factsPrevious').onclick=()=>perform(()=>loadFacts({index:factState.index-1,focus:true}));
 $('#factsNext').onclick=()=>perform(()=>loadFacts({index:factState.index+1,focus:true}));
-$('#refreshWorkspace').onclick=()=>perform(load);
+$('#refreshWorkspace').onclick=()=>perform(()=>load({recoverAccess:true}));
 $('#historyPrevious').onclick=()=>perform(()=>loadHistory({index:historyState.index-1,focus:true}));
 $('#historyNext').onclick=()=>perform(()=>loadHistory({index:historyState.index+1,focus:true}));
 $('#refreshHistory').onclick=()=>perform(()=>loadHistory({reset:true}));
@@ -517,11 +552,14 @@ $('#sourceSearchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadSources({
 $('#sourcesPrevious').onclick=()=>perform(()=>loadSources({index:sourceState.index-1,focus:true}));
 $('#sourcesNext').onclick=()=>perform(()=>loadSources({index:sourceState.index+1,focus:true}));
 $('#refreshSources').onclick=()=>perform(()=>loadSources({reset:true}));
-$('#proposal').onsubmit=e=>{e.preventDefault();submitOnce('#proposal',async()=>{const p=projectId,workspace=workspaceGeneration;proposalSubmissionGeneration++;await createRecord(`/api/projects/${p}/candidates`,Object.fromEntries(new FormData(e.target)));if(p!==projectId||workspace!==workspaceGeneration)return;message('候选已提交，等待负责人审批','#proposalFeedback');await load()},{feedback:'#proposalFeedback',progress:'正在提交候选…'})};
-$('#sourceForm').onsubmit=e=>{e.preventDefault();submitOnce('#sourceForm',async()=>{const p=projectId,workspace=workspaceGeneration,body=Object.fromEntries(new FormData(e.target)),source=await createRecord(`/api/projects/${p}/sources`,body);if(p!==projectId||workspace!==workspaceGeneration)return;selectSource(source);if(JSON.stringify(Object.fromEntries(new FormData(e.target)))===JSON.stringify(body))e.target.reset();message(`来源 #${source.id} 已保存并选为依据`,'#sourceFeedback');await load()},{feedback:'#sourceFeedback',progress:'正在保存来源…'})};
+$('#proposal').onsubmit=e=>{e.preventDefault();submitOnce('#proposal',async()=>{const p=projectId,workspace=workspaceGeneration,problem=writeProblem();if(problem)throw new Error(problem);proposalSubmissionGeneration++;await createRecord(`/api/projects/${p}/candidates`,Object.fromEntries(new FormData(e.target)));if(p!==projectId||workspace!==workspaceGeneration)return;message('候选已提交，等待负责人审批','#proposalFeedback');await load()},{feedback:'#proposalFeedback',progress:'正在提交候选…'})};
+$('#sourceForm').onsubmit=e=>{e.preventDefault();submitOnce('#sourceForm',async()=>{const p=projectId,workspace=workspaceGeneration,problem=writeProblem();if(problem)throw new Error(problem);const body=Object.fromEntries(new FormData(e.target)),source=await createRecord(`/api/projects/${p}/sources`,body);if(p!==projectId||workspace!==workspaceGeneration)return;selectSource(source);if(JSON.stringify(Object.fromEntries(new FormData(e.target)))===JSON.stringify(body))e.target.reset();message(`来源 #${source.id} 已保存并选为依据`,'#sourceFeedback');await load()},{feedback:'#sourceFeedback',progress:'正在保存来源…'})};
 async function simulated(value,fragment){
-  const p=projectId,workspace=workspaceGeneration,page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(fragment)}&limit=1`);
+  const p=projectId,workspace=workspaceGeneration,problem=writeProblem();if(problem)throw new Error(problem);
+  let page;const access=projectReadEpoch;
+  try{page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(fragment)}&limit=1`)}catch(error){noteProjectRead403(error,p,workspace,access);throw error}
   if(p!==projectId||workspace!==workspaceGeneration)return;
+  const currentProblem=writeProblem();if(currentProblem)throw new Error(currentProblem);
   if(!page.sources.length)throw new Error('当前项目缺少此模拟场景的来源');
   await createRecord(`/api/projects/${p}/candidates`,{subject:'项目',predicate:'截止日',value,source_id:page.sources[0].id,expected_version:1});
   if(p===projectId&&workspace===workspaceGeneration){message('模拟客户端已提交候选，尚未改变当前事实');await load()}
