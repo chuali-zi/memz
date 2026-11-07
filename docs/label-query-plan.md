@@ -97,3 +97,54 @@ MIGRATION_TEST_DATABASE_URL="$TEST_DATABASE_URL" node --test test/label-context-
 ```
 
 执行器测试使用原创合成fixture，真实HTTP测试证明登录、流式正文、注销及跨阶段共享期限会中断连接；真实PostgreSQL测试自行创建并删除随机临时库，覆盖RLS项目拒绝、值字段额外命中、来源修剪、25条范围拒绝、两遍之间批准新版本与窗口溢出，以及真实CLI读取。测试不调用模型、不读取答案标签；它们不是42题自然语言召回基准的重新运行，也不表示该缺口已普遍解决。
+
+## v2独立协议与纯规划器（第一阶段）
+
+本节的纯协议校验及规划器已实现，**尚未接入HTTP端点或CLI模式**。现有CLI仍默认固定25条snapshot和all_terms，不会自动改用v2。本阶段不增加模型调用、schema迁移或依赖。
+
+`scripts/exact-context-protocol.js` 提供两个独立wire合同，预定分别用于 `GET /api/projects/:p/current-labels` 和保留CSRF的只读 `POST /api/projects/:p/context/exact`。认证、数据库事务、实际字节读取限制及HTTP状态映射留待下一阶段；纯函数不从JSON字符串证明授权或数据库完整性。
+
+标签metadata固定最多512对，HTTP正文上限常量为1MiB；字段严格限定如下：
+
+```json
+{
+  "schema": "memz-current-labels-v1",
+  "consistency": "single-transaction-current-labels",
+  "projectId": 1,
+  "role": "viewer",
+  "sourceTextIsUntrusted": true,
+  "limit": 512,
+  "complete": true,
+  "labels": [{"subject":"项目","predicate":"截止日"}]
+}
+```
+
+`validateCurrentLabels(page,{projectId})` 绑定预期项目，拒绝未知字段、非法角色、非boolean完整性标记、重复标签及超限数组。每个label严格只有subject/predicate，各最多100 UTF-16单位，非空、合法Unicode、无NUL，保留原字面文本。metadata不允许value、source、evidence或gold字段。`complete:true,labels:[]` 表示完整空项目；`complete:false` 只能搭配空labels，不能携带前缀。调用者必须在不完整时拒绝规划，而不是将空列表当作完整无匹配。
+
+精确读取的请求只接受 `{"selector":{"subject":"项目","predicate":"截止日"}}`，项目来自路径，不从body改写。`validateExactContextRequest` 和 `validateExactSelector` 不trim、分词、大小写折叠或Unicode归一化，也不接受query、limit等隐含选择条件。响应有自己的selector回执，例如一个授权项目中的无当前记录结果：
+
+```json
+{
+  "schema": "memz-exact-context-v1",
+  "consistency": "single-transaction-current-exact-key",
+  "projectId": 1,
+  "selector": {"subject":"项目","predicate":"截止日"},
+  "role": "viewer",
+  "sourceTextIsUntrusted": true,
+  "facts": [],
+  "provenance": [],
+  "sources": []
+}
+```
+
+`validateExactContext(page,{projectId,selector})` 逐字段绑定项目与原选择器，最多接受一条事实。非空事实必须与selector精确相等，并通过与原snapshot共用的完整修订、候选、审批引用、全文来源及来源字典检查。事实存在而依据缺失或错配必须失败，不能被转换为合法空结果。响应不允许旧query、search、limit、after、next_after字段；不能用空query或伪造旧snapshot header冒充exact查询。原snapshot的header、游标和search校验继续保留原合同。
+
+`scripts/label-query-plan-v2.js` 的 `planExactLabelQuery({question,labels})` 使用同一固定问句模板，独立限制最多512行。唯一匹配返回 `mode:label_template_exact_v2`、`status:planned`、`selector` 与template，不生成all_terms查询，所以不施加旧八词限制。它不认识别名、代词、历史或多属性问题，仍保留明确拒绝；不接受gold、evidence、value或调用者提供的容量策略。调用者仍负责从单个已授权、完整current-labels响应提供词表，不拼分页快照。v1的 `planLabelQuery` 继续固定25行与八词限制。
+
+```sh
+node --test test/exact-context-protocol.test.js test/label-query-plan-v2.test.js \
+  test/label-query-plan.test.js test/query-planner-adversarial.test.js \
+  test/search-query.test.js test/context-snapshot.test.js
+```
+
+第一阶段的原创fixture覆盖512/513完整性、禁止证据字段sentinel、精确Unicode和标点、错误项目/selector、缺失或额外依据、新旧wire互相拒绝，以及原v1字段和失败状态兼容。这里没有真实SQL执行、HTTP授权或大项目查询性能结论。
