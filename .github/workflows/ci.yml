@@ -50,6 +50,15 @@ jobs:
         env:
           SYSTEM_TEST_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz
           PG_TOOLS_CONTAINER: ${{ job.services.postgres.id }}
+      - run: npm run test:session-recovery
+        env:
+          SESSION_RECOVERY_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: session-recovery${{ matrix.node == 24 && '-node24' || '' }}
+          path: artifacts/session-recovery/
+          if-no-files-found: ignore
       - run: npm run test:memory:integration
         env:
           MEMORY_TEST_DATABASE_URL: postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz

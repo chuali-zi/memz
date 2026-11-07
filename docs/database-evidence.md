@@ -4,13 +4,13 @@
 
 ## 复现
 
-先初始化测试PostgreSQL及共享memz_app角色（见README），使用具有创建数据库权限的测试管理员连接：
+先初始化专用测试PostgreSQL及现有共享memz_app角色（见README），使用具备fixture管理权限的测试管理员连接：除了创建数据库，core中的隔离进程测试还会创建/清理随机登录角色，并需要schema owner等测试操作权限；仅CREATEDB不够。推荐专用测试实例的postgres管理员，不使用生产凭据。按层选择命令见[测试入口](testing.md)。
 
 ```sh
 SYSTEM_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz npm run test:system:evidence
 ```
 
-该地址为公开演示配置。程序不重置提供的数据库；创建随机memz_system库，初始化schema，以非owner应用角色执行核心测试。迁移测试另建随机库，验证保留数据升级、重复和并发迁移、失败回滚、幂等创建及分页。仅删除自己创建的库。需要数据库管理员权限是为了创建和清理测试库，不代表应用以管理员运行。进程被强制终止可能无法执行finally清理；无完整清理记录的报告不能打包。
+该地址为公开演示配置。程序不重置提供的数据库；创建随机memz_system库，初始化schema，以非owner应用角色执行核心测试。迁移测试另建随机库，验证保留数据升级、重复和并发迁移、失败回滚、幂等创建及分页。各fixture仅对自己创建的库/临时角色执行清理，不删除已有memz_app；需要管理员是为这些隔离测试管理操作，不代表应用以管理员运行。强制终止、连接错误或finally失败可能留下已登记资源，不能承诺任何失败都清理成功；按TAP及清理记录核对确切owned名称。无完整清理记录的报告不能打包。
 
 输出artifacts/system/run-时间-随机值/：
 

@@ -1435,3 +1435,73 @@ for(const [action,label,invalid,valid] of [['approve','批准',{status:'approved
     console.log('Synthetic decision receipt browser:',JSON.stringify({action,apiRequests:requests.length,decisionPosts:2,databaseQueries:0,modelCalls:0,realCommitNotClaimed:true}));
   }finally{await closePage(page)}
 });
+
+async function expireSyntheticProjectSession(page){
+  await page.route('**/api/projects/1/audit?*',route=>route.fulfill({status:401,json:{error:'合成会话已过期'}}),{times:1});
+  await page.locator('#refreshAudit').focus();await page.keyboard.press('Enter');await page.locator('#auditStatus').getByText(/401 合成会话已过期/).waitFor();
+  assert.equal(await page.locator('#sessionRecoveryForm').count(),1,'a session-expired workspace has a same-account recovery form');
+}
+async function recoverSyntheticSession(page){await page.locator('#sessionRecoveryForm [name=password]').fill('synthetic-manual-password');await page.locator('#sessionRecoveryForm button').focus();await page.keyboard.press('Enter')}
+for(const form of ['sourceForm','proposal'])test(`${form} expired session recovery preserves the unknown intent until a manual same-key retry`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let logins=0;const loginBodies=[];await page.route('**/api/login',route=>{loginBodies.push(route.request().postDataJSON());return route.fulfill({json:{name:'Synthetic owner',csrf:++logins===1?'synthetic-initial-csrf':'synthetic-renewed-csrf'}})});
+    await login(page);await settled(page,'#loginForm');await settledLists(page);
+    if(form==='sourceForm'){await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('恢复后重试同一来源');await page.locator('#sourceForm [name=content]').fill('保留这份来源全文')}
+    const endpoint=form==='sourceForm'?'sources':'candidates',feedback=form==='sourceForm'?'#sourceFeedback':'#proposalFeedback',keys=[];let attempts=0;
+    await page.route(`**/api/projects/1/${endpoint}`,route=>{if(route.request().method()!=='POST')return route.fallback();keys.push(route.request().headers()['idempotency-key']);if(++attempts===1)return route.abort();return route.fulfill({status:401,json:{error:'合成会话已过期'}})});
+    const original=await draft(page),sourceDraft=await page.locator('#sourceForm').evaluate(node=>Object.fromEntries(new FormData(node)));
+    for(let i=0;i<2;i++){await page.locator('#'+form+' button').focus();await page.keyboard.press('Enter');await settled(page,'#'+form)}
+    const warning=await page.locator(feedback).textContent();assert.match(warning,/401.*写入结果可能不确定/);for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true,selector);
+    assert.equal(await page.locator('#sessionRecovery').isVisible(),true);assert.equal(await page.locator('#sessionRecoveryForm [name=password]').inputValue(),'');assert.match(await page.locator('#sessionAccount').textContent(),/owner/);
+    await page.evaluate(()=>document.querySelector('#loginForm').username.value='other');const bootstrap=await hold(page,'**/api/projects/1/data?*','GET');await recoverSyntheticSession(page);await bootstrap.observed;
+    assert.equal(loginBodies[1].username,'owner','reauthentication binds the accepted submitted account, not mutable hidden controls');assert.equal(await page.evaluate(()=>csrf==='synthetic-renewed-csrf'),true);for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true,'login alone does not restore project access');
+    const input=page.locator('#proposal [name=value]');await input.focus();await page.keyboard.press('ArrowLeft');const caret=await input.evaluate(node=>[node.selectionStart,node.selectionEnd]);bootstrap.release({role:'owner',sourceTextIsUntrusted:true});await settled(page,'#sessionRecoveryForm');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator(feedback).textContent(),warning);assert.deepEqual(await draft(page),original);assert.deepEqual(await page.locator('#sourceForm').evaluate(node=>Object.fromEntries(new FormData(node))),sourceDraft);assert.equal(await page.locator('#sourceSelect').inputValue(),'1');assert.equal(await input.evaluate(node=>node===document.activeElement),true);assert.deepEqual(await input.evaluate(node=>[node.selectionStart,node.selectionEnd]),caret);assert.equal(keys.length,2,'reauthentication never automatically retries creation');
+    const retry=await hold(page,`**/api/projects/1/${endpoint}`);await page.locator('#'+form+' button').focus();await page.keyboard.press('Enter');await retry.observed;keys.push(retry.requests[0].headers()['idempotency-key']);assert.equal(retry.requests[0].headers()['x-csrf-token']==='synthetic-renewed-csrf',true);retry.release(healthyCreationReceipt(retry.requests[0],96));await settled(page,'#'+form);
+    assert.equal(new Set(keys).size,1);assert.equal(await page.evaluate(()=>pendingCreations.size),0);assert.equal(await page.evaluate(()=>uncertainCreationKeys.size),0);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('manual reauthentication preserves simulation uncertainty and approval feedback through invalid login and access 503',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);await settled(page,'#loginForm');let attempts=0;await page.route('**/api/projects/1/candidates',route=>{if(route.request().method()!=='POST')return route.fallback();if(++attempts===1)return route.abort();return route.fulfill({status:401,json:{error:'合成会话已过期'}})});
+    for(let i=0;i<2;i++){await page.locator('#stale').focus();await page.keyboard.press('Enter');await settled(page,'#stale')}
+    assert.equal(await page.locator('#sessionRecoveryForm').count(),1);const warning=await page.locator('#notice').textContent();assert.match(warning,/写入结果可能不确定/);await page.evaluate(()=>message('合成审批回执未确认，请刷新核对','#candidateFeedback'));const approval=await page.locator('#candidateFeedback').textContent(),original=await draft(page),before=await page.evaluate(()=>({epoch:sessionEpoch,username:acceptedUsername,csrfUnchanged:csrf==='synthetic-csrf'}));
+    await page.route('**/api/login',route=>route.fulfill({json:{}}));await recoverSyntheticSession(page);await settled(page,'#sessionRecoveryForm');assert.match(await page.locator('#sessionFeedback').textContent(),/登录回执格式异常/);assert.deepEqual(await page.evaluate(()=>({epoch:sessionEpoch,username:acceptedUsername,csrfUnchanged:csrf==='synthetic-csrf'})),before);assert.equal(await page.locator('#sessionRecoveryForm [name=password]').inputValue(),'');
+    await page.route('**/api/login',route=>route.fulfill({json:{name:'Synthetic owner',csrf:'synthetic-new-csrf'}}));await page.route('**/api/projects/1/data?*',route=>route.fulfill({status:503,json:{error:'合成恢复访问暂不可用'}}));await recoverSyntheticSession(page);await settled(page,'#sessionRecoveryForm');await settledLists(page);
+    assert.match(await page.locator('#sessionFeedback').textContent(),/503 合成恢复访问暂不可用/);assert.equal(await page.locator('#notice').textContent(),warning);assert.equal(await page.locator('#candidateFeedback').textContent(),approval);assert.deepEqual(await draft(page),original);await keyboardDetailTrigger(page,'candidates');await page.keyboard.press('Enter');await page.getByRole('button',{name:'用最新版本填写新候选',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'用最新版本填写新候选',exact:true}).isDisabled(),true);for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true);
+    await page.unroute('**/api/projects/1/data?*');await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await settledLists(page);await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator('#notice').textContent(),warning);assert.equal(await page.locator('#candidateFeedback').textContent(),approval);assert.equal(attempts,2);assert.equal(await page.evaluate(()=>pendingCreations.size),1);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('a late old-session project 401 cannot expire the newly accepted session',async()=>{
+  const {page,errors}=await openPage();let release;
+  try{
+    await login(page);await settled(page,'#loginForm');await settledLists(page);let seen;const observed=new Promise(resolve=>{seen=resolve}),gate=new Promise(resolve=>{release=resolve});pageCleanups.get(page).add(release);
+    await page.route('**/api/projects/1/facts?*',async route=>{seen();await gate;await route.fulfill({status:401,json:{error:'旧会话的合成延迟401'}})},{times:1});await page.locator('#searchForm button').focus();await page.keyboard.press('Enter');await bounded(observed,'old session read');await expireSyntheticProjectSession(page);
+    await recoverSyntheticSession(page);await settled(page,'#sessionRecoveryForm');await settledLists(page);await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);const epoch=await page.evaluate(()=>sessionEpoch),feedback=await page.locator('#sessionFeedback').textContent();
+    const response=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/projects/1/facts'&&response.status()===401);release();await(await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.evaluate(()=>sessionEpoch),epoch);assert.equal(await page.evaluate(()=>sessionRecoveryRequired||sessionAccessPending),false);assert.equal(await page.locator('#sessionFeedback').textContent(),feedback);assert.equal(await page.locator('#proposal button').isEnabled(),true);assert.deepEqual(errors,[]);
+  }finally{release?.();await closePage(page)}
+});
+test('reauthentication errors remain visible after project navigation and switching accounts still discards local state',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await settled(page,'#loginForm');await settledLists(page);await page.locator('#proposal [name=value]').fill('不能跨账号保留的草稿');await expireSyntheticProjectSession(page);const pending=await hold(page,'**/api/login');await recoverSyntheticSession(page);await pending.observed;
+    await page.locator('#project').selectOption('2');await settledLists(page);pending.release({error:'合成重新登录密码不正确'},401);await settled(page,'#sessionRecoveryForm');
+    assert.equal(await page.locator('#project').inputValue(),'2');assert.match(await page.locator('#sessionFeedback').textContent(),/401 合成重新登录密码不正确/);assert.equal(await page.locator('#sessionRecovery').isVisible(),true);assert.equal(await page.locator('#proposal button').isDisabled(),true);assert.equal(await page.locator('#proposal [name=value]').inputValue(),'不能跨账号保留的草稿');
+    await page.route('**/api/logout',route=>route.fulfill({status:401,json:{error:'合成会话已失效'}}));const reloaded=page.waitForNavigation({waitUntil:'domcontentloaded'});await page.locator('#switchAccount').focus();await page.keyboard.press('Enter');await reloaded;
+    assert.equal(await page.locator('#loginForm').isVisible(),true);assert.equal(await page.evaluate(()=>pendingCreations.size),0);assert.equal(await page.evaluate(()=>acceptedUsername),null);assert.equal(await page.locator('#proposal [name=value]').inputValue(),'15号');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+test('reauthentication keeps access locked after project 403 and respects a viewer role on explicit refresh',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await settled(page,'#loginForm');await settledLists(page);await expireSyntheticProjectSession(page);await page.evaluate(()=>message('合成写入结果可能不确定，请保持本页'));
+    await page.route('**/api/projects/1/data?*',route=>route.fulfill({status:403,json:{error:'合成恢复后项目读取拒绝'}}));await recoverSyntheticSession(page);await settled(page,'#sessionRecoveryForm');await settledLists(page);
+    assert.match(await page.locator('#sessionFeedback').textContent(),/403 合成恢复后项目读取拒绝/);assert.equal(await page.evaluate(()=>sessionRecoveryRequired),false);assert.equal(await page.evaluate(()=>sessionAccessPending),true);for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true);
+    await page.route('**/api/projects/1/data?*',route=>route.fulfill({json:{role:'viewer',sourceTextIsUntrusted:true}}));await page.route('**/api/projects/1/candidates?*',route=>route.fulfill({json:{role:'viewer',candidates:[],next_before:null}}));await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await settledLists(page);await page.waitForFunction(()=>data?.role==='viewer');
+    assert.equal(await page.evaluate(()=>sessionAccessPending),false);assert.match(await page.locator('#projectAccess').textContent(),/只读/);for(const selector of mutationSelectors)assert.equal(await page.locator(selector).isDisabled(),true);assert.equal(await page.locator('#notice').textContent(),'合成写入结果可能不确定，请保持本页');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});

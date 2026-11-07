@@ -68,6 +68,8 @@ docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migra
 
 ## 验证
 
+按资源、权限和数据边界选择[分层测试入口](docs/testing.md)，区分无PG检查、隔离真实数据库、浏览器、故障恢复与材料包；CI矩阵及模型评测限制也在该索引说明。
+
 推荐在已初始化的测试PostgreSQL上运行独立临时库系统测试，无需重置现有演示数据：
 
 ```sh

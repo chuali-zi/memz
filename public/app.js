@@ -1,8 +1,10 @@
-let csrf='',projectId=null,data=null;const $=s=>document.querySelector(s);const el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
+let csrf='',projectId=null,data=null;
+let acceptedUsername=null,sessionEpoch=0,sessionRecoveryRequired=false,sessionAccessPending=false;
+const $=s=>document.querySelector(s);const el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 // Fixed browser request budget: headers and the complete JSON body share 15 seconds.
 const REQUEST_TIMEOUT_MS=15000,MAX_RESPONSE_BYTES=1048576;
 async function api(path,opts={}){
-  let timedOut=false,reader;
+  const requestEpoch=sessionEpoch;let timedOut=false,reader;
   const controller=new AbortController(),timer=setTimeout(()=>{timedOut=true;controller.abort()},REQUEST_TIMEOUT_MS);
   const timeout=()=>new Error('请求超时（15秒），请稍后重试');
   try{
@@ -32,6 +34,7 @@ async function api(path,opts={}){
     }
     return value;
   }catch(error){
+    noteSession401(error,path,requestEpoch);
     // Abort the real fetch first; cancellation/lock cleanup cannot replace the
     // primary failure or turn a fully validated HTTP rejection into uncertainty.
     controller.abort();
@@ -156,6 +159,34 @@ function validateDecisionReceipt(result,action,expectedVersion){
   if(!receiptRecord(result,['status'])||!(action==='approve'
     ?result.status==='approved'&&receiptVersion(expectedVersion)&&receiptId(result.version)&&result.version===expectedVersion+1
     :action==='reject'&&result.status==='rejected'))throw new Error('审批回执格式异常，处理结果未确认；请刷新核对候选状态后再操作');
+}
+
+function noteSession401(error,path,requestEpoch){
+  if(error.status!==401||requestEpoch!==sessionEpoch||acceptedUsername===null||!(/^\/api\/projects(?:\/|\?|$)/).test(path)||sessionRecoveryRequired)return;
+  sessionRecoveryRequired=true;sessionAccessPending=true;data=null;
+  const form=$('#sessionRecoveryForm');form.hidden=false;form.password.value='';
+  $('#sessionRecovery').hidden=false;$('#sessionAccount').textContent=acceptedUsername;
+  message('当前会话已失效。草稿和未确认请求保留在本页；请手动重新登录当前演示账号。','#sessionFeedback');writeControls();
+}
+async function recoverSession(form){
+  if(busyActions.has('#sessionRecoveryForm')||!sessionRecoveryRequired||acceptedUsername===null)return;
+  const username=acceptedUsername,workspace=workspaceGeneration,button=form.querySelector('button');let recoveryEpoch=sessionEpoch;
+  busyActions.add('#sessionRecoveryForm');form.setAttribute('aria-busy','true');button.disabled=true;
+  message('正在重新登录当前账号…','#sessionFeedback');
+  try{
+    const result=validateLoginReceipt(await api('/api/login',{method:'POST',body:JSON.stringify({username,password:form.password.value})}));
+    if(recoveryEpoch!==sessionEpoch||username!==acceptedUsername)return;
+    csrf=result.csrf;recoveryEpoch=++sessionEpoch;sessionRecoveryRequired=false;sessionAccessPending=true;form.hidden=true;
+    $('#identity').firstChild.textContent=result.name;
+    message('已重新登录，正在重新确认当前项目访问；尚未重试任何写入。','#sessionFeedback');
+    await load({recoverAccess:true});
+  }catch(error){if(recoveryEpoch===sessionEpoch&&username===acceptedUsername)message(`重新登录失败：${error.message}`,'#sessionFeedback')}
+  finally{
+    form.password.value='';busyActions.delete('#sessionRecoveryForm');form.setAttribute('aria-busy','false');button.disabled=false;writeControls();
+    if(recoveryEpoch===sessionEpoch&&username===acceptedUsername&&workspace===workspaceGeneration&&document.activeElement===document.body){
+      const target=sessionRecoveryRequired?form.password:sessionAccessPending?$('#refreshWorkspace'):$('#project');if(target.isConnected&&!target.disabled)target.focus();
+    }
+  }
 }
 
 async function switchAccount(){
@@ -429,6 +460,8 @@ async function loadCandidates({reset=false,index=candidateState.index,focus=fals
 let sourceGeneration=0,sourceState={project:null,workspace:null,query:'',cursors:[0],index:0,next:null},sourcePage=[],selectedSource=null;
 function writeProblem(ownerOnly=false,p=projectId,workspace=workspaceGeneration,retained=false){
   if(p===null||p!==projectId||workspace!==workspaceGeneration)return '工作区已变化，请重新核对后操作';
+  if(sessionRecoveryRequired)return '当前会话已失效，草稿已保留；请重新登录当前演示账号后再核对操作';
+  if(sessionAccessPending)return '当前会话的项目访问尚未重新确认，变更操作已暂停；请刷新工作台核对';
   if(deniedWorkspace===workspace)return '本次项目读取被拒绝，变更操作已暂停，草稿已保留；请刷新工作台重新确认';
   const role=roleWorkspace===workspace?acceptedRole:null;
   if(role==='viewer')return '当前项目为只读，草稿已保留；不能提交或审批';
@@ -447,8 +480,8 @@ function writeControls(){
   for(const button of document.querySelectorAll('#candidates button[data-mutation]'))button.disabled=button.getAttribute('aria-busy')==='true'||!!writeProblem(button.dataset.mutation==='owner',projectId,workspaceGeneration,true);
   let cue=$('#projectAccess');if(!cue){cue=el('span','','hint');cue.id='projectAccess';cue.setAttribute('role','status');$('#project').parentElement.append(cue)}
   const role=roleWorkspace===workspaceGeneration?acceptedRole:null,denied=deniedWorkspace===workspaceGeneration,option=$('#project').selectedOptions[0];
-  cue.textContent=projectId===null?'':denied?'本次项目读取被拒绝；旧页面和草稿已保留，变更入口已暂停。请刷新工作台重新确认。':role==='viewer'?'上次确认角色：只读 viewer。草稿已保留，不能提交或审批。':role?`上次确认角色：${role}。权限由服务端逐次核查。`:'正在确认当前项目权限…';
-  if(option)option.textContent=`${option.dataset.projectName} · ${denied?'读取被拒绝':role==='viewer'?'只读 viewer':role||'权限待确认'}`;
+  cue.textContent=projectId===null?'':sessionRecoveryRequired?'当前会话已失效；草稿和未确认请求已保留，请重新登录当前演示账号。':sessionAccessPending?'重新登录后的项目访问尚待确认；变更入口已暂停，请刷新工作台。':denied?'本次项目读取被拒绝；旧页面和草稿已保留，变更入口已暂停。请刷新工作台重新确认。':role==='viewer'?'上次确认角色：只读 viewer。草稿已保留，不能提交或审批。':role?`上次确认角色：${role}。权限由服务端逐次核查。`:'正在确认当前项目权限…';
+  if(option)option.textContent=`${option.dataset.projectName} · ${sessionRecoveryRequired?'需重新登录':sessionAccessPending?'访问待确认':denied?'读取被拒绝':role==='viewer'?'只读 viewer':role||'权限待确认'}`;
 }
 function sourceOptions(){
   const select=$('#sourceSelect');select.replaceChildren();
@@ -500,15 +533,16 @@ async function loadSources({reset=false,index=sourceState.index,focus=false}={})
 async function load({recoverAccess=false}={}){
   if(projectId===null)return loadProjects();
   if(recoverAccess)projectReadEpoch++;
-  const generation=++contextGeneration,p=projectId,workspace=workspaceGeneration,access=projectReadEpoch;
+  const generation=++contextGeneration,p=projectId,workspace=workspaceGeneration,access=projectReadEpoch,readSessionEpoch=sessionEpoch;
   data=null;writeControls();
   const facts=loadFacts({reset:true}),history=loadHistory({reset:true}),candidates=loadCandidates({reset:true}),sources=loadSources({reset:true}),audit=loadAudit({reset:true});
   try{
     const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false`);
-    if(generation!==contextGeneration||p!==projectId)return;
+    if(generation!==contextGeneration||p!==projectId||readSessionEpoch!==sessionEpoch)return;
     if(access===projectReadEpoch){
       data=validateWorkspaceBootstrap(result);acceptedRole=data.role;roleWorkspace=workspace;
       if(recoverAccess)deniedWorkspace=null;
+      if(sessionAccessPending&&!sessionRecoveryRequired){sessionAccessPending=false;message('已重新登录并重新确认当前项目访问。请核对未确认请求，再手动重试；系统不会自动提交。','#sessionFeedback')}
       // An automatic read cannot resolve an access denial or erase its error;
       // a resolved read failure also cannot clear a newer action's message.
       if(deniedWorkspace!==workspace){
@@ -517,7 +551,7 @@ async function load({recoverAccess=false}={}){
       }
       writeControls();
     }
-  }catch(e){if(generation===contextGeneration&&p===projectId){noteProjectRead403(e,p,workspace,access);workspaceProblem={project:p,workspace:workspaceGeneration,notice:message(`工作台加载失败：${e.message}。请刷新重试。`)}}}
+  }catch(e){if(generation===contextGeneration&&p===projectId&&readSessionEpoch===sessionEpoch){noteProjectRead403(e,p,workspace,access);if(sessionRecoveryRequired||sessionAccessPending)message(`工作台加载失败：${e.message}。请刷新工作台重试。`,'#sessionFeedback');else workspaceProblem={project:p,workspace:workspaceGeneration,notice:message(`工作台加载失败：${e.message}。请刷新重试。`)}}}
   await Promise.all([facts,history,candidates,sources,audit]);
 }
 async function perform(fn,feedback=null){
@@ -552,13 +586,14 @@ async function submitOnce(target,fn,{feedback=null,progress='正在提交…'}={
 }
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
 $('#loginForm').onsubmit=e=>{e.preventDefault();submitOnce('#loginForm',async()=>{
-  const f=new FormData(e.target),x=validateLoginReceipt(await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))}));
-  csrf=x.csrf;message('');if($('#login').contains(document.activeElement))document.activeElement.blur();$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));
+  const credentials=Object.fromEntries(new FormData(e.target)),x=validateLoginReceipt(await api('/api/login',{method:'POST',body:JSON.stringify(credentials)}));
+  acceptedUsername=credentials.username;sessionEpoch++;csrf=x.csrf;message('');if($('#login').contains(document.activeElement))document.activeElement.blur();$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));
   const b=el('button','切换账号');b.id='switchAccount';b.onclick=()=>submitOnce('#switchAccount',switchAccount,{progress:'正在退出当前账号…'});$('#identity').append(b);
   const projects=loadProjects(),workspace=workspaceGeneration;await projects;
   // Hiding the login form leaves keyboard focus on BODY; respect any later user focus.
   if(workspace===workspaceGeneration&&document.activeElement===document.body)(projectId===null||!data?$('#refreshWorkspace'):$('#project')).focus();
 },{progress:'正在登录…'})};
+$('#sessionRecoveryForm').onsubmit=e=>{e.preventDefault();return recoverSession(e.target)};
 $('#project').onchange=e=>{workspaceGeneration++;for(const id of ['#notice','#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
 $('#factsPrevious').onclick=()=>perform(()=>loadFacts({index:factState.index-1,focus:true}));
 $('#factsNext').onclick=()=>perform(()=>loadFacts({index:factState.index+1,focus:true}));

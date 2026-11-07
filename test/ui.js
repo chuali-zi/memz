@@ -30,10 +30,10 @@ async function runUI({baseURL='http://127.0.0.1:3000',executablePath=process.env
     await page.goto(baseURL);
     await page.getByRole('button',{name:'进入项目'}).waitFor();
     await capture('01-login.png','合成演示账号登录界面');
-    await page.locator('[name=password]').fill('wrong');
+    await page.locator('#loginForm [name=password]').fill('wrong');
     await page.getByRole('button',{name:'进入项目'}).click();
     await page.getByText('401 账号或密码错误').waitFor({state:'visible'});
-    await page.locator('[name=password]').fill('demo-owner');
+    await page.locator('#loginForm [name=password]').fill('demo-owner');
     const invalidProjectRequests=[];
     page.on('request',request=>{if(/\/api\/projects\/(null|0)\//.test(request.url()))invalidProjectRequests.push(request.url())});
     await page.route('**/api/projects',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'项目列表测试故障'})}));
