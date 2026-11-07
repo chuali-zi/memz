@@ -24,9 +24,10 @@ async function switchAccount(){
   // An expired session is already logged out; let the user authenticate again.
   location.reload();
 }
-let projectGeneration=0;
+// Project IDs can repeat after navigation; bind mutations to this workspace visit.
+let projectGeneration=0,workspaceGeneration=0,proposalSubmissionGeneration=0;
 async function loadProjects(){
-  const generation=++projectGeneration;
+  const generation=++projectGeneration;workspaceGeneration++;
   projectId=null;data=null;selectedSource=null;sourcePage=[];for(const id of ['#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);
   const select=$('#project');select.replaceChildren();
   for(const button of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))button.disabled=true;
@@ -167,12 +168,15 @@ function renderCandidate(d,c,role,p){
         panel.append(el('p','将替换候选表单内容；不会自动提交或删除原提案。','hint'),prepare);
         prepare.onclick=()=>perform(async()=>{
           prepare.disabled=true;
+          const form=$('#proposal'),draft=JSON.stringify(Object.fromEntries(new FormData(form))),submission=proposalSubmissionGeneration;
           try{
+            if(busyActions.has('#proposal'))throw new Error('候选正在提交，表单内容已保留；请等待结果后再填写新候选');
             const latest=await api(`/api/projects/${p}/candidates/${c.id}/source`);
             if(p!==projectId||!d.isConnected)return;
             if(!['owner','member'].includes(latest.role)||latest.candidate.status!=='pending'||latest.comparison.matches)throw new Error('候选状态或权限已变化，请刷新核对后再操作');
             if(latest.current?.value===latest.candidate.value&&latest.current?.source_id===latest.candidate.source_id)throw new Error('当前事实已采用相同值与同一来源，请刷新核对；原候选仍待处理');
-            const form=$('#proposal');
+            if(busyActions.has('#proposal')||submission!==proposalSubmissionGeneration)throw new Error('读取期间候选发生提交，原表单内容已保留；请先核对提交结果后再操作');
+            if(JSON.stringify(Object.fromEntries(new FormData(form)))!==draft)throw new Error('读取期间候选草稿已修改，已保留新草稿；如仍需替换，请再次点击填写新候选');
             for(const name of ['subject','predicate','value'])form.elements[name].value=latest.candidate[name];
             form.elements.expected_version.value=latest.comparison.currentVersion;
             selectSource(latest.source);
@@ -191,15 +195,16 @@ function renderCandidate(d,c,role,p){
   for(const [label,action] of [['批准','approve'],['驳回','reject']]){
     const b=el('button',label,action==='reject'?'secondary':'');
     b.onclick=()=>perform(async()=>{
+      const workspace=workspaceGeneration;
       for(const button of actions.querySelectorAll('button'))button.disabled=true;
       try{
         const result=await api(`/api/projects/${p}/candidates/${c.id}/${action}`,{method:'POST'});
-        if(p===projectId){
+        if(p===projectId&&workspace===workspaceGeneration){
           await load();
-          if(p===projectId){message(action==='approve'?`批准成功：本次生成 v${result.version}，当前事实已更新；旧版本保留在历史中。`:'驳回成功：候选保留为已驳回，本次操作未修改当前事实。','#candidateFeedback');$('#candidateFeedback').focus()}
+          if(p===projectId&&workspace===workspaceGeneration){message(action==='approve'?`批准成功：本次生成 v${result.version}，当前事实已更新；旧版本保留在历史中。`:'驳回成功：候选保留为已驳回，本次操作未修改当前事实。','#candidateFeedback');$('#candidateFeedback').focus()}
         }
       }catch(e){
-        if(e.status===409&&p===projectId)await load();
+        if(e.status===409&&p===projectId&&workspace===workspaceGeneration)await load();
         throw e;
       }finally{for(const button of actions.querySelectorAll('button'))button.disabled=false}
     },'#candidateFeedback');actions.append(b);
@@ -290,24 +295,24 @@ async function load(){
   }catch(e){if(generation===contextGeneration&&p===projectId)message(`工作台加载失败：${e.message}。请刷新重试。`)}
   await Promise.all([facts,history,candidates,sources,audit]);
 }
-async function perform(fn,feedback=null){const p=projectId;if(feedback){message('');message('',feedback)}try{await fn()}catch(e){if(!feedback||p===projectId){message(e.message,feedback||'#notice');if(feedback)$(feedback).focus()}}}
+async function perform(fn,feedback=null){const p=projectId,workspace=workspaceGeneration;if(feedback){message('');message('',feedback)}try{await fn()}catch(e){if(p===projectId&&workspace===workspaceGeneration){message(e.message,feedback||'#notice');if(feedback)$(feedback).focus()}}}
 // Lock before awaiting so rapid clicks and keyboard submission share one in-flight action.
 async function submitOnce(target,fn,{feedback=null,progress='正在提交…'}={}){
   if(busyActions.has(target))return;
   busyActions.add(target);
-  const root=$(target),button=root.tagName==='BUTTON'?root:root.querySelector('button'),label=button.textContent,p=projectId;
+  const root=$(target),button=root.tagName==='BUTTON'?root:root.querySelector('button'),label=button.textContent,p=projectId,workspace=workspaceGeneration;
   root.setAttribute('aria-busy','true');button.disabled=true;button.textContent=progress;
   try{
     await perform(async()=>{message(progress,feedback||'#notice');await fn()},feedback);
   }finally{
     busyActions.delete(target);root.setAttribute('aria-busy','false');button.textContent=label;
-    if(p===projectId&&$(feedback||'#notice').textContent===progress)message('',feedback||'#notice');
+    if(p===projectId&&workspace===workspaceGeneration&&$(feedback||'#notice').textContent===progress)message('',feedback||'#notice');
     if(target==='#loginForm')button.disabled=false;else writeControls();
   }
 }
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
 $('#loginForm').onsubmit=e=>{e.preventDefault();submitOnce('#loginForm',async()=>{const f=new FormData(e.target);const x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=x.csrf;message('');$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));const b=el('button','切换账号');b.onclick=()=>perform(switchAccount);$('#identity').append(b);await loadProjects()},{progress:'正在登录…'})};
-$('#project').onchange=e=>{for(const id of ['#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
+$('#project').onchange=e=>{workspaceGeneration++;for(const id of ['#notice','#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
 $('#factsPrevious').onclick=()=>perform(()=>loadFacts({index:factState.index-1,focus:true}));
 $('#factsNext').onclick=()=>perform(()=>loadFacts({index:factState.index+1,focus:true}));
 $('#refreshWorkspace').onclick=()=>perform(load);
@@ -326,13 +331,14 @@ $('#sourceSearchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadSources({
 $('#sourcesPrevious').onclick=()=>perform(()=>loadSources({index:sourceState.index-1,focus:true}));
 $('#sourcesNext').onclick=()=>perform(()=>loadSources({index:sourceState.index+1,focus:true}));
 $('#refreshSources').onclick=()=>perform(()=>loadSources({reset:true}));
-$('#proposal').onsubmit=e=>{e.preventDefault();submitOnce('#proposal',async()=>{const p=projectId;await createRecord(`/api/projects/${p}/candidates`,Object.fromEntries(new FormData(e.target)));if(p!==projectId)return;message('候选已提交，等待负责人审批','#proposalFeedback');await load()},{feedback:'#proposalFeedback',progress:'正在提交候选…'})};
-$('#sourceForm').onsubmit=e=>{e.preventDefault();submitOnce('#sourceForm',async()=>{const p=projectId,body=Object.fromEntries(new FormData(e.target)),source=await createRecord(`/api/projects/${p}/sources`,body);if(p!==projectId)return;selectSource(source);if(JSON.stringify(Object.fromEntries(new FormData(e.target)))===JSON.stringify(body))e.target.reset();message(`来源 #${source.id} 已保存并选为依据`,'#sourceFeedback');await load()},{feedback:'#sourceFeedback',progress:'正在保存来源…'})};
+$('#proposal').onsubmit=e=>{e.preventDefault();submitOnce('#proposal',async()=>{const p=projectId,workspace=workspaceGeneration;proposalSubmissionGeneration++;await createRecord(`/api/projects/${p}/candidates`,Object.fromEntries(new FormData(e.target)));if(p!==projectId||workspace!==workspaceGeneration)return;message('候选已提交，等待负责人审批','#proposalFeedback');await load()},{feedback:'#proposalFeedback',progress:'正在提交候选…'})};
+$('#sourceForm').onsubmit=e=>{e.preventDefault();submitOnce('#sourceForm',async()=>{const p=projectId,workspace=workspaceGeneration,body=Object.fromEntries(new FormData(e.target)),source=await createRecord(`/api/projects/${p}/sources`,body);if(p!==projectId||workspace!==workspaceGeneration)return;selectSource(source);if(JSON.stringify(Object.fromEntries(new FormData(e.target)))===JSON.stringify(body))e.target.reset();message(`来源 #${source.id} 已保存并选为依据`,'#sourceFeedback');await load()},{feedback:'#sourceFeedback',progress:'正在保存来源…'})};
 async function simulated(value,fragment){
-  const p=projectId,page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(fragment)}&limit=1`);
+  const p=projectId,workspace=workspaceGeneration,page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(fragment)}&limit=1`);
+  if(p!==projectId||workspace!==workspaceGeneration)return;
   if(!page.sources.length)throw new Error('当前项目缺少此模拟场景的来源');
   await createRecord(`/api/projects/${p}/candidates`,{subject:'项目',predicate:'截止日',value,source_id:page.sources[0].id,expected_version:1});
-  if(p===projectId){message('模拟客户端已提交候选，尚未改变当前事实');await load()}
+  if(p===projectId&&workspace===workspaceGeneration){message('模拟客户端已提交候选，尚未改变当前事实');await load()}
 }
 $('#stale').onclick=()=>submitOnce('#stale',()=>simulated('25号','会议纪要'),{progress:'正在提交模拟候选…'});$('#injection').onclick=()=>submitOnce('#injection',()=>simulated('30号','外部文档'),{progress:'正在提交模拟候选…'});
 

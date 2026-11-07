@@ -40,11 +40,11 @@ async function openPage(){
   return {page,errors};
 }
 async function login(page){await page.locator('#loginForm button').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled)}
-async function hold(page,pattern){
+async function hold(page,pattern,method='POST'){
   let seen,finish;
   const observed=new Promise(resolve=>{seen=resolve}),completion=new Promise(resolve=>{finish=resolve}),requests=[];
   await page.route(pattern,async route=>{
-    if(route.request().method()!=='POST'){await route.fallback();return}
+    if(route.request().method()!==method){await route.fallback();return}
     requests.push(route.request());seen();
     const {status,body}=await completion;
     await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
@@ -156,5 +156,127 @@ test('simulated client has a pending lock and a usable narrow-screen recovery st
     assert.equal(await page.locator('#sourceForm [name=content]').evaluate(node=>getComputedStyle(node).outlineStyle),'solid');
     if(process.env.PRODUCT_EXPERIENCE_SCREENSHOT)await page.screenshot({path:process.env.PRODUCT_EXPERIENCE_SCREENSHOT,fullPage:true});
     assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+async function conflictFixture(page){
+  const source={id:1,title:'合成依据',content:'仅用于交互测试。'},alternative={id:2,title:'另一合成依据',content:'另一份人工草稿依据。'};
+  const candidate={id:10,subject:'合成冲突',predicate:'截止日',value:'原候选值',status:'pending',expected_version:0,source_id:1,source:source.title};
+  const proof={candidate,source,role:'owner',comparison:{matches:false,expectedVersion:0,currentVersion:2},current:{value:'当前批准值',version:2,source_id:2,candidate_id:11,source_title:alternative.title}};
+  await page.route('**/api/projects/1/sources?*',route=>route.fulfill({json:{sources:[source,alternative],next_after:null}}));
+  await page.route('**/api/projects/1/candidates?*',route=>route.fulfill({json:{candidates:[candidate],role:'owner',next_before:null}}));
+  await page.route('**/api/projects/1/candidates/10/source',route=>route.fulfill({json:proof}));
+  await login(page);await page.locator('#candidates').getByRole('button',{name:'核对来源原文',exact:true}).click();
+  const prepare=page.getByRole('button',{name:'用最新版本填写新候选',exact:true});await prepare.waitFor();
+  return {proof,prepare};
+}
+async function draft(page){return page.locator('#proposal').evaluate(form=>Object.fromEntries(new FormData(form)))}
+async function returnToFirstProject(page){
+  for(const id of ['2','1']){
+    await page.locator('#project').selectOption(id);
+    await page.waitForFunction(()=>document.querySelector('#sources').getAttribute('aria-busy')==='false'&&document.querySelector('#candidates').getAttribute('aria-busy')==='false');
+  }
+}
+
+test('conflict recovery preserves text, version and source edited during its read',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,prepare}=await conflictFixture(page),pending=await hold(page,'**/api/projects/1/candidates/10/source','GET');
+    await prepare.click();await pending.observed;
+    await page.locator('#proposal [name=value]').fill('刚编辑的草稿');
+    await page.locator('#proposal [name=expected_version]').fill('7');
+    await page.locator('#sourceSelect').selectOption('2');
+    const edited=await draft(page);pending.release(proof);
+    await page.locator('#candidateFeedback').getByText(/草稿.*已保留/).waitFor();
+    assert.deepEqual(await draft(page),edited);
+    assert.equal(await prepare.isEnabled(),true);
+    assert.equal(await page.locator('#proposalFeedback').textContent(),'');
+    assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('unchanged conflict recovery still fills the latest version without submitting',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {prepare}=await conflictFixture(page),writes=[];
+    page.on('request',request=>{if(request.method()==='POST')writes.push(request.url())});
+    await prepare.click();await page.locator('#proposalFeedback').getByText(/已用读取时 v2.*尚未提交/).waitFor();
+    assert.equal((await draft(page)).value,'原候选值');assert.equal((await draft(page)).expected_version,'2');assert.equal((await draft(page)).source_id,'1');
+    assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('a failed submission during conflict recovery keeps the original retry content',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,prepare}=await conflictFixture(page),reading=await hold(page,'**/api/projects/1/candidates/10/source','GET');
+    await prepare.click();await reading.observed;
+    const original=await draft(page),creation=await hold(page,'**/api/projects/1/candidates');
+    await page.locator('#proposal button').click();await creation.observed;
+    creation.release({error:'合成响应不确定'},503);await settled(page,'#proposal');
+    reading.release(proof);await page.locator('#candidateFeedback').getByText(/提交.*已保留/).waitFor();
+    assert.deepEqual(await draft(page),original);
+    assert.match(await page.locator('#proposalFeedback').textContent(),/写入结果可能不确定/);
+    assert.equal(await prepare.isEnabled(),true);assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('a source response from an earlier visit cannot select evidence or reload after A to B to A',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await page.locator('#addSourceShortcut').click();
+    await page.locator('#sourceForm [name=title]').fill('旧访问提交标题');await page.locator('#sourceForm [name=content]').fill('旧访问正文');
+    const creation=await hold(page,'**/api/projects/1/sources');
+    await page.locator('#sourceForm button').click();await creation.observed;
+    await returnToFirstProject(page);
+    await page.locator('#sourceForm [name=title]').fill('新访问的来源草稿');
+    let reads=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/api/projects/1/data')reads++});
+    creation.release({id:99,title:'旧访问提交标题'});await settled(page,'#sourceForm');
+    assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'新访问的来源草稿');
+    assert.equal(await page.locator('#sourceSelect').inputValue(),'1');
+    assert.equal(await page.locator('#sourceFeedback').textContent(),'');
+    assert.equal(reads,0);assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('an uncertain candidate error from an earlier visit does not replace new visit feedback',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);const creation=await hold(page,'**/api/projects/1/candidates');
+    await page.locator('#proposal button').click();await creation.observed;
+    await returnToFirstProject(page);
+    await page.locator('#sources').getByRole('button',{name:'选作依据',exact:true}).click();
+    const notice=await page.locator('#notice').textContent();
+    creation.release({error:'旧访问的合成写入故障'},503);await settled(page,'#proposal');
+    assert.equal(await page.locator('#proposalFeedback').textContent(),'');
+    assert.equal(await page.locator('#notice').textContent(),notice);
+    assert.equal(await page.locator('#proposal button').isEnabled(),true);assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('a simulated lookup from an earlier visit does not create a candidate after returning',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);
+    const lookup=await hold(page,url=>url.pathname==='/api/projects/1/sources'&&url.searchParams.get('limit')==='1','GET');
+    const writes=[];page.on('request',request=>{if(request.method()==='POST')writes.push(request.url())});
+    await page.locator('#stale').click();await lookup.observed;await returnToFirstProject(page);
+    lookup.release({sources:[{id:1,title:'合成会议纪要',content:'旧访问的来源。'}],next_after:null});await settled(page,'#stale');
+    assert.deepEqual(writes,[]);assert.equal(await page.locator('#notice').textContent(),'');
+    assert.equal(await page.locator('#stale').isEnabled(),true);assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('a late approval result cannot refresh or announce success in a new visit',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);const approval=await hold(page,'**/api/projects/1/candidates/10/approve');
+    await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).click();await approval.observed;
+    await returnToFirstProject(page);
+    let reads=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/api/projects/1/data')reads++});
+    const response=page.waitForResponse('**/api/projects/1/candidates/10/approve');approval.release({version:3});await response;
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.locator('#candidateFeedback').textContent(),'');assert.equal(reads,0);
+    assert.equal(await page.locator('#project').inputValue(),'1');assert.deepEqual(errors,[]);
   }finally{await page.close()}
 });
