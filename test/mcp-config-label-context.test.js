@@ -5,7 +5,7 @@ const {Client}=require('@modelcontextprotocol/sdk/client/index.js');
 const {StdioClientTransport}=require('@modelcontextprotocol/sdk/client/stdio.js');
 const {configuration}=require('../scripts/mcp-config');
 const script=path.resolve(__dirname,'../scripts/mcp-config.js');
-const usage='Usage: node scripts/mcp-config.js --host claude-desktop|vscode [--label-context]\n';
+const usage='Usage: node scripts/mcp-config.js --host claude-desktop|vscode [--label-context] [--history-context]\n';
 const entry=(value,host)=>value[host==='vscode'?'servers':'mcpServers'].memz;
 const inherited={MEMZ_PASSWORD:'synthetic-generator-private',MEMZ_USERNAME:'owner',MEMZ_BASE_URL:'https://synthetic.invalid/',MEMZ_PROJECT_ID:'2',MEMZ_MCP_ALLOW_PROPOSALS:'1',MEMZ_MCP_ENABLE_LABEL_CONTEXT:'1'};
 function generate(args,{file=script,cwd}={}){return spawnSync(process.execPath,[file,...args],{cwd,env:inherited,encoding:'utf8',timeout:10000})}

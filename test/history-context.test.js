@@ -41,3 +41,79 @@ test('history reports bounded timeout and authorization failures without raw err
   const slow=fixture();await assert.rejects(()=>readHistoryContext({totalTimeoutMs:1,fetchImpl:async(...args)=>{await new Promise(r=>setTimeout(r,10));return slow.fetchImpl(...args)}}),{code:'TOTAL_TIMEOUT'});
   assert.equal(slow.calls.at(-1).pathname,'/api/logout');
 });
+test('optional native signal rejects pre-cancelled or invalid callers before any HTTP',async()=>{
+  const controller=new AbortController();controller.abort(new Error('synthetic-private-cancel-reason'));let requests=0;
+  const fetchImpl=async()=>{requests++;throw new Error('synthetic-unexpected-request')};
+  await assert.rejects(()=>readHistoryContext({signal:controller.signal,fetchImpl}),{code:'REQUEST_CANCELLED',message:'REQUEST_CANCELLED'});
+  for(const signal of [null,true,1,'signal',{},[],new AbortController()])await assert.rejects(()=>readHistoryContext({signal,fetchImpl}),{code:'INVALID_SIGNAL'});
+  assert.equal(requests,0);
+});
+test('an uncancelled optional native signal preserves the original history JSON and request sequence',async()=>{
+  const one=fixture(),two=fixture();
+  const original=await readHistoryContext({fetchImpl:one.fetchImpl});
+  assert.deepEqual(await readHistoryContext({fetchImpl:two.fetchImpl,signal:new AbortController().signal}),original);
+  assert.deepEqual(two.calls.map(url=>url.href),one.calls.map(url=>url.href));
+});
+
+const {bounded,deferred,historyWire,respond,withHttp}=require('./mcp-history-fixture');
+for(const phase of ['login','history','proof'])for(const body of [false,true])test(`native history cancellation aborts real ${phase} ${body?'body':'headers'} with bounded session cleanup`,{timeout:10000},async()=>{
+  const caller=new AbortController(),started=deferred(),closed=deferred(),wire=historyWire();let independent=false;
+  const target=path=>phase==='login'?path==='/api/login':phase==='history'?path.startsWith('/api/projects/7/history?'):path==='/api/projects/7/facts/provenance';
+  await withHttp((request,reply)=>{
+    if(target(request.path)){
+      reply.res.once('close',closed.resolve);
+      if(body){reply.res.writeHead(200,{'content-type':'application/json',...(phase==='login'?{'set-cookie':'sid=synthetic-unknown-login; HttpOnly'}:{})});reply.res.write('{"unfinished":')}
+      if(!body)started.resolve();return;
+    }
+    respond(request,reply,wire);
+  },async({baseURL,requests})=>{
+    const fetchImpl=async(url,options)=>{
+      if(new URL(url).pathname==='/api/logout')independent=caller.signal.aborted&&!options.signal.aborted;
+      const response=await fetch(url,options);if(body&&target(new URL(url).pathname+new URL(url).search))started.resolve();return response;
+    };
+    const rejected=assert.rejects(readHistoryContext({baseURL,projectId:7,signal:caller.signal,fetchImpl,timeoutMs:1000,totalTimeoutMs:3000}),error=>error.code==='REQUEST_CANCELLED'&&error.message==='REQUEST_CANCELLED'&&error.cause===undefined);
+    await bounded(started.promise,'observing real history cancellation target');caller.abort(new Error('synthetic-private-reason'));
+    await rejected;await bounded(closed.promise,'closing cancelled history connection');
+    assert.equal(requests.at(-1).path,phase==='login'?'/api/login':'/api/logout');
+    assert.equal(requests.length,phase==='login'?1:phase==='history'?3:4);
+    if(phase!=='login')assert.equal(independent,true);
+  });
+});
+test('history cancellation during completed read cleanup cannot return data, and failed logout preserves the primary read error',{timeout:10000},async()=>{
+  const caller=new AbortController();
+  await withHttp((request,reply)=>{
+    if(request.path==='/api/logout'){caller.abort(new Error('synthetic-private-late-cancel'));reply.send({ok:true});return}respond(request,reply);
+  },async({baseURL})=>{await assert.rejects(()=>readHistoryContext({baseURL,projectId:7,signal:caller.signal}),{code:'REQUEST_CANCELLED'})});
+  await withHttp((request,reply)=>{
+    if(request.path.includes('/history?'))reply.send({error:'synthetic-private-read-error'},403);
+    else if(request.path==='/api/logout')reply.send({error:'synthetic-private-cleanup-error'},500);
+    else respond(request,reply);
+  },async({baseURL})=>{await assert.rejects(()=>readHistoryContext({baseURL,projectId:7}),{code:'HTTP_403',message:'HTTP_403',status:403})});
+});
+test('history non-OK and logout401 unfinished bodies close without exposing raw errors',{timeout:10000},async()=>{
+  const historyClosed=deferred(),logoutClosed=deferred();
+  await withHttp((request,reply)=>{
+    if(request.path.includes('/history?')){reply.res.once('close',historyClosed.resolve);reply.res.writeHead(403,{'content-type':'application/json'});reply.res.write('{"error":"synthetic-private-unfinished');return}
+    if(request.path==='/api/logout'){reply.res.once('close',logoutClosed.resolve);reply.res.writeHead(401,{'content-type':'application/json'});reply.res.write('{"unfinished":');return}respond(request,reply);
+  },async({baseURL})=>{await assert.rejects(()=>readHistoryContext({baseURL,projectId:7}),{code:'HTTP_403',message:'HTTP_403',status:403});await bounded(Promise.all([historyClosed.promise,logoutClosed.promise]),'closing failed history and logout401 bodies')});
+});
+test('a cancelled history read retains its primary error while independent logout times out',{timeout:10000},async()=>{
+  const caller=new AbortController(),started=deferred(),closed=deferred();
+  await withHttp((request,reply)=>{
+    if(request.path.includes('/history?')){started.resolve();return}
+    if(request.path==='/api/logout'){reply.res.once('close',closed.resolve);reply.res.writeHead(200,{'content-type':'application/json'});reply.res.write('{"unfinished":');return}respond(request,reply);
+  },async({baseURL,requests})=>{
+    const rejected=assert.rejects(readHistoryContext({baseURL,projectId:7,signal:caller.signal,timeoutMs:150,totalTimeoutMs:2000}),{code:'REQUEST_CANCELLED'});
+    await bounded(started.promise,'waiting for held historical read');caller.abort();await rejected;await bounded(closed.promise,'bounded independent history logout');assert.equal(requests.at(-1).path,'/api/logout');
+  });
+});
+test('history CLI rejects signal/stdin/unknown arguments before issuing HTTP',{timeout:10000},async()=>{
+  const {spawnSync}=require('node:child_process'),path=require('node:path');
+  await withHttp(()=>assert.fail('Unsupported CLI input must not call HTTP'),async({baseURL,requests})=>{
+    for(const args of [['--stdin'],['--signal','synthetic-private'],['--unknown']]){
+      const child=spawnSync(process.execPath,[path.resolve(__dirname,'../scripts/history-context.js'),...args],{env:{MEMZ_BASE_URL:baseURL},input:'{"signal":"synthetic-private"}',encoding:'utf8',timeout:3000});
+      assert.equal(child.status,1);assert.equal(child.stdout,'');assert.equal(child.stderr,'INVALID_ARGUMENTS\n');
+    }
+    assert.equal(requests.length,0);
+  });
+});

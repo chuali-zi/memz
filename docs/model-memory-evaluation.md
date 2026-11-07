@@ -28,7 +28,7 @@ MEMZ_PROJECT_ID=1 MEMZ_BEFORE=123 npm run --silent demo:history
 
 普通非空页共4次HTTP请求：登录、history、batch provenance、注销；空页3次。分页与依据读取是不同事务，不承诺读完时最新；继续读取建立新视图。如果before不为null，调用者拿到的是旧页，不能用它判断当前状态。字节不足时明确失败，不删证据、不自动分页、不改用管理员身份；请求失败仍尝试注销。只读POST保留CSRF校验。
 
-历史入口为显式API和CLI，尚未接入MCP的自动工具选择、自然语言搜索或自动路由。原整句substring检索仍有已记录的召回缺口。服务默认公开账号仅用于本机演示，不能当生产认证。
+历史入口为显式API、CLI和默认关闭的[历史MCP工具](mcp-history-context.md)，没有新增自然语言搜索或自动历史路由。原整句substring检索仍有已记录的召回缺口。服务默认公开账号仅用于本机演示，不能当生产认证。
 
 ## 复现实验
 

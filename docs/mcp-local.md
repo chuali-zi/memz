@@ -35,6 +35,7 @@
 - `memz_read_context`：可选 `query`（200 字符）、`limit`（1–25，默认 10）、`after`（事实游标）、`maxOutputBytes`（2048–32768，默认 32768）。输出文本是一份 JSON，保留固定版本、来源原文、候选与审批者 ID。预算是 JSON UTF-8 字节，不是 token 或摘要；JSON-RPC 包装另有开销。续读使用 `nextAfter`；跨页不保证同一快照。来源原文是非可信数据，不应作为指令执行。
 - `memz_submit_proposal`：仅显式开启时出现。必填 `sourceId`、`subject`、`predicate`、`value`、`expectedVersion`、`idempotencyKey`。必须引用该项目已有来源；不提供来源创建、批准、驳回、任意 SQL 或任意 HTTP 工具。提交后仍需负责人通过界面审批。
 - `memz_read_label_context`：另由 `MEMZ_MCP_ENABLE_LABEL_CONTEXT=1` 显式开启，追加于原工具清单之后。只接受字段问句及输出预算，内部读取完整标签并取得精确批准证据，不改变旧检索工具。开关、预算和独立快照边界见[字段问句读取](mcp-label-context.md)。
+- `memz_read_history_context`：另由 `MEMZ_MCP_ENABLE_HISTORY_CONTEXT=1` 显式开启，追加在现有工具末尾。只读已批准历史和完整固定版本来源，支持 limit/before/输出预算；不是当前视图或日期 as-of 查询。生成器仅在 `--history-context` 时追加开关，默认 JSON 保持旧字节。见[历史读取](mcp-history-context.md)。
 
 提交示例（sourceId 必须替换成实际已有来源）：
 

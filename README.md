@@ -1,6 +1,6 @@
 # Memz · 可审计的项目上下文记忆
 
-面向项目协作智能体的数据库演示：把来源、候选、负责人审批、不可变修订和审计连接起来。默认演示客户端为明确标注的模拟程序，不调用模型；独立实验器可显式调用DeepSeek；数据与账号均为合成样例。项目正从演示原型推进工程化，仍不具备公开生产部署所需的身份认证等能力。
+为项目智能体维护可审计的已批准上下文：提议关联来源，经负责人审批后形成不可变修订，可回查当前值、旧版本和原文。网页、HTTP与MCP客户端真实访问本机数据库；MCP默认只读，页面的模拟agent按钮明确标注为模拟，不调用模型。账号与初始数据均为公开合成样例，尚不具备公开生产部署所需的身份认证等能力。
 
 ## 与只保存聊天记录有什么不同？
 
@@ -140,6 +140,15 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 需要同时接入来源写入时，按[来源到候选的两步流程](docs/source-client.md)先调用source-client，再将实际返回的sourceId绑定到proposal-client。两个步骤独立保留幂等键，部分失败不会自动删除来源或批准候选。
 
 本机智能体可使用 [MCP stdio 兼容适配](docs/mcp-local.md)：固定项目、默认只读，显式开启后可提交待审；支持 2025-11-25 握手，不提供审批工具。
+
+| 使用目的 | MCP工具 | 开启方式 |
+| --- | --- | --- |
+| 读取当前批准事实与依据 | `memz_read_context` | 默认提供，字面关键词匹配 |
+| 按明确字段问句读取当前值 | `memz_read_label_context` | 配置生成时加 `--label-context`；固定模板，不是语义搜索 |
+| 回查批准历史、旧值与完整原文 | `memz_read_history_context` | 配置生成时加 `--history-context`；每次一页，显式续读 |
+| 提出变更供负责人审批 | `memz_submit_proposal` | 按MCP说明单独开启；只创建pending候选 |
+
+两个只读选项可以一起使用，例如 `node scripts/mcp-config.js --host vscode --label-context --history-context`。配置生成器始终关闭提议工具。历史读取的分页、整份输出预算和取消边界见[历史MCP接入](docs/mcp-history-context.md)；它不提供任意日期的生效时间查询，也不会自动遍历全部历史。
 
 宿主配置可用 `node scripts/mcp-config.js --host claude-desktop` 或 `--host vscode` 生成，只输出待审阅 JSON，不修改用户设置。可用[显式字段问句配置](docs/mcp-config-label-context.md)加入 `--label-context`，提议工具仍关闭。
 

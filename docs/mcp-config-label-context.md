@@ -22,7 +22,7 @@ Claude Desktop片段继续使用顶层 `mcpServers`；VS Code片段继续使用�
 
 开关可以放在 `--host` 前或后，每项只能出现一次；未知host、未知参数、重复参数、`--label-context=1` 或附带值均退出1，stdout为空，只打印固定usage，不回显输入。
 
-模块调用保持旧API，可显式提供唯一的可选布尔字段：
+模块调用保持旧API，原有 `labelContext` 可选布尔字段保持兼容；新增历史选项见[历史接入](mcp-history-context.md)：
 
 ```js
 const {configuration}=require('./scripts/mcp-config');
