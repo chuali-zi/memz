@@ -95,6 +95,11 @@ async function hold(page,pattern,method='POST'){
 }
 async function submitTwice(page,selector){await page.evaluate(selector=>{const form=document.querySelector(selector);form.requestSubmit();form.requestSubmit()},selector)}
 async function settled(page,selector){await page.waitForFunction(selector=>document.querySelector(selector).getAttribute('aria-busy')==='false',selector)}
+function healthyCreationReceipt(request,id){
+  const body=request.postDataJSON(),path=new URL(request.url()).pathname,project=Number(path.split('/')[3]);
+  return path.endsWith('/sources')?{id,project_id:project,title:body.title.trim(),content:body.content.trim()}:
+    {id,project_id:project,subject:body.subject.trim(),predicate:body.predicate.trim(),value:body.value.trim(),source_id:Number(body.source_id),expected_version:Number(body.expected_version),status:'pending',proposed_by:2,created_at:'2026-11-07T00:00:00.000Z'};
+}
 
 test('login announces its pending state and only sends one in-flight request',async()=>{
   const {page,errors}=await openPage();
@@ -135,7 +140,7 @@ test('uncertain creation retains input and reuses its key after manual retry',as
     const retry=await hold(page,'**/api/projects/1/sources');
     await page.locator('#sourceForm button').click();await retry.observed;
     assert.equal(retry.requests[0].headers()['idempotency-key'],pending.requests[0].headers()['idempotency-key']);
-    retry.release({id:7,title:'合成待保存来源'});await settled(page,'#sourceForm');
+    retry.release(healthyCreationReceipt(retry.requests[0],7));await settled(page,'#sourceForm');
     assert.equal(await page.locator('#sourceSelect').inputValue(),'7');
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'');
     assert.match(await page.locator('#sourceFeedback').textContent(),/来源 #7 已保存/);
@@ -151,7 +156,7 @@ test('successful source creation preserves a draft edited while its response was
     const pending=await hold(page,'**/api/projects/1/sources');
     await page.locator('#sourceForm button').click();await pending.observed;
     await page.locator('#sourceForm [name=title]').fill('下一份来源草稿');
-    pending.release({id:8,title:'已提交标题'});await settled(page,'#sourceForm');
+    pending.release(healthyCreationReceipt(pending.requests[0],8));await settled(page,'#sourceForm');
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'下一份来源草稿');
     assert.equal(await page.locator('#sourceSelect').inputValue(),'8');
     assert.deepEqual(errors,[]);
@@ -171,7 +176,7 @@ test('a late candidate response cannot announce success or reload another projec
     await page.locator('#project').selectOption('2');
     await page.waitForFunction(()=>document.querySelector('#sources').getAttribute('aria-busy')==='false');
     assert.equal(await page.locator('#proposal button').isDisabled(),true);
-    pending.release({id:9});await settled(page,'#proposal');
+    pending.release(healthyCreationReceipt(pending.requests[0],9));await settled(page,'#proposal');
     assert.equal(await page.locator('#project').inputValue(),'2');
     assert.equal(await page.locator('#proposalFeedback').textContent(),'');
     assert.equal(reads,1,'only project selection loads project two');
@@ -273,7 +278,7 @@ test('a source response from an earlier visit cannot select evidence or reload a
     await returnToFirstProject(page);
     await page.locator('#sourceForm [name=title]').fill('新访问的来源草稿');
     let reads=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/api/projects/1/data')reads++});
-    creation.release({id:99,title:'旧访问提交标题'});await settled(page,'#sourceForm');
+    creation.release(healthyCreationReceipt(creation.requests[0],99));await settled(page,'#sourceForm');
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'新访问的来源草稿');
     assert.equal(await page.locator('#sourceSelect').inputValue(),'1');
     assert.equal(await page.locator('#sourceFeedback').textContent(),'');
@@ -355,7 +360,7 @@ test('creation deadline unlocks the form, preserves input and reuses its key onl
     const retry=await hold(page,'**/api/projects/1/candidates');
     await page.locator('#proposal button').click();await retry.observed;
     assert.equal(retry.requests[0].headers()['idempotency-key'],pending.requests[0].headers()['idempotency-key']);
-    retry.release({id:71});pending.release({id:71});await settled(page,'#proposal');
+    retry.release(healthyCreationReceipt(retry.requests[0],71));pending.release(healthyCreationReceipt(pending.requests[0],71));await settled(page,'#proposal');
     assert.match(await page.locator('#proposalFeedback').textContent(),/候选已提交/);assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
@@ -376,7 +381,7 @@ for(const failure of ['network','invalid-200','invalid-409'])test(`${failure} is
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'合成网络恢复草稿');assert.equal(sent.length,1);
     const retry=await hold(page,'**/api/projects/1/sources');await page.locator('#sourceForm button').click();await retry.observed;
     assert.equal(retry.requests[0].headers()['idempotency-key'],sent[0].headers()['idempotency-key']);
-    retry.release({id:72,title:'合成网络恢复草稿'});await settled(page,'#sourceForm');assert.deepEqual(errors,[]);
+    retry.release(healthyCreationReceipt(retry.requests[0],72));await settled(page,'#sourceForm');assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
 
@@ -988,7 +993,7 @@ for(const mode of ['large-200','large-403','utf8-403'])test(`real HTTP ${mode} c
     const keys=[];let recover=false,disconnected;
     await realHTTP(page,'/api/projects/1/sources',(req,res)=>{
       keys.push(req.headers['idempotency-key']);
-      if(recover){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({id:81,title:'真实HTTP合成重试来源'}));return}
+      if(recover){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({id:81,project_id:1,title:'真实HTTP合成重试来源',content:'失败时保留的原文'}));return}
       if(mode==='utf8-403'){res.writeHead(403,{'Content-Type':'application/json'});res.end(Buffer.concat([Buffer.from('{"error":"'),Buffer.from([0xff]),Buffer.from('"}')]))}
       else disconnected=oversizedOpenBody(res,mode==='large-403'?403:200);
     },{method:'POST'});
@@ -1188,7 +1193,7 @@ for(const form of ['sourceForm','proposal'])test(`a ${form} failure with lost fo
     const retry=await hold(page,`**/api/projects/1/${endpoint}`);await page.keyboard.press('Enter');await retry.observed;
     assert.equal(retry.requests[0].headers()['idempotency-key'],pending.requests[0].headers()['idempotency-key']);
     assert.deepEqual(retry.requests[0].postDataJSON(),initial);
-    retry.release(form==='sourceForm'?{id:7,title:initial.title}:{id:8});await settled(page,`#${form}`);
+    retry.release(healthyCreationReceipt(retry.requests[0],form==='sourceForm'?7:8));await settled(page,`#${form}`);
     assert.match(await page.locator(feedback).textContent(),form==='sourceForm'?/来源 #7 已保存/:/候选已提交/);assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
@@ -1362,4 +1367,48 @@ for(const kind of ['data','detail'])test(`a stale ${kind} 403 cannot deny a newe
     const response=page.waitForResponse(r=>new URL(r.url()).pathname===(kind==='data'?'/api/projects/1/data':'/api/projects/1/facts/41/provenance')&&r.status()===403);release();await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     assert.equal(await page.locator('#project').inputValue(),'1');assert.equal(await page.locator('#proposal button').isEnabled(),true);assert.doesNotMatch(await page.locator('#projectAccess').textContent(),/读取被拒绝/);assert.equal(await page.locator('#project').evaluate(node=>node===document.activeElement),true);assert.deepEqual(errors,[]);
   }finally{release?.();await closePage(page)}
+});
+
+for(const form of ['sourceForm','proposal'])test(`${form} rejects wrong complete JSON creation receipts before clearing its key or changing drafts`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);
+    if(form==='sourceForm'){await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill(' 原始标题😀 ');await page.locator('#sourceForm [name=content]').fill(' 原始全文😀\n ')}
+    else for(const name of ['subject','predicate','value'])await page.locator(`#proposal [name=${name}]`).fill(' 原始'+name+'😀 ');
+    const initial=await page.locator('#'+form).evaluate(node=>Object.fromEntries(new FormData(node))),feedback=form==='sourceForm'?'#sourceFeedback':'#proposalFeedback',endpoint=form==='sourceForm'?'sources':'candidates',keys=[];
+    const changes=[wire=>({...wire,project_id:2}),wire=>({...wire,id:0}),wire=>({...wire,id:'91'}),()=>({}),()=>null,()=>[],wire=>{const copy={...wire};delete copy.project_id;return copy},wire=>({...wire,[form==='sourceForm'?'title':'value']:'synthetic-private-receipt'})];
+    if(form==='sourceForm')changes.push(wire=>({...wire,content:'different full text'}));else changes.push(wire=>({...wire,source_id:2}),wire=>({...wire,expected_version:99}),wire=>({...wire,source_id:String(wire.source_id)}),wire=>({...wire,status:'approved'}));
+    for(const change of changes){
+      const pending=await hold(page,`**/api/projects/1/${endpoint}`);await page.locator('#'+form+' button').focus();await page.keyboard.press('Enter');await pending.observed;keys.push(pending.requests[0].headers()['idempotency-key']);pending.release(change(healthyCreationReceipt(pending.requests[0],91)));await settled(page,'#'+form);
+      assert.match(await page.locator(feedback).textContent(),/创建回执格式异常.*写入结果可能不确定/);assert.ok(!(await page.locator(feedback).textContent()).includes('synthetic-private'));assert.deepEqual(await page.locator('#'+form).evaluate(node=>Object.fromEntries(new FormData(node))),initial);assert.equal(await page.locator('#sourceSelect').inputValue(),'1');
+    }
+    const valid=await hold(page,`**/api/projects/1/${endpoint}`);await page.locator('#'+form+' button').focus();await page.keyboard.press('Enter');await valid.observed;keys.push(valid.requests[0].headers()['idempotency-key']);valid.release({...healthyCreationReceipt(valid.requests[0],91),unusedMetadata:'synthetic-unused'});await settled(page,'#'+form);
+    assert.equal(new Set(keys).size,1);assert.match(await page.locator(feedback).textContent(),form==='sourceForm'?/来源 #91 已保存/:/候选已提交/);assert.equal(await page.evaluate(()=>pendingCreations.size),0);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+for(const form of ['sourceForm','proposal'])for(const first of ['lost','503'])test(`${form} ${first} then write403 keeps one key through permission reactivation and verified success`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);if(form==='sourceForm'){await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('同一来源意图');await page.locator('#sourceForm [name=content]').fill('不能丢失的全文')}
+    const endpoint=form==='sourceForm'?'sources':'candidates',feedback=form==='sourceForm'?'#sourceFeedback':'#proposalFeedback',keys=[];let attempts=0;
+    await page.route(`**/api/projects/1/${endpoint}`,async route=>{if(route.request().method()!=='POST')return route.fallback();attempts++;keys.push(route.request().headers()['idempotency-key']);if(attempts===1&&first==='lost')return route.abort();return route.fulfill({status:attempts===1?503:403,json:{error:'合成写入响应不确定或当前拒绝'}})});
+    const original=await page.locator('#'+form).evaluate(node=>Object.fromEntries(new FormData(node)));
+    for(let i=0;i<2;i++){await page.locator('#'+form+' button').focus();await page.keyboard.press('Enter');await settled(page,'#'+form);assert.match(await page.locator(feedback).textContent(),/写入结果可能不确定/);assert.deepEqual(await page.locator('#'+form).evaluate(node=>Object.fromEntries(new FormData(node))),original)}
+    await page.route('**/api/projects/1/audit?*',route=>route.fulfill({status:403,json:{error:'合成项目读取拒绝'}}));await page.locator('#refreshAudit').focus();await page.keyboard.press('Enter');await page.locator('#projectAccess').getByText(/读取被拒绝/).waitFor();assert.equal(await page.locator('#'+form+' button').isDisabled(),true);
+    await page.unroute('**/api/projects/1/audit?*');await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);await settledLists(page);
+    const pending=await hold(page,`**/api/projects/1/${endpoint}`);await page.locator('#'+form+' button').focus();await page.keyboard.press('Enter');await pending.observed;keys.push(pending.requests[0].headers()['idempotency-key']);pending.release(healthyCreationReceipt(pending.requests[0],92));await settled(page,'#'+form);
+    assert.equal(keys.length,3,'only manual submissions send writes');assert.equal(new Set(keys).size,1);assert.match(await page.locator(feedback).textContent(),form==='sourceForm'?/来源 #92 已保存/:/候选已提交/);assert.equal(await page.evaluate(()=>pendingCreations.size),0);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+for(const scenario of ['stale','injection'])test(`${scenario} simulated client rejects a mismatched candidate receipt and manually retries the same intent`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);const keys=[],draftBefore=await draft(page);let writes=0;page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname.startsWith('/api/projects/'))writes++});
+    for(const valid of [false,true]){
+      const pending=await hold(page,'**/api/projects/1/candidates');await page.locator('#'+scenario).focus();await page.keyboard.press('Enter');await pending.observed;keys.push(pending.requests[0].headers()['idempotency-key']);const wire=healthyCreationReceipt(pending.requests[0],93);pending.release(valid?wire:{...wire,status:'approved'});await settled(page,'#'+scenario);
+      assert.match(await page.locator('#notice').textContent(),valid?/模拟客户端已提交候选，尚未改变当前事实/:/创建回执格式异常.*写入结果可能不确定/);assert.deepEqual(await draft(page),draftBefore);
+    }
+    assert.equal(writes,2,'manual proposals never issue approval requests');assert.equal(new Set(keys).size,1);assert.equal(await page.evaluate(()=>pendingCreations.size),0);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
 });

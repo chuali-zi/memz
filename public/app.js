@@ -42,17 +42,37 @@ async function api(path,opts={}){
     if(reader){try{reader.releaseLock()}catch{}}
   }
 }
-const pendingCreations=new Map(),busyActions=new Set();
+const pendingCreations=new Map(),uncertainCreationKeys=new Set(),busyActions=new Set();
+function validateCreationReceipt(path,body,result){
+  const invalid=()=>{throw new Error('创建回执格式异常，请稍后重试')};
+  const match=/^\/api\/projects\/([0-9]+)\/(sources|candidates)$/.exec(path);
+  const integer=(value,min)=>{
+    if(typeof value!=='number'&&!(typeof value==='string'&&/^[0-9]+$/.test(value)))invalid();
+    const number=Number(value);if(!Number.isInteger(number)||number<min||number>2147483647)invalid();return number;
+  };
+  const text=(value,max)=>{if(!receiptText(value)||!value.trim()||value.length>max)invalid();return value.trim()};
+  if(!match||!receiptRecord(body,[])||!receiptRecord(result,['id','project_id'])||!receiptId(result.id)||result.project_id!==integer(match[1],1))invalid();
+  const fields=match[2]==='sources'?{title:150,content:4000}:{subject:100,predicate:100,value:1000};
+  for(const [field,max] of Object.entries(fields))if(!Object.hasOwn(body,field)||!Object.hasOwn(result,field)||result[field]!==text(body[field],max))invalid();
+  if(match[2]==='candidates'&&(!receiptRecord(body,['source_id','expected_version'])||!receiptRecord(result,['source_id','expected_version','status'])||result.source_id!==integer(body.source_id,1)||result.expected_version!==integer(body.expected_version,0)||result.status!=='pending'))invalid();
+}
 async function createRecord(path,body){
   const encoded=JSON.stringify(body),intent=JSON.stringify([path,encoded]);
   let key=pendingCreations.get(intent);
   if(!key){key=crypto.randomUUID();pendingCreations.set(intent,key)}
   try{
     const result=await api(path,{method:'POST',headers:{'Idempotency-Key':key},body:encoded});
+    // Bind acceptance to the bytes sent, even if the caller edits its object
+    // while the request is in flight. Unused server metadata is not evidence.
+    validateCreationReceipt(path,JSON.parse(encoded),result);
+    uncertainCreationKeys.delete(key);
     if(pendingCreations.get(intent)===key)pendingCreations.delete(intent);return result;
   }catch(error){
-    if(error.status>=400&&error.status<500&&pendingCreations.get(intent)===key)pendingCreations.delete(intent);
-    if(!error.status||error.status>=500){
+    const unknown=!error.status||error.status>=500;
+    if(unknown&&pendingCreations.get(intent)===key)uncertainCreationKeys.add(key);
+    const uncertain=unknown||uncertainCreationKeys.has(key);
+    if(!uncertain&&error.status>=400&&error.status<500&&pendingCreations.get(intent)===key)pendingCreations.delete(intent);
+    if(uncertain){
       if(!error.message.includes('写入结果可能不确定'))error.message+='。写入结果可能不确定';
       error.message+='。请保持本页和内容不变，恢复后再次提交；系统会复用本次请求。不要刷新页面或修改内容后重试。';
     }
