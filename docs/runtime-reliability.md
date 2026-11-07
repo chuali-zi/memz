@@ -57,8 +57,12 @@ npm run test:outage
 
 `PORT` 省略或为空时使用3000；显式值只接受1至5位十进制数字、范围0至65535，转换成数字后监听本机TCP。0用于自动选择空闲端口，启动日志显示实际端口。非数字不能被Node当成Unix socket路径。非法配置或端口占用退出1，只打印固定诊断，不输出提供的值或堆栈；导入模块不检查CLI端口、不启动监听。
 
-`npm start` 收到SIGTERM或SIGINT后停止接收新工作，等待已进入的HTTP请求完成再关闭连接池，成功退出0；已接收连接上的后续请求返回503和Connection: close。重复信号不重复关闭或延长期限。HTTP排空与pool.end共用20秒期限，失败或到期退出1，只打印固定诊断，不强制release仍被事务占用的客户端。直接require(server.js)的测试或宿主自行拥有server和pool，不自动接管进程信号。
+`npm start` 保留为交互开发入口。前台终端的Ctrl+C通常向整个前台进程组发送SIGINT，与只向npm PID发送信号不同：npm包装进程的PID不等于应用PID，也不保证转发信号。本机合成验证中，只向npm PID发送SIGTERM后npm退出、应用仍能响应存活探针；只发送SIGINT时也未观察到应用排空。该验证使用本机临时端口及存活探针，不连接数据库，最终清理自己创建的进程组。
+
+需要supervisor或精确PID信号停止时，启动项直接执行 `node server.js`，使用exec形式让监督器管理应用进程；若必须经shell启动，最后使用 `exec node server.js`。这是服务进程入口说明，不是部署配置。`node server.js` 应用进程收到SIGTERM或SIGINT后停止接收新工作，等待已进入的HTTP请求完成再关闭连接池，成功退出0；已接收连接上的后续请求返回503和Connection: close。重复信号不重复关闭或延长期限。HTTP排空与pool.end共用20秒期限，失败或到期退出1，只打印固定诊断，不强制release仍被事务占用的客户端。直接require(server.js)的测试或宿主自行拥有server和pool，不自动接管进程信号。
 
 成功监听后的HTTP server error进入同一个有界排空流程并退出1，固定诊断不含原始异常。重复error或信号只触发一次pool关闭；不会把运行时错误误当启动失败而留下已结束连接池的活监听器。
 
 期限依赖事件循环可运行，不能抢占同步死循环；外部进程监督仍需要自己的最终停止期限。卡住handler、卡住pool.end和真实PG锁等待已分别设计合成回归，不把连接排空称为任意故障下无数据损失保证。
+
+直接Node子进程的正向回归见 `node --test test/server-shutdown.test.js test/startup-validation.test.js`：信号测试通过与CLI相同的生命周期模块覆盖在途HTTP完成、重复信号、连接门禁及实际20秒期限；启动校验直接执行 `server.js`。它们不把npm包装进程当作应用，也不验证任何实际supervisor配置。

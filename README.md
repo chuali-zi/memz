@@ -22,6 +22,8 @@ docker compose up -d --wait
 node scripts/check-setup.js && npm start
 ```
 
+`npm start` 用于交互开发，前台终端的 Ctrl+C 通常发送给整个前台进程组。需要 supervisor 或精确 PID 信号停止服务时，启动项应直接执行 `node server.js`（exec 形式），让信号送达应用进程；不要假设 npm PID 就是应用 PID。停止与排空边界见[运行可靠性](docs/runtime-reliability.md#命令行服务启动与退出)。
+
 访问 http://127.0.0.1:3000 。首次启动时 `db/schema.sql` 由 PostgreSQL 的初始化入口以迁移 owner 执行，创建应用角色、表、RLS 和种子。可用账号：`owner` / `demo-owner`、`member` / `demo-member`、`viewer` / `demo-viewer`、`other` / `demo-other`。这些凭据是公开的，仅供演示。
 
 重置会**删除本项目数据库卷里的所有数据**，并重新迁移和导入合成样例：
@@ -39,14 +41,25 @@ docker compose up -d --wait
 
 ## 保留数据升级
 
-`001-current-revision-integrity.sql` 加强当前修订约束，`002-create-idempotency.sql` 增加创建回执表；二者支持原始schema与当前新安装版本，可重复执行，不修改已有事实、来源、候选、历史、审计或序列。每个脚本是独立事务，按编号顺序执行。先暂停应用写入，备份并确认备份可用，再以 schema owner 执行：
+`001-current-revision-integrity.sql` 加强当前修订约束，`002-create-idempotency.sql` 增加创建回执表；二者支持原始schema与当前新安装版本，可重复执行，不修改已有事实、来源、候选、历史、审计或序列。每个脚本是独立事务，按编号顺序执行。先暂停应用写入，在仓库根目录、确认当前 Compose 项目就是待维护数据库后创建备份：
 
 ```sh
-mkdir -p backups
-docker compose exec -T db pg_dump -U postgres -d memz -Fc > backups/before-001.dump
-docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/001-current-revision-integrity.sql
+memz_backup=$(sh scripts/backup-before-migration.sh) &&
+printf '备份保存于：%s\n' "$memz_backup"
+```
+
+脚本仅创建本次独有目录中的私有 `.dump`，不覆盖旧备份，不执行迁移；失败非零退出、stdout为空，仅清理本次文件。随后必须对**输出的本次备份**在独立空库实际恢复并验证，再决定继续；[随机库恢复测试](docs/backup-recovery.md)通过或仅能列出归档目录，都不能证明本次文件可恢复。
+
+确认本次恢复验证通过后，回到同一终端的仓库根目录，以 schema owner 执行：
+
+```sh
+test -n "${memz_backup:-}" &&
+test -s "$memz_backup" &&
+docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/001-current-revision-integrity.sql &&
 docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/002-create-idempotency.sql
 ```
+
+这两个 `test` 只防止备份步骤失败或文件丢失后误继续，不是恢复核验。备份失败会清空本次变量；任一前提或001失败都会短路后续迁移，不依赖 `set -e`。已有库和旧备份始终保留，不自动恢复或降级。
 
 迁移在单事务内锁定 facts/revisions 并验证既有数据。锁等待超过 5 秒或单条语句超过 60 秒即失败；安排维护窗口，确认没有活跃长事务后重试。若现有指针指向错误事实、版本不匹配或正版本缺少指针，迁移会报错并整体回滚，业务数据保留；不要用删除数据来绕过校验，应先核对来源与历史。迁移成功后再启动应用。此脚本不提供自动降级，不是通用迁移框架。
 
