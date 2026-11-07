@@ -5,7 +5,9 @@ const {parseSearchQuery}=require('./scripts/search-query');
 const {SNAPSHOT_MAX_BYTES,snapshotReceipt}=require('./scripts/context-snapshot');
 const {SessionStore,SESSION_TTL_MS}=require('./scripts/session-store');
 const {databasePoolOptions,databaseErrorKind,safeErrorCode,runTransaction}=require('./scripts/database');
+const {createShutdownGate,installShutdown}=require('./scripts/server-lifecycle');
 const app=express();
+const shutdownGate=createShutdownGate();
 const pool=new Pool(databasePoolOptions(process.env.DATABASE_URL || 'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz'));
 // pg removes failed idle clients before emitting this event; later requests reconnect.
 // Do not log the error/client object: it can contain connection credentials.
@@ -20,6 +22,7 @@ app.use((req,res,next)=>{
   if(!match||(match[2]!==undefined&&(Number(match[2])<1||Number(match[2])>65535)))return res.status(403).json({error:'仅支持本机演示地址'});
   next();
 });
+app.use(shutdownGate.middleware);
 app.use(express.json({limit:'16kb',verify:(req,res,buffer)=>{req.jsonBodyBytes=buffer.length}})); app.use(cookieParser());
 app.post('/api/login',requireJsonObject,(req,res)=>{
   if(req.get('origin')&&req.get('origin')!==`${req.protocol}://${req.get('host')}`)return res.status(403).json({error:'请求来源无效'});
@@ -303,5 +306,8 @@ app.use((err,req,res,next)=>{
   if(res.headersSent)return next(err);
   res.status(status).json({error:message});
 });
-if(require.main===module){const server=app.listen(process.env.PORT||3000,'127.0.0.1',()=>console.log(`Memz http://127.0.0.1:${server.address().port}`))}
+if(require.main===module){
+  const server=app.listen(process.env.PORT||3000,'127.0.0.1',()=>console.log(`Memz http://127.0.0.1:${server.address().port}`));
+  installShutdown({server,pool,onDrain:shutdownGate.beginDrain});
+}
 module.exports={app,pool,tx,decide,readProject,readFactsPage,readHistoryPage,readCandidatesPage,readSourcesPage};
