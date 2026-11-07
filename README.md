@@ -8,6 +8,8 @@
 
 [可复现对照](docs/demo-script.md#同一输入的对照阅读)在同一合成流程中展示“最后收到的提议”与实际批准事实：前者最终为30号，后者仍为15号v2。对照是明确定义的简易读取规则，不是其他聊天系统或模型的效果评测。运行后的表格含本次真实候选、版本和来源ID。
 
+工程化迭代与下一阶段验收见[产品化推进记录](docs/productization-progress.md)。启动前可先做[离线 Compose 配置检查](docs/compose-safety.md)，会话容量与数据库故障边界见[运行可靠性](docs/runtime-reliability.md)。
+
 ## 启动
 
 首次接入者可按[开发者完整上手指南](docs/developer-quickstart.md)从空库走到来源、审批和客户端上下文；包含第二终端配置、预算续读以及实际遇到的安装问题。以下命令使用POSIX shell语法。
