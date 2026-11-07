@@ -1,1 +1,3 @@
 * text=auto
+# Recorded evidence is hashed as raw bytes, including its README.
+evaluation/evidence/reader-capacity-2026-11-07/* -text
