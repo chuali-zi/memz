@@ -18,7 +18,7 @@ const SOCKET_TIMEOUT=10000;
 async function commitAckProxy({host,port,database}){
   assert.ok(['127.0.0.1','localhost','::1'].includes(host),'Proxy upstream must be local');
   assert.match(database,/^memz_commit_ack_[a-f0-9]{16}$/);
-  let armed=false,dropped=0,problem;
+  let armed=false,dropped=0,problem,closing=false;
   const sockets=new Set();
   const server=net.createServer(front=>{
     let back,startup=Buffer.alloc(0),pending=Buffer.alloc(0),frontendBytes=0,backendBytes=0,closed=false;
@@ -34,11 +34,13 @@ async function commitAckProxy({host,port,database}){
       front.destroy();if(back)back.destroy();
     };
     track(front);
+    if(closing){stop();return;}
     const forward=bytes=>{
       if(back.writableLength+bytes.length>MAX_BUFFER)return stop('FRONTEND_BUFFER_LIMIT');
       if(!back.write(bytes)){front.pause();back.once('drain',()=>{if(!closed)front.resume()})}
     };
     front.on('data',chunk=>{
+      if(closing){stop();return;}
       frontendBytes+=chunk.length;
       if(frontendBytes>4*MAX_BUFFER)return stop('FRONTEND_TOTAL_LIMIT');
       if(back)return forward(chunk);
@@ -91,11 +93,22 @@ async function commitAckProxy({host,port,database}){
     arm(){assert.equal(armed,false);assert.equal(problem,undefined,'Proxy must be healthy before injection');armed=true;},
     status(){return {armed,dropped,problem};},
     async close(){
-      for(const socket of sockets)socket.destroy();
-      await new Promise((resolve,reject)=>{
-        const timer=setTimeout(()=>reject(new Error('Synthetic commit proxy cleanup timed out')),3000);
-        server.close(error=>{clearTimeout(timer);error?reject(new Error('Synthetic commit proxy cleanup failed')):resolve()});
+      closing=true;
+      // server.close only waits for accepted frontend connections, not our
+      // upstream sockets. Attach every close waiter before destroying either
+      // side, including sockets already destroyed whose close event is pending.
+      const socketClosures=[...sockets].map(socket=>new Promise(resolve=>socket.once('close',resolve)));
+      const listenerClosed=new Promise((resolve,reject)=>{
+        server.close(error=>error?reject(new Error('Synthetic commit proxy cleanup failed')):resolve());
       });
+      for(const socket of sockets)socket.destroy();
+      let timer;
+      try{
+        await Promise.race([
+          Promise.all([listenerClosed,...socketClosures]),
+          new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Synthetic commit proxy cleanup timed out')),3000)})
+        ]);
+      }finally{clearTimeout(timer)}
       assert.equal(sockets.size,0,'All proxy connections must be closed');
     }
   };
