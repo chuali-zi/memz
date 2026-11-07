@@ -9,6 +9,9 @@ const {chromium}=require('playwright');
 let server,browser,baseURL;
 before(async()=>{
   server=http.createServer(async(req,res)=>{
+    // Deliberately unfinished responses exist only in this local test server.
+    if(req.url==='/__test__/pending-headers')return;
+    if(req.url==='/__test__/pending-body'){res.writeHead(200,{'Content-Type':'application/json'});res.write('{"unfinished":');return}
     const file={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}[new URL(req.url,'http://localhost').pathname];
     if(!file){res.writeHead(404).end();return}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
@@ -278,5 +281,142 @@ test('a late approval result cannot refresh or announce success in a new visit',
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     assert.equal(await page.locator('#candidateFeedback').textContent(),'');assert.equal(reads,0);
     assert.equal(await page.locator('#project').inputValue(),'1');assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+async function freezeClock(page){
+  await page.clock.install({time:new Date('2026-01-01T00:00:00Z')});
+  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+}
+async function expireRequest(page){await page.clock.fastForward(15001);await page.clock.resume()}
+for(const endpoint of ['pending-headers','pending-body'])test(`fixed deadline covers ${endpoint} without exposing a timeout override`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await freezeClock(page);
+    // Store the result in-page so evaluation does not await the deliberately unfinished request.
+    const observed=endpoint==='pending-body'?page.waitForResponse(`**/__test__/${endpoint}`):page.waitForRequest(`**/__test__/${endpoint}`);
+    await page.evaluate(endpoint=>{globalThis.deadlineResult=null;api(`/__test__/${endpoint}`).then(()=>globalThis.deadlineResult='unexpected success',error=>globalThis.deadlineResult=error.message)},endpoint);
+    await observed;await expireRequest(page);
+    await page.waitForFunction(()=>globalThis.deadlineResult!==null);
+    assert.match(await page.evaluate(()=>globalThis.deadlineResult),/请求超时（15秒）/);
+    assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('creation deadline unlocks the form, preserves input and reuses its key only on manual retry',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await freezeClock(page);
+    const pending=await hold(page,'**/api/projects/1/candidates');
+    const original=await draft(page);await page.locator('#proposal button').click();await pending.observed;
+    await expireRequest(page);await settled(page,'#proposal');
+    assert.match(await page.locator('#proposalFeedback').textContent(),/请求超时.*写入结果可能不确定/);
+    assert.deepEqual(await draft(page),original);assert.equal(pending.requests.length,1);
+    assert.equal(await page.locator('#proposal button').isEnabled(),true);
+    const retry=await hold(page,'**/api/projects/1/candidates');
+    await page.locator('#proposal button').click();await retry.observed;
+    assert.equal(retry.requests[0].headers()['idempotency-key'],pending.requests[0].headers()['idempotency-key']);
+    retry.release({id:71});pending.release({id:71});await settled(page,'#proposal');
+    assert.match(await page.locator('#proposalFeedback').textContent(),/候选已提交/);assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+for(const failure of ['network','invalid-200','invalid-409'])test(`${failure} is localized and retains an uncertain creation key`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await page.locator('#addSourceShortcut').click();
+    await page.locator('#sourceForm [name=title]').fill('合成网络恢复草稿');await page.locator('#sourceForm [name=content]').fill('不能因为响应损坏而删除。');
+    const sent=[];
+    await page.route('**/api/projects/1/sources',async route=>{
+      if(route.request().method()!=='POST'){await route.fallback();return}
+      sent.push(route.request());
+      if(failure==='network')await route.abort();else await route.fulfill({status:failure==='invalid-409'?409:200,contentType:'text/html',body:'<html>synthetic invalid JSON</html>'});
+    });
+    await page.locator('#sourceForm button').click();await settled(page,'#sourceForm');
+    assert.match(await page.locator('#sourceFeedback').textContent(),failure==='network'?/网络连接失败.*写入结果可能不确定/:/不是有效 JSON.*写入结果可能不确定/);
+    assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'合成网络恢复草稿');assert.equal(sent.length,1);
+    const retry=await hold(page,'**/api/projects/1/sources');await page.locator('#sourceForm button').click();await retry.observed;
+    assert.equal(retry.requests[0].headers()['idempotency-key'],sent[0].headers()['idempotency-key']);
+    retry.release({id:72,title:'合成网络恢复草稿'});await settled(page,'#sourceForm');assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+const pagedLists=[
+  {root:'facts',key:'after',start:'0',next:'next_after',items:'facts',row:id=>({id,subject:`合成事实${id}`,predicate:'状态',value:'可回查',version:1,source:'合成依据'})},
+  {root:'history',key:'before',start:null,next:'next_before',items:'history',row:id=>({id,fact_id:id,subject:`合成历史${id}`,predicate:'状态',value:'可回查',version:1,source:'合成依据',created_at:'2026-01-01T00:00:00Z'})},
+  {root:'candidates',key:'before',start:null,next:'next_before',items:'candidates',row:id=>({id,subject:`合成候选${id}`,predicate:'状态',value:'待审',status:'pending',expected_version:0,source_id:1,source:'合成依据'})},
+  {root:'sources',key:'after',start:'0',next:'next_after',items:'sources',row:id=>({id,title:`合成来源${id}`,content:'本页依据全文。'})},
+  {root:'audit',key:'before',start:null,next:'next_before',items:'audit',row:id=>({id,action:'合成审计',detail:`测试操作${id}`,actor_id:1,created_at:'2026-01-01T00:00:00Z'})}
+];
+test('all five lists retain their successful page and cursor through consecutive failures and retry',async t=>{
+  for(const config of pagedLists)await t.test(config.root,async()=>{
+    const {page,errors}=await openPage();
+    try{
+      let failures=0;const cursors=[];
+      await page.route(`**/api/projects/1/${config.root}?*`,async route=>{
+        const cursor=new URL(route.request().url()).searchParams.get(config.key);cursors.push(cursor);
+        if(cursor==='2'&&++failures<=2){
+          await route.fulfill({status:failures===1?503:200,contentType:'application/json',body:failures===1?JSON.stringify({error:'连续失败一'}):'broken JSON'});return;
+        }
+        const id=cursor==='2'?3:cursor==='1'?2:1;
+        await route.fulfill({json:{[config.items]:[config.row(id)],[config.next]:id===3?null:id,role:'owner'}});
+      });
+      await login(page);await page.locator(`#${config.root}Status`).getByText(/第 1 页/).waitFor();
+      await page.locator(`#${config.root}Next`).click();await page.locator(`#${config.root}Status`).getByText(/第 2 页/).waitFor();
+      const original=await page.locator(`#${config.root}`).textContent();
+      for(const error of [/503 连续失败一/,/不是有效 JSON/]){
+        await page.locator(`#${config.root}Next`).click();await page.locator(`#${config.root}Status`).getByText(error).waitFor();
+        assert.equal(await page.locator(`#${config.root}`).textContent(),original);
+        assert.equal(await page.locator(`#${config.root}Previous`).isEnabled(),true);
+        assert.equal(await page.locator(`#${config.root}Next`).isEnabled(),true);
+        if(config.root==='candidates')assert.equal(await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).isEnabled(),true);
+        if(config.root==='sources')assert.equal(await page.locator('#sourceSelect').inputValue(),'1');
+      }
+      await page.locator(`#${config.root}Next`).click();await page.locator(`#${config.root}Status`).getByText(/第 3 页/).waitFor();
+      assert.equal(await page.locator(`#${config.root}Next`).isDisabled(),true);
+      assert.deepEqual(cursors,[config.start,'1','2','2','2'],'failures never advance or truncate the successful cursor stack');
+      await page.locator(`#${config.root}Previous`).click();await page.locator(`#${config.root}Status`).getByText(/第 2 页/).waitFor();
+      assert.equal(await page.locator(`#${config.root}`).textContent(),original);
+      assert.equal(cursors.at(-1),'1');assert.equal(await page.locator(`#${config.root}Next`).isEnabled(),true);
+      assert.deepEqual(errors,[]);
+    }finally{await page.close()}
+  });
+});
+
+test('a timed-out new search retains the accepted query and cursor for subsequent pagination',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const queries=[];
+    await page.route('**/api/projects/1/facts?*',async route=>{
+      const url=new URL(route.request().url());queries.push([url.searchParams.get('q'),url.searchParams.get('after')]);
+      const id=url.searchParams.get('after')==='1'?2:1;
+      await route.fulfill({json:{facts:[pagedLists[0].row(id)],next_after:id===1?1:null}});
+    });
+    await login(page);await page.locator('#factsStatus').getByText(/第 1 页/).waitFor();
+    const original=await page.locator('#facts').textContent();await freezeClock(page);
+    const search=await hold(page,url=>url.pathname==='/api/projects/1/facts'&&url.searchParams.get('q')==='失败的新检索','GET');
+    await page.locator('#searchForm [name=q]').fill('失败的新检索');await page.locator('#searchForm button').click();await search.observed;
+    await expireRequest(page);await page.locator('#factsStatus').getByText(/请求超时（15秒）/).waitFor();
+    assert.equal(await page.locator('#facts').textContent(),original);assert.equal(await page.locator('#factsNext').isEnabled(),true);
+    assert.equal(await page.locator('#factsPrevious').isDisabled(),true);
+    search.release({facts:[],next_after:null});
+    await page.locator('#factsNext').click();await page.locator('#factsStatus').getByText(/第 2 页/).waitFor();
+    assert.deepEqual(queries,[['','0'],['','1']]);assert.deepEqual(errors,[]);
+  }finally{await page.close()}
+});
+
+test('a failed candidate filter keeps the accepted status, role and pending actions',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await conflictFixture(page);
+    await page.route('**/api/projects/1/candidates?*',async route=>{
+      if(new URL(route.request().url()).searchParams.get('status')==='approved')await route.fulfill({status:503,json:{error:'合成筛选失败'}});
+      else await route.fallback();
+    });
+    const original=await page.locator('#candidates').textContent();
+    await page.locator('#candidateFilter').selectOption('approved');await page.locator('#candidatesStatus').getByText(/503 合成筛选失败/).waitFor();
+    assert.equal(await page.locator('#candidateFilter').inputValue(),'all');
+    assert.equal(await page.locator('#candidates').textContent(),original);
+    assert.equal(await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).isEnabled(),true);assert.deepEqual(errors,[]);
   }finally{await page.close()}
 });

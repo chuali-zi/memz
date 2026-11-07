@@ -32,7 +32,7 @@ async function main(){
     const request=(path,opts={})=>fetch(base+path,{...opts,headers:{cookie,...opts.headers},signal:AbortSignal.timeout(5000)});
     const before=await request('/api/projects');assert.equal(before.status,200);const projects=await before.json();
     const sent=[];let loseNext=false,committedId;
-    const context=vm.createContext({document:{querySelector:()=>({username:{}})},crypto:{randomUUID},fetch:async(path,opts)=>{
+    const context=vm.createContext({AbortController,setTimeout,clearTimeout,document:{querySelector:()=>({username:{}})},crypto:{randomUUID},fetch:async(path,opts)=>{
       sent.push({key:opts.headers['Idempotency-Key'],body:opts.body});
       const response=await request(path,{...opts,headers:{...opts.headers,'X-CSRF-Token':csrf}});
       if(loseNext){loseNext=false;assert.equal(response.status,200);committedId=(await response.json()).id;throw new Error('synthetic response lost after commit')}
@@ -50,7 +50,7 @@ async function main(){
     const saved=await context.create(path,body);assert.equal(sent[0].key,sent[1].key);assert.ok(saved.id);
     report.checks.push('same-session-and-create-key-after-restart');
     const uncertain={title:'响应丢失恢复来源',content:'数据库已提交但客户端没有收到响应'};
-    loseNext=true;await assert.rejects(context.create(path,uncertain),/synthetic response lost/);assert.equal(sent.length,3);
+    loseNext=true;await assert.rejects(context.create(path,uncertain),/网络连接失败/);assert.equal(sent.length,3);
     await docker('stop','--time','5',container);
     await assert.rejects(context.create(path,uncertain),/503/);assert.equal(sent[2].key,sent[3].key);
     await docker('start',container);await ready();

@@ -1,5 +1,28 @@
 let csrf='',projectId=null,data=null;const $=s=>document.querySelector(s);const el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
-async function api(path,opts={}){const r=await fetch(path,{...opts,headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...opts.headers}});const v=await r.json();if(!r.ok){const error=new Error(`${r.status} ${v.error}`);error.status=r.status;throw error}return v}
+// Fixed browser request budget: headers and the complete JSON body share 15 seconds.
+const REQUEST_TIMEOUT_MS=15000;
+async function api(path,opts={}){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),REQUEST_TIMEOUT_MS);
+  const timeout=()=>new Error('请求超时（15秒），请稍后重试');
+  try{
+    let response;
+    try{response=await fetch(path,{...opts,signal:controller.signal,headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...opts.headers}})}
+    catch(error){if(controller.signal.aborted)throw timeout();throw new Error('网络连接失败，请检查连接后重试')}
+    let value;
+    try{value=await response.json()}
+    catch(error){
+      if(controller.signal.aborted)throw timeout();
+      if(error.name==='SyntaxError')throw new Error('服务器响应不是有效 JSON，请稍后重试');
+      throw new Error('网络连接中断，未能完整读取响应，请稍后重试');
+    }
+    if(controller.signal.aborted)throw timeout();
+    if(!response.ok){
+      if(!value||typeof value.error!=='string')throw new Error('服务器响应格式异常，请稍后重试');
+      const error=new Error(`${response.status} ${value.error}`);error.status=response.status;throw error;
+    }
+    return value;
+  }finally{clearTimeout(timer)}
+}
 const pendingCreations=new Map(),busyActions=new Set();
 async function createRecord(path,body){
   const encoded=JSON.stringify(body),intent=JSON.stringify([path,encoded]);
@@ -40,7 +63,7 @@ async function loadProjects(){
     projectId=Number(select.value);message('');await load();
   }catch(error){if(generation===projectGeneration)message(`项目列表加载失败：${error.message}。请刷新工作台重试。`)}
 }
-let contextGeneration=0,factGeneration=0,factState={query:'',cursors:[0],index:0,next:null};
+let contextGeneration=0,factGeneration=0,factState={project:null,workspace:null,query:'',cursors:[0],index:0,next:null};
 function factControls(busy=false){
   $('#facts').setAttribute('aria-busy',String(busy));
   $('#factsPrevious').disabled=busy||factState.index===0;
@@ -69,13 +92,15 @@ function appendProvenance(d,f,p){
 }
 async function loadFacts({reset=false,index=factState.index,focus=false}={}){
   if(projectId===null)return;
-  if(reset){factState={query:$('#searchForm').q.value,cursors:[0],index:0,next:null};index=0}
-  const generation=++factGeneration,p=projectId,query=factState.query,after=factState.cursors[index];
-  factControls(true);$('#facts').replaceChildren();$('#factsStatus').textContent='正在加载当前事实…';
+  if(factState.project!==projectId||factState.workspace!==workspaceGeneration){$('#facts').replaceChildren();factState={project:projectId,workspace:workspaceGeneration,query:'',cursors:[0],index:0,next:null};}
+  const requested=reset?{project:projectId,workspace:workspaceGeneration,query:$('#searchForm').q.value,cursors:[0],index:0,next:null}:factState;
+  if(reset)index=0;
+  const generation=++factGeneration,p=projectId,query=requested.query,after=requested.cursors[index];
+  factControls(true);$('#factsStatus').textContent='正在加载当前事实…';
   try{
     const page=await api(`/api/projects/${p}/facts?q=${encodeURIComponent(query)}&limit=50&after=${after}`);
     if(generation!==factGeneration||p!==projectId)return;
-    factState.index=index;factState.next=page.next_after;
+    factState=requested;factState.index=index;factState.next=page.next_after;
     factState.cursors=factState.cursors.slice(0,index+1);
     if(page.next_after!==null)factState.cursors.push(page.next_after);
     rows('#facts',page.facts,(d,f)=>renderFact(d,f,p));
@@ -83,11 +108,11 @@ async function loadFacts({reset=false,index=factState.index,focus=false}={}){
     factControls();if(focus)$('#factsTitle').focus();
   }catch(e){
     if(generation!==factGeneration||p!==projectId)return;
-    $('#factsStatus').textContent=`加载失败：${e.message}。请刷新工作台重试。`;
-    $('#facts').setAttribute('aria-busy','false');$('#factsPrevious').disabled=true;$('#factsNext').disabled=true;
+    $('#factsStatus').textContent=`加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新工作台重试。`;
+    factControls();
   }
 }
-let historyGeneration=0,historyState={cursors:[null],index:0,next:null};
+let historyGeneration=0,historyState={project:null,workspace:null,cursors:[null],index:0,next:null};
 function historyControls(busy=false){
   $('#history').setAttribute('aria-busy',String(busy));
   $('#historyPrevious').disabled=busy||historyState.index===0;
@@ -95,13 +120,15 @@ function historyControls(busy=false){
 }
 async function loadHistory({reset=false,index=historyState.index,focus=false}={}){
   if(projectId===null)return;
-  if(reset){historyState={cursors:[null],index:0,next:null};index=0}
-  const generation=++historyGeneration,p=projectId,before=historyState.cursors[index];
-  historyControls(true);$('#history').replaceChildren();$('#historyStatus').textContent='正在加载版本历史…';
+  if(historyState.project!==projectId||historyState.workspace!==workspaceGeneration){$('#history').replaceChildren();historyState={project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null};}
+  const requested=reset?{project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null}:historyState;
+  if(reset)index=0;
+  const generation=++historyGeneration,p=projectId,before=requested.cursors[index];
+  historyControls(true);$('#historyStatus').textContent='正在加载版本历史…';
   try{
     const page=await api(`/api/projects/${p}/history?limit=25${before===null?'':`&before=${before}`}`);
     if(generation!==historyGeneration||p!==projectId)return;
-    historyState.index=index;historyState.next=page.next_before;
+    historyState=requested;historyState.index=index;historyState.next=page.next_before;
     historyState.cursors=historyState.cursors.slice(0,index+1);
     if(page.next_before!==null)historyState.cursors.push(page.next_before);
     rows('#history',page.history,(d,h)=>{
@@ -112,11 +139,11 @@ async function loadHistory({reset=false,index=historyState.index,focus=false}={}
     historyControls();if(focus)$('#historyTitle').focus();
   }catch(e){
     if(generation!==historyGeneration||p!==projectId)return;
-    $('#historyStatus').textContent=`历史加载失败：${e.message}。请刷新历史重试。`;
-    $('#history').setAttribute('aria-busy','false');$('#historyPrevious').disabled=true;$('#historyNext').disabled=true;
+    $('#historyStatus').textContent=`历史加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新历史重试。`;
+    historyControls();
   }
 }
-let auditGeneration=0,auditState={cursors:[null],index:0,next:null};
+let auditGeneration=0,auditState={project:null,workspace:null,cursors:[null],index:0,next:null};
 function auditControls(busy=false){
   $('#audit').setAttribute('aria-busy',String(busy));
   $('#auditPrevious').disabled=busy||auditState.index===0;
@@ -124,13 +151,15 @@ function auditControls(busy=false){
 }
 async function loadAudit({reset=false,index=auditState.index,focus=false}={}){
   if(projectId===null)return;
-  if(reset){auditState={cursors:[null],index:0,next:null};index=0}
-  const generation=++auditGeneration,p=projectId,before=auditState.cursors[index];
-  auditControls(true);$('#audit').replaceChildren();$('#auditStatus').textContent='正在加载操作审计…';
+  if(auditState.project!==projectId||auditState.workspace!==workspaceGeneration){$('#audit').replaceChildren();auditState={project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null};}
+  const requested=reset?{project:projectId,workspace:workspaceGeneration,cursors:[null],index:0,next:null}:auditState;
+  if(reset)index=0;
+  const generation=++auditGeneration,p=projectId,before=requested.cursors[index];
+  auditControls(true);$('#auditStatus').textContent='正在加载操作审计…';
   try{
     const page=await api(`/api/projects/${p}/audit?limit=25${before===null?'':`&before=${before}`}`);
     if(generation!==auditGeneration||p!==projectId)return;
-    auditState.index=index;auditState.next=page.next_before;
+    auditState=requested;auditState.index=index;auditState.next=page.next_before;
     auditState.cursors=auditState.cursors.slice(0,index+1);
     if(page.next_before!==null)auditState.cursors.push(page.next_before);
     rows('#audit',page.audit,(d,a)=>d.append(el('strong',a.action),el('span',`#${a.id}`,'badge'),el('div',`${a.detail} · 用户 ${a.actor_id} · ${new Date(a.created_at).toLocaleString()}`,'meta')));
@@ -138,11 +167,11 @@ async function loadAudit({reset=false,index=auditState.index,focus=false}={}){
     auditControls();if(focus)$('#auditTitle').focus();
   }catch(e){
     if(generation!==auditGeneration||p!==projectId)return;
-    $('#auditStatus').textContent=`审计加载失败：${e.message}。请刷新审计重试。`;
-    $('#audit').setAttribute('aria-busy','false');$('#auditPrevious').disabled=true;$('#auditNext').disabled=true;
+    $('#auditStatus').textContent=`审计加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新审计重试。`;
+    auditControls();
   }
 }
-let candidateGeneration=0,candidateState={status:'all',cursors:[null],index:0,next:null};
+let candidateGeneration=0,candidateState={project:null,workspace:null,status:'all',cursors:[null],index:0,next:null};
 function candidateControls(busy=false){
   $('#candidates').setAttribute('aria-busy',String(busy));
   $('#candidatesPrevious').disabled=busy||candidateState.index===0;
@@ -213,13 +242,15 @@ function renderCandidate(d,c,role,p){
 }
 async function loadCandidates({reset=false,index=candidateState.index,focus=false}={}){
   if(projectId===null)return;
-  if(reset){candidateState={status:$('#candidateFilter').value,cursors:[null],index:0,next:null};index=0}
-  const generation=++candidateGeneration,p=projectId,before=candidateState.cursors[index],status=candidateState.status;
-  candidateControls(true);$('#candidates').replaceChildren();$('#candidatesStatus').textContent='正在加载候选…';
+  if(candidateState.project!==projectId||candidateState.workspace!==workspaceGeneration){$('#candidates').replaceChildren();candidateState={project:projectId,workspace:workspaceGeneration,status:'all',cursors:[null],index:0,next:null};}
+  const requested=reset?{project:projectId,workspace:workspaceGeneration,status:$('#candidateFilter').value,cursors:[null],index:0,next:null}:candidateState;
+  if(reset)index=0;
+  const generation=++candidateGeneration,p=projectId,before=requested.cursors[index],status=requested.status;
+  candidateControls(true);$('#candidatesStatus').textContent='正在加载候选…';
   try{
     const page=await api(`/api/projects/${p}/candidates?status=${status}&limit=25${before===null?'':`&before=${before}`}`);
     if(generation!==candidateGeneration||p!==projectId)return;
-    candidateState.index=index;candidateState.next=page.next_before;
+    candidateState=requested;candidateState.index=index;candidateState.next=page.next_before;
     candidateState.cursors=candidateState.cursors.slice(0,index+1);
     if(page.next_before!==null)candidateState.cursors.push(page.next_before);
     rows('#candidates',page.candidates,(d,c)=>renderCandidate(d,c,page.role,p));
@@ -227,11 +258,11 @@ async function loadCandidates({reset=false,index=candidateState.index,focus=fals
     candidateControls();if(focus)$('#candidatesTitle').focus();
   }catch(e){
     if(generation!==candidateGeneration||p!==projectId)return;
-    $('#candidatesStatus').textContent=`候选加载失败：${e.message}。请刷新候选重试。`;
-    $('#candidates').setAttribute('aria-busy','false');$('#candidatesPrevious').disabled=true;$('#candidatesNext').disabled=true;
+    $('#candidatesStatus').textContent=`候选加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新候选重试。`;
+    $('#candidateFilter').value=candidateState.status;candidateControls();
   }
 }
-let sourceGeneration=0,sourceState={query:'',cursors:[0],index:0,next:null},sourcePage=[],selectedSource=null;
+let sourceGeneration=0,sourceState={project:null,workspace:null,query:'',cursors:[0],index:0,next:null},sourcePage=[],selectedSource=null;
 function writeControls(){
   $('#sourceForm button').disabled=!data||busyActions.has('#sourceForm');
   for(const id of ['#stale','#injection'])$(id).disabled=!data||busyActions.has(id);
@@ -254,13 +285,15 @@ function sourceControls(busy=false){
 }
 async function loadSources({reset=false,index=sourceState.index,focus=false}={}){
   if(projectId===null)return;
-  if(reset){sourceState={query:$('#sourceSearchForm').q.value,cursors:[0],index:0,next:null};index=0}
-  const generation=++sourceGeneration,p=projectId,query=sourceState.query,after=sourceState.cursors[index];
-  sourcePage=[];sourceOptions();sourceControls(true);$('#sources').replaceChildren();$('#sourcesStatus').textContent='正在加载来源…';
+  if(sourceState.project!==projectId||sourceState.workspace!==workspaceGeneration){$('#sources').replaceChildren();sourceState={project:projectId,workspace:workspaceGeneration,query:'',cursors:[0],index:0,next:null};sourcePage=[];sourceOptions();}
+  const requested=reset?{project:projectId,workspace:workspaceGeneration,query:$('#sourceSearchForm').q.value,cursors:[0],index:0,next:null}:sourceState;
+  if(reset)index=0;
+  const generation=++sourceGeneration,p=projectId,query=requested.query,after=requested.cursors[index];
+  sourceControls(true);$('#sourcesStatus').textContent='正在加载来源…';
   try{
     const page=await api(`/api/projects/${p}/sources?q=${encodeURIComponent(query)}&limit=25&after=${after}`);
     if(generation!==sourceGeneration||p!==projectId)return;
-    sourceState.index=index;sourceState.next=page.next_after;
+    sourceState=requested;sourceState.index=index;sourceState.next=page.next_after;
     sourceState.cursors=sourceState.cursors.slice(0,index+1);
     if(page.next_after!==null)sourceState.cursors.push(page.next_after);
     sourcePage=page.sources;
@@ -276,15 +309,14 @@ async function loadSources({reset=false,index=sourceState.index,focus=false}={})
     sourceControls();if(focus)$('#sourcesTitle').focus();
   }catch(e){
     if(generation!==sourceGeneration||p!==projectId)return;
-    $('#sourcesStatus').textContent=`来源加载失败：${e.message}。请刷新来源重试。`;
-    $('#sources').setAttribute('aria-busy','false');$('#sourcesPrevious').disabled=true;$('#sourcesNext').disabled=true;
+    $('#sourcesStatus').textContent=`来源加载失败：${e.message}。本次未更新列表，已加载的页面和翻页范围保留。请刷新来源重试。`;
+    sourceControls();
   }
 }
 async function load(){
   if(projectId===null)return loadProjects();
   const generation=++contextGeneration,p=projectId;
   data=null;
-  for(const id of ['#sources','#candidates','#history','#audit'])$(id).replaceChildren();
   for(const b of document.querySelectorAll('#proposal button,#sourceForm button,#stale,#injection'))b.disabled=true;
   const facts=loadFacts({reset:true}),history=loadHistory({reset:true}),candidates=loadCandidates({reset:true}),sources=loadSources({reset:true}),audit=loadAudit({reset:true});
   try{
