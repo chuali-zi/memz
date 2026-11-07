@@ -45,6 +45,21 @@ test('query violations and artifact tampering are retained as safe error rows',a
   const tampered={...fixture(),sha256:'bad'};const row=await a.queryFrozen(tampered,{id:'q',scope:'synthetic-a',question:'color'},reader,{fetchImpl});
   assert.equal(row.error.code,'ARTIFACT_HASH_MISMATCH');assert.equal(requests,0);
 });
+test('programmatic query boundaries reject unknown and accessor fields without reading them',async()=>{
+  for(const key of ['gold','answer','evidence_ids','id','question']){
+    let reads=0,requests=0;
+    const query={id:'q-sentinel',scope:'synthetic-a',question:'color'};
+    Object.defineProperty(query,key,{enumerable:true,get(){reads++;return 'GOLD_SENTINEL'}});
+    const row=await a.queryFrozen(fixture(),query,reader,{fetchImpl:async()=>{requests++}});
+    assert.equal(reads,0,key);assert.equal(requests,0,key);
+    assert.equal(row.status,'error');assert.equal(row.error.code,'INVALID_QUERY_FIELDS');
+    assert.equal(row.context,null);assert.ok(!JSON.stringify(row).includes('GOLD_SENTINEL'));
+  }
+  const query={id:'q-hidden',scope:'synthetic-a',question:'color'};
+  Object.defineProperty(query,'gold',{value:'GOLD_SENTINEL'});
+  const row=await a.queryFrozen(fixture(),query,reader,{fetchImpl:async()=>assert.fail('no network')});
+  assert.equal(row.error.code,'INVALID_QUERY_FIELDS');assert.equal(row.context,null);
+});
 test('reader binding prevents accidentally reusing frozen data for another user',async()=>{
   let requests=0;const row=await a.queryFrozen(fixture(),{id:'q',scope:'synthetic-a',question:'color'},
     {username:'other',password:'demo-other'},{method:'flat_same_facts',fetchImpl:async()=>{requests++}});

@@ -140,10 +140,24 @@ function validateFrozen(frozen,reader){
   check(fields(b.snapshot,['facts','sources'])&&Array.isArray(b.snapshot.facts)&&Array.isArray(b.snapshot.sources),'INVALID_FROZEN_SNAPSHOT');
   return b;
 }
+function queryRecord(q){
+  check(q&&typeof q==='object'&&!Array.isArray(q),'INVALID_QUERY_FIELDS');
+  const descriptors=Object.getOwnPropertyDescriptors(q),keys=Reflect.ownKeys(descriptors);
+  // Check the complete schema and property kinds before reading any value.
+  // In particular, never serialize a rejected gold/evidence accessor.
+  check(keys.every(k=>['id','scope','question','date'].includes(k))
+    &&['id','scope','question'].every(k=>Object.hasOwn(descriptors,k))
+    &&keys.every(k=>Object.hasOwn(descriptors[k],'value')&&descriptors[k].enumerable),'INVALID_QUERY_FIELDS');
+  return Object.fromEntries(keys.map(k=>[k,descriptors[k].value]));
+}
+function queryId(q){
+  try{const d=q&&Object.getOwnPropertyDescriptor(q,'id');return d&&Object.hasOwn(d,'value')&&id(d.value)?d.value:null}catch{return null}
+}
 function validateQuery(q,scope){
-  check(q&&typeof q==='object'&&!Array.isArray(q)&&Object.keys(q).every(k=>['id','scope','question','date'].includes(k))
-    &&['id','scope','question'].every(k=>Object.hasOwn(q,k))&&id(q.id)&&q.scope===scope
-    &&text(q.question,200)&&(!Object.hasOwn(q,'date')||q.date===null||text(q.date,100,true)),'INVALID_QUERY_FIELDS');
+  q=queryRecord(q);
+  check(id(q.id)&&q.scope===scope&&text(q.question,200)
+    &&(!Object.hasOwn(q,'date')||q.date===null||text(q.date,100,true)),'INVALID_QUERY_FIELDS');
+  return q;
 }
 function renderFacts(facts,ingested){
   const bySource=new Map(ingested.sources.map(s=>[s.sourceId,s.documentId]));
@@ -155,11 +169,12 @@ function renderFacts(facts,ingested){
 }
 async function queryFrozen(frozen,query,reader,{method='memz_current',maxContextBytes=262144,fetchImpl=fetch}={}){
   const start=performance.now(),spans=[];
-  const row={status:'error',id:id(query?.id)?query.id:null,method:['memz_current','flat_same_facts'].includes(method)?method:null,modelCalls:0,answer:null,answerQuality:null,
+  const row={status:'error',id:queryId(query),method:['memz_current','flat_same_facts'].includes(method)?method:null,modelCalls:0,answer:null,answerQuality:null,
     transportMode:fetchImpl===fetch?'product_http':'injected_test_transport',
     inputTokens:null,outputTokens:null,generationMs:null,answerE2EMs:null,context:null,retrievedDocumentIds:[],provenance:[],spans};
   try{
-    frozen=immutable(JSON.parse(canonical(frozen)));query=JSON.parse(canonical(query));reader=readerOptions(reader);
+    query=queryRecord(query);
+    frozen=immutable(JSON.parse(canonical(frozen)));reader=readerOptions(reader);
     const b=validateFrozen(frozen,reader);validateQuery(query,b.ingested.prepared.scope);
     check(['memz_current','flat_same_facts'].includes(method),'INVALID_METHOD');
     check(Number.isInteger(maxContextBytes)&&maxContextBytes>0&&maxContextBytes<=1048576,'INVALID_CONTEXT_BUDGET');

@@ -11,6 +11,8 @@
 5. `queryFrozen(frozen, query, reader, options)` 只接受 `id/scope/question` 与可选 date；query 无权覆盖项目、用户、地址或检索策略。`memz_current` 将完整问题原文交给真实 `/context` 的 substring 检索；超过 200 UTF-16 单位直接保留失败行，不改写关键词。`flat_same_facts` 在同一获批事实集上按字面子串筛选。两者使用相同渲染格式和上下文字节上限。reader 请求 ID 加 method 后缀，防止配对组重复 ID。
 6. `memz_score.py` 独立校验 frozen／query／context 哈希、事实与来源投影、provenance，再计算严格 evidence 指标。缺失或失败的行仍进入配对分母，空 evidence 为 N/A，无法解析的 evidence 不修复。答案字段不参与检索；evidence 命中不是答案正确率。
 
+程序化 query 在序列化和读取字段值前先检查全部自有字段及其描述符：未知字段（含不可枚举字段）和 accessor 均拒绝，不调用 gold、evidence、id 或 question getter。错误行的可选 id 也只从自有 data property 取得。随后仅复制允许的字段并验证字符串/scope；不会通过 `toJSON` 或 getter 把标签变成问题。此保护针对模块的普通对象输入，不是恶意 JavaScript Proxy 的执行沙箱，也无法识别藏在合法问题文本中的答案；CLI JSON隔离及独立gold挂载要求仍保留。
+
 ## 冻结边界
 
 首版要求每个 scope 使用**专用项目和停止写入的隔离实验服务**。服务需要事先配置项目与 membership；适配器不借管理员凭据自动创建项目。一个项目最多 25 个获批事实、100 个来源，来源集合必须精确对应导入清单。普通客户端源文本不可修改，但 adapter 仍检测来源内容变化、新来源、新事实及版本／溯源漂移。
