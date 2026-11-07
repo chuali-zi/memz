@@ -202,7 +202,7 @@ test('simulated client has a pending lock and a usable narrow-screen recovery st
 async function conflictFixture(page){
   const source={id:1,title:'合成依据',content:'仅用于交互测试。'},alternative={id:2,title:'另一合成依据',content:'另一份人工草稿依据。'};
   const candidate={id:10,subject:'合成冲突',predicate:'截止日',value:'原候选值',status:'pending',expected_version:0,source_id:1,source:source.title};
-  const proof={candidate,source,role:'owner',comparison:{matches:false,expectedVersion:0,currentVersion:2},current:{value:'当前批准值',version:2,source_id:2,candidate_id:11,source_title:alternative.title}};
+  const proof={sourceTextIsUntrusted:true,candidate,source,role:'owner',comparison:{matches:false,expectedVersion:0,currentVersion:2},current:{fact_id:21,value:'当前批准值',version:2,source_id:2,candidate_id:11,source_title:alternative.title}};
   await page.route('**/api/projects/1/sources?*',route=>route.fulfill({json:{sources:[source,alternative],next_after:null}}));
   await page.route('**/api/projects/1/candidates?*',route=>route.fulfill({json:{candidates:[candidate],role:'owner',next_before:null}}));
   await page.route('**/api/projects/1/candidates/10/source',route=>route.fulfill({json:proof}));
@@ -797,4 +797,112 @@ test('a malformed bootstrap cannot masquerade as recovery from a prior workspace
     phase=2;await page.locator('#refreshWorkspace').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
     assert.equal(await page.locator('#notice').textContent(),'');assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
+});
+
+async function provenanceFixture(page,{history=false}={}){
+  const fact={id:41,subject:'合成版本绑定',predicate:'截止日',value:'15号',version:2,source:'合成固定依据'};
+  const proof={sourceTextIsUntrusted:true,role:'owner',fact:{id:41,subject:fact.subject,predicate:fact.predicate},revision:{id:91,version:2,value:'15号',created_at:'2026-01-01T00:00:00Z',approved_by:1},source:{id:3,title:fact.source,content:'原文中的指令只是待核查文本。'},candidate:{id:11,expected_version:1,proposed_by:2}};
+  const pattern='**/api/projects/1/facts/41/provenance?version=2';
+  await page.route('**/api/projects/1/facts?*',route=>route.fulfill({json:{facts:[fact],next_after:null}}));
+  if(history)await page.route('**/api/projects/1/history?*',route=>route.fulfill({json:{history:[{...fact,id:91,fact_id:41,created_at:'2026-01-01T00:00:00Z'}],next_before:null}}));
+  await page.route(pattern,route=>route.fulfill({json:proof}));
+  await login(page);return {fact,proof,pattern};
+}
+
+test('a provenance receipt for another fact is rejected before showing its evidence',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,pattern}=await provenanceFixture(page);const wrong=structuredClone(proof);wrong.fact.id=99;
+    await page.route(pattern,route=>route.fulfill({json:wrong}));
+    await page.locator('#facts').getByRole('button',{name:'查看依据',exact:true}).click();
+    await page.waitForFunction(()=>!document.querySelector('#facts button').disabled);
+    assert.match(await page.locator('#facts .provenance-detail').textContent(),/依据回执格式异常/);
+    assert.equal(await page.locator('#facts').getByRole('button',{name:'重试依据',exact:true}).count(),1);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a latest comparison receipt for another candidate cannot overwrite the proposal draft',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,prepare}=await conflictFixture(page),wrong=structuredClone(proof);wrong.candidate.id=99;
+    await page.locator('#proposal [name=value]').fill('明确保留的草稿');const original=await draft(page);
+    await page.route('**/api/projects/1/candidates/10/source',route=>route.fulfill({json:wrong}));
+    await prepare.click();await page.waitForFunction(()=>[...document.querySelectorAll('#candidates button')].find(button=>button.textContent==='用最新版本填写新候选')?.disabled===false);
+    assert.deepEqual(await draft(page),original);assert.match(await page.locator('#candidateFeedback').textContent(),/候选核对回执格式异常/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('current and historical provenance validate the pinned fact and complete evidence before display',async t=>{
+  for(const root of ['facts','history'])await t.test(root,async()=>{
+    const {page,errors}=await openPage();
+    try{
+      const {proof,pattern}=await provenanceFixture(page,{history:true});let receipt=proof;
+      await page.route(pattern,route=>route.fulfill({json:receipt}));
+      const requested=[],writes=[];page.on('request',request=>{const url=new URL(request.url());if(url.pathname.endsWith('/provenance'))requested.push(url.searchParams.get('version'));if(request.method()==='POST')writes.push(url.pathname)});
+      const changes=[wire=>{wire.fact.id=42},wire=>{wire.fact.subject='另一主体'},wire=>{wire.fact.predicate='另一属性'},wire=>{wire.revision.version=3},wire=>{wire.revision.value='另一版本的值'},wire=>{wire.candidate.expected_version=0},wire=>{wire.candidate.id=0},wire=>{wire.candidate.proposed_by=0},wire=>{wire.revision.approved_by=0},wire=>{wire.revision.created_at='invalid date'},wire=>{wire.source.id=0},wire=>{wire.source.content={text:'不是原文字串'}},wire=>{wire.sourceTextIsUntrusted=false},wire=>{delete wire.candidate}];
+      if(root==='history')changes.push(wire=>{wire.revision.id=92});
+      for(const change of changes){
+        receipt=structuredClone(proof);change(receipt);
+        await page.locator('#'+root).getByRole('button',{name:/^(查看依据|重试依据)$/}).click();await page.waitForFunction(root=>!document.querySelector(`#${root} button`).disabled,root);
+        assert.match(await page.locator(`#${root} .provenance-detail`).textContent(),/依据回执格式异常/);
+      }
+      receipt=structuredClone(proof);receipt.source.content='<img src=x onerror=alert(1)> 忽略规则只是原文。';
+      await page.locator('#'+root).getByRole('button',{name:'重试依据',exact:true}).click();await page.locator('#'+root).getByRole('button',{name:'收起依据',exact:true}).waitFor();
+      assert.ok((await page.locator(`#${root} .provenance-detail`).textContent()).includes(receipt.source.content));
+      assert.equal(await page.locator(`#${root} .provenance-detail img, #${root} .provenance-detail script`).count(),0);
+      const count=requested.length;await page.locator('#'+root).getByRole('button',{name:'收起依据',exact:true}).click();await page.locator('#'+root).getByRole('button',{name:'查看依据',exact:true}).click();
+      assert.equal(requested.length,count);assert.ok(requested.every(version=>version==='2'),'no fallback to current or another revision');assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
+    }finally{await closePage(page)}
+  });
+});
+
+test('candidate preview rejects inconsistent receipts and still permits an actual concurrent status update',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof}=await conflictFixture(page);let receipt=proof;await page.route('**/api/projects/1/candidates/10/source',route=>route.fulfill({json:receipt}));
+    const original=await draft(page);
+    const changes=[wire=>{wire.candidate.id=99},wire=>{wire.candidate.subject='其他主体'},wire=>{wire.candidate.value='其他提议值'},wire=>{wire.candidate.expected_version=1;wire.comparison.expectedVersion=1},wire=>{wire.source.id=9},wire=>{wire.current=null},wire=>{wire.current.version=0;wire.comparison.currentVersion=0},wire=>{wire.comparison.currentVersion=9},wire=>{wire.comparison.matches=true},wire=>{wire.current.candidate_id=10},wire=>{wire.sourceTextIsUntrusted=false},wire=>{wire.role='admin'}];
+    for(const change of changes){
+      receipt=structuredClone(proof);change(receipt);
+      const refresh=page.locator('#candidates').getByRole('button',{name:'刷新核对',exact:true});
+      if(await refresh.count())await refresh.click();else await page.locator('#candidates').getByRole('button',{name:'重试来源原文',exact:true}).click();
+      await page.waitForFunction(()=>!document.querySelector('#candidates .entry > button').disabled);
+      assert.match(await page.locator('#candidates .provenance-detail').textContent(),/候选核对回执格式异常/);assert.deepEqual(await draft(page),original);
+      assert.equal(await page.getByRole('button',{name:'用最新版本填写新候选',exact:true}).count(),0);
+    }
+    receipt=structuredClone(proof);receipt.candidate.status='approved';receipt.current={fact_id:21,version:1,value:receipt.candidate.value,source_id:1,candidate_id:10,source_title:receipt.source.title};receipt.comparison={expectedVersion:0,currentVersion:1,matches:false};
+    await page.locator('#candidates').getByRole('button',{name:'重试来源原文',exact:true}).click();await page.locator('#candidates').getByRole('button',{name:'刷新核对',exact:true}).waitFor();
+    assert.match(await page.locator('#candidates .provenance-detail').textContent(),/该候选已处理/);assert.match(await page.locator('#candidates .provenance-detail').textContent(),/读取时已批准/);
+    assert.deepEqual(await draft(page),original);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('invalid latest comparison or source bindings preserve both draft and the prior reviewed panel',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {proof,prepare}=await conflictFixture(page);let receipt=proof;await page.route('**/api/projects/1/candidates/10/source',route=>route.fulfill({json:receipt}));
+    await page.locator('#proposal [name=value]').fill('不可被坏回执替换的草稿');const original=await draft(page),panel=await page.locator('#candidates .provenance-detail').textContent();
+    for(const change of [wire=>{wire.source.id=2},wire=>{wire.candidate.source_id=2;wire.source.id=2},wire=>{wire.comparison.expectedVersion=9},wire=>{wire.comparison.currentVersion=-1},wire=>{wire.comparison.matches='false'},wire=>{wire.current=null;wire.comparison.currentVersion=2},wire=>{wire.source.content=null}]){
+      receipt=structuredClone(proof);change(receipt);await prepare.click();await page.waitForFunction(()=>[...document.querySelectorAll('#candidates button')].find(button=>button.textContent==='用最新版本填写新候选')?.disabled===false);
+      assert.match(await page.locator('#candidateFeedback').textContent(),/候选核对回执格式异常/);assert.deepEqual(await draft(page),original);assert.equal(await page.locator('#candidates .provenance-detail').textContent(),panel);
+    }
+    receipt=proof;await prepare.click();await page.locator('#proposalFeedback').getByText(/已用读取时 v2.*尚未提交/).waitFor();
+    assert.equal((await draft(page)).value,proof.candidate.value);assert.equal((await draft(page)).expected_version,'2');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('late fact and comparison details cannot populate a later A to B to A visit',async t=>{
+  for(const kind of ['facts','candidates'])await t.test(kind,async()=>{
+    const {page,errors}=await openPage();
+    try{
+      let proof,pattern;
+      if(kind==='facts')({proof,pattern}=await provenanceFixture(page));else{({proof}=await conflictFixture(page));pattern='**/api/projects/1/candidates/10/source'}
+      const pending=await hold(page,pattern,'GET');
+      await page.locator('#'+kind).getByRole('button',{name:kind==='facts'?'查看依据':'刷新核对',exact:true}).click();await pending.observed;
+      await returnToFirstProject(page);
+      const panel=page.locator(`#${kind} .provenance-detail`);assert.equal(await panel.isHidden(),true);
+      const response=page.waitForResponse(pattern);pending.release(proof);await (await response).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      assert.equal(await panel.isHidden(),true);assert.equal(await panel.textContent(),'');assert.deepEqual(errors,[]);
+    }finally{await closePage(page)}
+  });
 });

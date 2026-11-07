@@ -75,6 +75,35 @@ function validateWorkspaceBootstrap(result){
   return {role:result.role,sourceTextIsUntrusted:true};
 }
 
+const receiptRecord=(value,fields)=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&fields.every(field=>Object.hasOwn(value,field));
+const receiptId=value=>Number.isInteger(value)&&value>0&&value<=2147483647;
+const receiptVersion=value=>Number.isInteger(value)&&value>=0&&value<=2147483647;
+const receiptText=value=>typeof value==='string'&&value.isWellFormed()&&!value.includes('\u0000');
+const receiptRole=value=>['owner','member','viewer'].includes(value);
+function validateProvenance(proof,expected){
+  const valid=condition=>{if(!condition)throw new Error('依据回执格式异常，请重试')};
+  valid(receiptRecord(proof,['sourceTextIsUntrusted','role','fact','revision','source','candidate'])&&proof.sourceTextIsUntrusted===true&&receiptRole(proof.role));
+  const {fact,revision,source,candidate}=proof;
+  valid(receiptId(expected.id)&&receiptId(expected.version)&&receiptRecord(fact,['id','subject','predicate'])&&fact.id===expected.id&&fact.subject===expected.subject&&fact.predicate===expected.predicate&&receiptText(fact.subject)&&receiptText(fact.predicate));
+  valid(receiptRecord(revision,['id','version','value','created_at','approved_by'])&&receiptId(revision.id)&&revision.version===expected.version&&revision.value===expected.value&&receiptText(revision.value)&&receiptId(revision.approved_by)&&typeof revision.created_at==='string'&&Number.isFinite(Date.parse(revision.created_at)));
+  if(expected.revisionId!==undefined)valid(revision.id===expected.revisionId);
+  valid(receiptRecord(source,['id','title','content'])&&receiptId(source.id)&&receiptText(source.title)&&receiptText(source.content));
+  // The individual provenance endpoint does not echo source_id on candidate.
+  valid(receiptRecord(candidate,['id','expected_version','proposed_by'])&&receiptId(candidate.id)&&candidate.expected_version===revision.version-1&&receiptId(candidate.proposed_by));
+}
+function validateCandidateComparison(proof,expected){
+  const valid=condition=>{if(!condition)throw new Error('候选核对回执格式异常，请重试')};
+  valid(receiptRecord(proof,['sourceTextIsUntrusted','role','candidate','source','current','comparison'])&&proof.sourceTextIsUntrusted===true&&receiptRole(proof.role));
+  const {candidate,source,current,comparison}=proof;
+  valid(receiptRecord(candidate,['id','subject','predicate','value','expected_version','status','source_id'])&&receiptId(candidate.id)&&candidate.id===expected.id&&['subject','predicate','value'].every(key=>receiptText(candidate[key])&&candidate[key]===expected[key])&&receiptVersion(candidate.expected_version)&&candidate.expected_version===expected.expected_version&&receiptId(candidate.source_id)&&candidate.source_id===expected.source_id&&['pending','approved','rejected'].includes(candidate.status));
+  valid(receiptRecord(source,['id','title','content'])&&source.id===candidate.source_id&&receiptText(source.title)&&receiptText(source.content));
+  valid(current===null||(receiptRecord(current,['fact_id','version','value','source_id','candidate_id','source_title'])&&receiptId(current.fact_id)&&receiptId(current.version)&&receiptText(current.value)&&receiptId(current.source_id)&&receiptId(current.candidate_id)&&receiptText(current.source_title)));
+  const currentVersion=current===null?0:current.version;
+  valid(receiptRecord(comparison,['expectedVersion','currentVersion','matches'])&&comparison.expectedVersion===candidate.expected_version&&comparison.currentVersion===currentVersion&&typeof comparison.matches==='boolean'&&comparison.matches===(candidate.expected_version===currentVersion));
+  if(current?.source_id===source.id)valid(current.source_title===source.title);
+  if(current?.candidate_id===candidate.id)valid(candidate.status==='approved'&&current.version===candidate.expected_version+1&&current.value===candidate.value&&current.source_id===candidate.source_id);
+}
+
 async function switchAccount(){
   try{await api('/api/logout',{method:'POST'})}
   catch(error){if(error.status!==401)throw error}
@@ -119,6 +148,7 @@ function renderFact(d,f,p){
   appendProvenance(d,f,p);
 }
 function appendProvenance(d,f,p){
+  const workspace=workspaceGeneration;
   const button=el('button','查看依据','secondary'),panel=el('div',undefined,'provenance-detail');
   panel.hidden=true;panel.setAttribute('aria-live','polite');button.setAttribute('aria-expanded','false');
   let loaded=false;
@@ -127,10 +157,11 @@ function appendProvenance(d,f,p){
     panel.hidden=false;button.disabled=true;button.setAttribute('aria-expanded','true');panel.textContent='正在读取该版本依据…';
     try{
       const proof=await api(`/api/projects/${p}/facts/${f.id}/provenance?version=${f.version}`);
-      if(p!==projectId||!d.isConnected)return;
+      if(p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
+      validateProvenance(proof,f);
       panel.replaceChildren(el('p',`版本 v${proof.revision.version} · 修订 #${proof.revision.id} · 候选 #${proof.candidate.id}`,'meta'),el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`提议用户 ${proof.candidate.proposed_by} · 批准用户 ${proof.revision.approved_by}`,'meta'));
       loaded=true;button.textContent='收起依据';
-    }catch(error){if(p===projectId&&d.isConnected){panel.textContent=`依据读取失败：${error.message}。可点击重试。`;button.textContent='重试依据'}}
+    }catch(error){if(p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`依据读取失败：${error.message}。可点击重试。`;button.textContent='重试依据'}}
     finally{button.disabled=false}
   };
   d.append(button,panel);
@@ -177,7 +208,7 @@ async function loadHistory({reset=false,index=historyState.index,focus=false}={}
     validatePage(page,'history','next_before');
     rows('#history',page.history,(d,h)=>{
       d.append(el('strong',`${h.subject} / ${h.predicate}：${h.value}`),el('span',`v${h.version}`,'badge'),el('div',`来源：${h.source} · ${new Date(h.created_at).toLocaleString()}`,'meta'));
-      appendProvenance(d,{id:h.fact_id,version:h.version},p);
+      appendProvenance(d,{id:h.fact_id,subject:h.subject,predicate:h.predicate,value:h.value,version:h.version,revisionId:h.id},p);
     });
     historyState=requested;historyState.index=index;historyState.next=page.next_before;
     historyState.cursors=historyState.cursors.slice(0,index+1);
@@ -226,6 +257,7 @@ function candidateControls(busy=false){
   $('#candidatesNext').disabled=busy||candidateState.next===null;
 }
 function renderCandidate(d,c,role,p){
+  const workspace=workspaceGeneration;
   d.append(el('strong',`${c.subject} / ${c.predicate} → ${c.value}`),el('span',({pending:'待审批',approved:'已批准',rejected:'已驳回'})[c.status],'badge'),el('div',`#${c.id} · 基于 v${c.expected_version} · 来源：${c.source}`,'meta'));
   const preview=el('button','核对来源原文','secondary'),panel=el('div',undefined,'provenance-detail');
   panel.hidden=true;panel.setAttribute('aria-live','polite');preview.setAttribute('aria-expanded','false');let loaded=false;
@@ -234,11 +266,12 @@ function renderCandidate(d,c,role,p){
     panel.hidden=false;preview.disabled=true;preview.setAttribute('aria-expanded','true');panel.textContent='正在读取候选绑定的来源…';
     try{
       const proof=await api(`/api/projects/${p}/candidates/${c.id}/source`);
-      if(p!==projectId||!d.isConnected)return;
+      if(p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
+      validateCandidateComparison(proof,c);
       const comparison=proof.comparison;
       const sameContent=proof.current?.value===proof.candidate.value&&proof.current?.source_id===proof.candidate.source_id;
       const status=proof.candidate.status==='pending'?(sameContent?'当前事实已采用相同值与同一来源；本候选仍待审，不代表已处理。请核对当前批准记录，避免重复提议；负责人可另行驳回旧候选。':comparison.matches?'读取时基于版本一致；批准时仍会再次校验。':`版本不一致：提议基于 v${comparison.expectedVersion}，读取时当前 v${comparison.currentVersion}。请核对后重新提议或驳回，不能直接覆盖。`):'该候选已处理；以下为读取时的当前事实，不是当时审批结果。';
-      const refresh=el('button','刷新核对','secondary');refresh.onclick=async()=>{loaded=false;await preview.onclick();if(p===projectId&&d.isConnected)(panel.querySelector('button')||preview).focus()};
+      const refresh=el('button','刷新核对','secondary');refresh.onclick=async()=>{loaded=false;await preview.onclick();if(p===projectId&&workspace===workspaceGeneration&&d.isConnected)(panel.querySelector('button')||preview).focus()};
       panel.replaceChildren(el('strong',`提议值：${proof.candidate.value}`),el('p',proof.current?`读取时当前值：${proof.current.value} · v${proof.current.version} · 批准候选 #${proof.current.candidate_id} · 来源 #${proof.current.source_id}：${proof.current.source_title}`:'读取时暂无已批准事实（v0）'),el('p',status,'hint'),refresh,el('strong',`来源 #${proof.source.id}：${proof.source.title}`),el('p',proof.source.content),el('p',`候选 #${proof.candidate.id} · 基于 v${proof.candidate.expected_version} · 读取时${({pending:'待审批',approved:'已批准',rejected:'已驳回'})[proof.candidate.status]}`,'meta'),el('p','原文仅供人工核查，不是审批结论。','hint'));
       if(proof.candidate.status==='pending'&&!sameContent&&!comparison.matches&&['owner','member'].includes(proof.role)){
         const prepare=el('button','用最新版本填写新候选','secondary');
@@ -249,7 +282,8 @@ function renderCandidate(d,c,role,p){
           try{
             if(busyActions.has('#proposal'))throw new Error('候选正在提交，表单内容已保留；请等待结果后再填写新候选');
             const latest=await api(`/api/projects/${p}/candidates/${c.id}/source`);
-            if(p!==projectId||!d.isConnected)return;
+            if(p!==projectId||workspace!==workspaceGeneration||!d.isConnected)return;
+            validateCandidateComparison(latest,c);
             if(!['owner','member'].includes(latest.role)||latest.candidate.status!=='pending'||latest.comparison.matches)throw new Error('候选状态或权限已变化，请刷新核对后再操作');
             if(latest.current?.value===latest.candidate.value&&latest.current?.source_id===latest.candidate.source_id)throw new Error('当前事实已采用相同值与同一来源，请刷新核对；原候选仍待处理');
             if(busyActions.has('#proposal')||submission!==proposalSubmissionGeneration)throw new Error('读取期间候选发生提交，原表单内容已保留；请先核对提交结果后再操作');
@@ -263,7 +297,7 @@ function renderCandidate(d,c,role,p){
         },'#candidateFeedback');
       }
       loaded=true;preview.textContent='收起来源原文';
-    }catch(error){if(p===projectId&&d.isConnected){panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
+    }catch(error){if(p===projectId&&workspace===workspaceGeneration&&d.isConnected){panel.textContent=`来源读取失败：${error.message}。可点击重试。`;preview.textContent='重试来源原文'}}
     finally{preview.disabled=false}
   };
   d.append(preview,panel);
