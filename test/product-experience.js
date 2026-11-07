@@ -420,3 +420,67 @@ test('a failed candidate filter keeps the accepted status, role and pending acti
     assert.equal(await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).isEnabled(),true);assert.deepEqual(errors,[]);
   }finally{await page.close()}
 });
+
+async function acceptedPage(page,config){
+  return {text:await page.locator(`#${config.root}`).textContent(),state:await page.evaluate(root=>({facts:factState,history:historyState,candidates:candidateState,sources:sourceState,audit:auditState})[root],config.root),previous:await page.locator(`#${config.root}Previous`).isDisabled(),next:await page.locator(`#${config.root}Next`).isDisabled(),selection:await page.locator('#sourceSelect').inputValue()};
+}
+test('all five lists reject an HTTP 200 empty-object receipt before replacing the accepted page',async t=>{
+  for(const config of pagedLists)await t.test(config.root,async()=>{
+    const {page,errors}=await openPage();
+    try{
+      const cursors=[];let recover=false;
+      await page.route(`**/api/projects/1/${config.root}?*`,async route=>{
+        const cursor=new URL(route.request().url()).searchParams.get(config.key);cursors.push(cursor);
+        if(cursor==='1'&&!recover){await route.fulfill({json:{}});return}
+        const id=cursor==='1'?2:1;
+        await route.fulfill({json:{[config.items]:[config.row(id)],[config.next]:id===1?1:null,role:'owner'}});
+      });
+      await login(page);await page.locator(`#${config.root}Status`).getByText(/第 1 页/).waitFor();
+      const original=await acceptedPage(page,config);
+      await page.locator(`#${config.root}Next`).click();await page.locator(`#${config.root}Status`).getByText(/加载失败/).waitFor();
+      assert.deepEqual(await acceptedPage(page,config),original,'a malformed success receipt must not change DOM, accepted state, evidence or navigation');
+      assert.match(await page.locator(`#${config.root}Status`).textContent(),/分页响应格式异常/);
+      recover=true;await page.locator(`#${config.root}Next`).click();await page.locator(`#${config.root}Status`).getByText(/第 2 页/).waitFor();
+      assert.deepEqual(cursors,[config.start,'1','1']);assert.equal(await page.locator(`#${config.root}Next`).isDisabled(),true);assert.deepEqual(errors,[]);
+    }finally{await page.close()}
+  });
+});
+
+test('all five lists reject malformed JSON page shapes and cursors, then recover with accepted filters',async t=>{
+  for(const config of pagedLists)await t.test(config.root,async()=>{
+    const {page,errors}=await openPage();
+    try{
+      let bad=null;const requests=[];
+      const valid=id=>({[config.items]:[config.row(id)],[config.next]:id===1?1:null,role:'owner'});
+      await page.route(`**/api/projects/1/${config.root}?*`,async route=>{
+        const url=new URL(route.request().url());requests.push({cursor:url.searchParams.get(config.key),query:url.searchParams.get('q'),status:url.searchParams.get('status')});
+        await route.fulfill({json:bad?bad.value:valid(url.searchParams.get(config.key)==='1'?2:1)});
+      });
+      await login(page);await page.locator(`#${config.root}Status`).getByText(/第 1 页/).waitFor();
+      if(config.root==='facts'||config.root==='sources'){
+        const form=config.root==='facts'?'#searchForm':'#sourceSearchForm';
+        await page.locator(`${form} [name=q]`).fill('已接受的检索');await page.locator(`${form} button`).click();
+        await page.waitForFunction(root=>({facts:factState,sources:sourceState})[root].query==='已接受的检索',config.root);
+      }else if(config.root==='candidates'){
+        await page.locator('#candidateFilter').selectOption('pending');await page.waitForFunction(()=>candidateState.status==='pending');
+      }
+      const original=await acceptedPage(page,config),first=requests.length;
+      const invalid=[null,{[config.items]:null,[config.next]:null,role:'owner'},{[config.items]:[null],[config.next]:null,role:'owner'},{[config.items]:[config.row(2)],role:'owner'},...[-1,0,1.5,'2',Number.MAX_SAFE_INTEGER+1,99].map(cursor=>({...valid(2),[config.next]:cursor})),{...valid(2),[config.items]:[],[config.next]:2}];
+      if(config.root==='candidates')invalid.push({...valid(2),role:'admin'});
+      if(config.root==='sources')invalid.push({...valid(2),sources:[{...config.row(2),content:null}]});
+      for(const receipt of invalid){
+        bad={value:receipt};await page.locator(`#${config.root}Next`).click();
+        await page.waitForFunction(root=>document.querySelector(`#${root}`).getAttribute('aria-busy')==='false',config.root);
+        assert.match(await page.locator(`#${config.root}Status`).textContent(),/分页响应格式异常/);
+        assert.deepEqual(await acceptedPage(page,config),original);
+      }
+      bad=null;await page.locator(`#${config.root}Next`).click();await page.locator(`#${config.root}Status`).getByText(/第 2 页/).waitFor();
+      assert.equal(await page.locator(`#${config.root}Next`).isDisabled(),true);
+      const retries=requests.slice(first);assert.equal(retries.length,invalid.length+1);
+      assert.ok(retries.every(request=>request.cursor==='1'));
+      if(config.root==='facts'||config.root==='sources')assert.ok(retries.every(request=>request.query==='已接受的检索'));
+      if(config.root==='candidates')assert.ok(retries.every(request=>request.status==='pending'));
+      assert.deepEqual(errors,[]);
+    }finally{await page.close()}
+  });
+});
