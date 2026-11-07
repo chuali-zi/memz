@@ -152,6 +152,11 @@ function validateLoginReceipt(result){
 function validateLogoutReceipt(result){
   if(!receiptRecord(result,['ok'])||result.ok!==true)throw new Error('退出回执格式异常，尚未确认退出，请重试');
 }
+function validateDecisionReceipt(result,action,expectedVersion){
+  if(!receiptRecord(result,['status'])||!(action==='approve'
+    ?result.status==='approved'&&receiptVersion(expectedVersion)&&receiptId(result.version)&&result.version===expectedVersion+1
+    :action==='reject'&&result.status==='rejected'))throw new Error('审批回执格式异常，处理结果未确认；请刷新核对候选状态后再操作');
+}
 
 async function switchAccount(){
   try{validateLogoutReceipt(await api('/api/logout',{method:'POST'}))}
@@ -384,6 +389,7 @@ function renderCandidate(d,c,role,p){
       for(const button of actions.querySelectorAll('button')){button.disabled=true;button.setAttribute('aria-busy','true')}
       try{
         const result=await api(`/api/projects/${p}/candidates/${c.id}/${action}`,{method:'POST'});
+        validateDecisionReceipt(result,action,c.expected_version);
         if(p===projectId&&workspace===workspaceGeneration){
           await load();
           if(p===projectId&&workspace===workspaceGeneration){message(action==='approve'?`批准成功：本次生成 v${result.version}，当前事实已更新；旧版本保留在历史中。`:'驳回成功：候选保留为已驳回，本次操作未修改当前事实。','#candidateFeedback');$('#candidateFeedback').focus()}

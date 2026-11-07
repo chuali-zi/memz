@@ -1412,3 +1412,26 @@ for(const scenario of ['stale','injection'])test(`${scenario} simulated client r
     assert.equal(writes,2,'manual proposals never issue approval requests');assert.equal(new Set(keys).size,1);assert.equal(await page.evaluate(()=>pendingCreations.size),0);assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
+
+for(const [action,label,invalid,valid] of [['approve','批准',{status:'approved',version:99},{status:'approved',version:1}],['reject','驳回',{status:'approved'},{status:'rejected'}]])test(`${action} requires a matching receipt before announcing success, preserving the accepted page and edited draft through a failed refresh`,async()=>{
+  const {page,errors}=await openPage();const requests=[];
+  try{
+    page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/'))requests.push({method:request.method(),path:new URL(request.url()).pathname})});
+    const {proof}=await conflictFixture(page);await settled(page,'#loginForm');await settledLists(page);
+    assert.equal(proof.candidate.expected_version,0,'positive approval receipt is expected_version + 1');
+    const accepted=await page.locator('#candidates').textContent(),trigger=await page.locator('#candidates').getByRole('button',{name:label,exact:true}).elementHandle(),pending=await hold(page,`**/api/projects/1/candidates/10/${action}`),start=requests.length;
+    await page.locator('#candidates').getByRole('button',{name:label,exact:true}).focus();await page.keyboard.press('Enter');await pending.observed;
+    const input=page.locator('#proposal [name=value]');await input.focus();await page.keyboard.press('Control+a');await page.keyboard.type('审批期间继续编辑的草稿');await page.keyboard.press('ArrowLeft');const original=await draft(page),caret=await input.evaluate(node=>[node.selectionStart,node.selectionEnd]);
+    pending.release(invalid);await page.waitForFunction(button=>button.getAttribute('aria-busy')==='false',trigger);
+    assert.match(await page.locator('#candidateFeedback').textContent(),/回执.*未确认.*刷新核对/);assert.doesNotMatch(await page.locator('#candidateFeedback').textContent(),/成功|v99|undefined/);assert.equal(await page.locator('#candidateFeedback').getAttribute('role'),'status');
+    assert.equal(await page.locator('#candidates').textContent(),accepted);assert.deepEqual(await draft(page),original);assert.equal(await input.evaluate(node=>node===document.activeElement),true);assert.deepEqual(await input.evaluate(node=>[node.selectionStart,node.selectionEnd]),caret);assert.deepEqual(requests.slice(start),[{method:'POST',path:`/api/projects/1/candidates/10/${action}`}],'a bad receipt triggers neither automatic retry nor automatic reload');
+    const unavailable=route=>route.request().method()==='GET'?route.fulfill({status:503,json:{error:'合成后续刷新暂不可用'}}):route.fallback();await page.route('**/api/projects/1/**',unavailable);
+    await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await page.locator('#notice').getByText(/工作台加载失败：503 合成后续刷新暂不可用/).waitFor();await settledLists(page);
+    assert.match(await page.locator('#candidateFeedback').textContent(),/未确认/);assert.equal(await page.locator('#candidates').textContent(),accepted);assert.deepEqual(await draft(page),original);assert.deepEqual(await input.evaluate(node=>[node.selectionStart,node.selectionEnd]),caret);assert.equal(requests.slice(start).filter(request=>request.method==='POST').length,1);
+    await page.unroute('**/api/projects/1/**',unavailable);await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await settledLists(page);await page.waitForFunction(()=>data?.role==='owner');assert.match(await page.locator('#candidates').textContent(),/待审批/);assert.deepEqual(await draft(page),original);
+    const confirmed=await hold(page,`**/api/projects/1/candidates/10/${action}`);await page.locator('#candidates').getByRole('button',{name:label,exact:true}).focus();await page.keyboard.press('Enter');await confirmed.observed;confirmed.release(valid);
+    await page.locator('#candidateFeedback').getByText(action==='approve'?/批准成功：本次生成 v1/:/驳回成功：候选保留为已驳回/).waitFor();await settledLists(page);
+    assert.deepEqual(await draft(page),original);assert.equal(requests.slice(start).filter(request=>request.method==='POST').length,2,'only the two deliberate keyboard actions send decisions');assert.deepEqual(errors,[]);
+    console.log('Synthetic decision receipt browser:',JSON.stringify({action,apiRequests:requests.length,decisionPosts:2,databaseQueries:0,modelCalls:0,realCommitNotClaimed:true}));
+  }finally{await closePage(page)}
+});
