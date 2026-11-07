@@ -4,21 +4,8 @@ const {spawn}=require('node:child_process');
 const {Client}=require('pg');
 const {readContext}=require('../scripts/context-client');
 const {createInterface}=require('node:readline');
+const {pgTool}=require('./pg-tool-helper');
 
-function pgTool(name,url,input){
-  const u=new URL(url),container=process.env.PG_TOOLS_CONTAINER;
-  const env={...process.env,PGPASSWORD:decodeURIComponent(u.password)};
-  const args=['--host',u.hostname,'--port',u.port||'5432','--username',decodeURIComponent(u.username),'--dbname',u.pathname.slice(1),...(name==='pg_dump'?['--format=custom']:['--exit-on-error','--single-transaction','--no-owner'])];
-  return new Promise((resolve,reject)=>{
-    const binary=fs.existsSync(`/usr/lib/postgresql/16/bin/${name}`)?`/usr/lib/postgresql/16/bin/${name}`:name;
-    const child=spawn(container?'docker':binary,container?['exec','-i','-e','PGPASSWORD',container,name,...args]:args,{env,stdio:['pipe','pipe','pipe']});
-    const chunks=[];let size=0;const timer=setTimeout(()=>{child.kill();reject(new Error(`${name} timed out`))},60000);
-    child.stdout.on('data',chunk=>{size+=chunk.length;if(size>8*1024*1024){child.kill();reject(new Error('Synthetic backup exceeds test limit'))}else chunks.push(chunk)});
-    child.stderr.resume();child.stdin.on('error',()=>{});
-    child.on('error',()=>{clearTimeout(timer);reject(new Error(`${name} could not start`))});
-    child.on('close',code=>{clearTimeout(timer);resolve({code,bytes:Buffer.concat(chunks)})});child.stdin.end(input);
-  });
-}
 async function service(url){
   const u=new URL(url);u.username='memz_app';u.password='memz_demo_only';
   const child=spawn(process.execPath,['-e',"const {app}=require('./server');const s=app.listen(0,'127.0.0.1',()=>console.log(s.address().port));"],{env:{...process.env,DATABASE_URL:u.href},stdio:['ignore','pipe','pipe']});
