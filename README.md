@@ -1,6 +1,6 @@
 # Memz · 可审计的项目上下文记忆
 
-面向项目协作智能体的数据库演示：把来源、候选、负责人审批、不可变修订和审计连接起来。当前客户端为明确标注的模拟程序，不调用模型；数据与账号均为合成样例。项目是比赛初版，不是生产系统。
+面向项目协作智能体的数据库演示：把来源、候选、负责人审批、不可变修订和审计连接起来。默认演示客户端为明确标注的模拟程序，不调用模型；独立实验器可显式调用DeepSeek；数据与账号均为合成样例。项目是比赛初版，不是生产系统。
 
 ## 与只保存聊天记录有什么不同？
 
@@ -74,7 +74,11 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 运行 `npm run eval:retrieval` 可生成 19 个正确性用例与逐例 HTTP 延迟报告；需显式设置测试管理员连接，详见[数据集、运行步骤与测量限制](docs/retrieval-evaluation.md)。CI 自动保存 `retrieval-evaluation` 报告，不使用虚构成绩或跨环境性能阈值。
 
-长期记忆公开基准的研究、固定数据清单、离线检索实验及后续公平比较方案见 [memory benchmarks](benchmarks/memory/README.md)。新增可选[批量溯源与来源去重](docs/context-optimization.md)，用 `npm run eval:context` 在独立临时库对比四种组合，记录请求数、输出字节、读取延迟和写入维护开销；需要显式 `CONTEXT_EVALUATION_DATABASE_URL`。仓库不包含第三方数据或源码；字节、检索证据命中与合成 HTTP 实验不代表真实模型的质量、加速或 token 节省结论。
+长期记忆公开基准的研究、固定数据清单、离线检索实验及后续公平比较方案见 [memory benchmarks](benchmarks/memory/README.md)。新增可选[批量溯源与来源去重](docs/context-optimization.md)，用 `npm run eval:context` 在独立临时库对比六种组合，记录请求数、输出字节、读取延迟和写入维护开销；需要显式 `CONTEXT_EVALUATION_DATABASE_URL`。仓库不包含第三方数据或源码；字节、检索证据命中与合成 HTTP 实验不代表真实模型的质量、加速或 token 节省结论。
+
+## 真实模型效果实验
+
+已完成使用 `DEEPSEEK_API_KEY` 的350次原创合成测试调用，另有1次连通性请求。留出集28题各重复两次：完整历史与新增历史读取均56/56正确，历史读取平均输入829 token（完整历史948）；原当前事实48/56，缺口为旧版本问题。显式reader投影保持当前事实成绩，平均输入由962降到646 token。这不代表公开基准、自动抽取或真实用户场景已验证。见[实验报告与逐题证据](benchmarks/memory/DEEPSEEK_RESULTS.md)、[工程入口与复现](docs/model-memory-evaluation.md)、[论文到工程](benchmarks/memory/RESEARCH_TO_ENGINEERING_2026-11-06.md)。
 
 ## 演示（约 7 分钟）
 
@@ -96,7 +100,7 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 
 详见 [数据模型与取舍](docs/design.md)、[数据字典](docs/data-dictionary.md)与[接口及时序](docs/api-sequences.md)。数据库用事务局部身份设置和 RLS 限制项目范围；应用连接为非 owner、非超级用户、无 BYPASSRLS。会话是服务端随机不透明 cookie，浏览器身份不来自请求中的 user_id 或角色；状态更改要求 CSRF token。来源内容以文本呈现，默认搜索是参数化的字面子串匹配；可显式启用[多关键词全部匹配](docs/lexical-retrieval.md)，让空白分隔的词片段跨主体、属性、当前值组合检索，仍按事实 ID 分页，**不是语义搜索**。
 
-这是单机演示：固定公开账号、内存 session（重启失效，未做集群/速率限制）、HTTP 本机运行、没有真实智能体/文档导入/真实语料或语义检索评测。该 RLS 设计信任应用服务设置事务身份；已获得应用数据库凭据的人可以自己设置身份，不能抵御此类攻击。生产部署还需真实身份认证、密钥管理、会话存储、TLS、权限复核与安全审计。数据库账号密码只供本地演示。
+这是单机演示：固定公开账号、内存 session（重启失效，未做集群/速率限制）、HTTP 本机运行、尚无真实用户智能体流程、文档自动导入、真实语料或语义检索评测；独立DeepSeek实验只验证合成数据上的读取阶段。该 RLS 设计信任应用服务设置事务身份；已获得应用数据库凭据的人可以自己设置身份，不能抵御此类攻击。生产部署还需真实身份认证、密钥管理、会话存储、TLS、权限复核与安全审计。数据库账号密码只供本地演示。
 
 仅取当前事实可使用兼容新增的[游标分页接口](docs/bounded-retrieval.md)，默认 50、最多 100 条；页面已接入50条分页；原聚合接口默认完整响应仍兼容。历史也采用[独立分页](docs/history-pagination.md)，每页25条；[候选分页与状态筛选](docs/candidate-pagination.md)每页25条，[来源也按标题检索与分页](docs/source-pagination.md)，已选依据跨页保留。[审计分页](docs/audit-pagination.md)每页25条，可查看100条之后的早期操作。五类列表可独立读取，整页刷新用于重新核对。
 

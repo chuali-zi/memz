@@ -1,0 +1,969 @@
+{
+  "schema": "memz-memory-quality-export-v1",
+  "synthetic": true,
+  "status": "passed",
+  "sourceCommit": "ff47b7c7ec365251d71245d0fa6b2bbae1aa82fb",
+  "workingTreeDirty": false,
+  "files": {
+    "server.js": "acad755ab545c692ad4d6c7cb988d847b3fe5c31b789cf6303492f35bb3a1d89",
+    "db/schema.sql": "6dc7b3f3a10f868aa6b1d3f0ba2792c8b615224e6e56a75afa926b81eeb64d0f",
+    "scripts/context-client.js": "59adec914d7213aa83180f66eb3a3058c97750492e9e6bd8d1f019e46f8ca658",
+    "scripts/context-snapshot.js": "ddd95b987a78c88186dc26ac1d7a50f2eba2992c6324d0da7c68fba969d62191",
+    "scripts/reader-context.js": "4e0a048df1f3765b9a32e9491167b405c5fff2086cdef4248611d0b1b9341676",
+    "scripts/history-context.js": "a8977dd4a5ce65376df7a82daf199a2acf2c366c33d1af83a22f73959273ec3b",
+    "evaluation/memory-quality-export.js": "632020b10a1864241d68a9276e406da6338f3ecb444afb1180453753561d180d"
+  },
+  "startedAt": "2026-11-06T15:38:34.868Z",
+  "environment": {
+    "node": "v24.22.1",
+    "postgres": "16.15 (Debian 16.15-1.pgdg13+2)"
+  },
+  "ingestion": {
+    "modelCalls": 0,
+    "approval": "scripted owner approval of predefined synthetic facts, not model extraction or human timing",
+    "elapsedMs": 1476.56311,
+    "timingScope": "fixture creation plus context export/probes; not isolated write latency"
+  },
+  "scopes": [
+    {
+      "id": "dev/scope-1",
+      "projectId": 3,
+      "subject": "青榆项目",
+      "eventCount": 9,
+      "currentFacts": 4,
+      "split": "dev"
+    },
+    {
+      "id": "dev/scope-2",
+      "projectId": 4,
+      "subject": "赤帆项目",
+      "eventCount": 9,
+      "currentFacts": 4,
+      "split": "dev"
+    },
+    {
+      "id": "heldout/scope-3",
+      "projectId": 5,
+      "subject": "霜鹭项目",
+      "eventCount": 9,
+      "currentFacts": 4,
+      "split": "heldout"
+    },
+    {
+      "id": "heldout/scope-4",
+      "projectId": 6,
+      "subject": "墨鲸项目",
+      "eventCount": 9,
+      "currentFacts": 4,
+      "split": "heldout"
+    },
+    {
+      "id": "heldout/scope-5",
+      "projectId": 7,
+      "subject": "银杉项目",
+      "eventCount": 9,
+      "currentFacts": 4,
+      "split": "heldout"
+    },
+    {
+      "id": "heldout/scope-6",
+      "projectId": 8,
+      "subject": "砂鸢项目",
+      "eventCount": 9,
+      "currentFacts": 4,
+      "split": "heldout"
+    }
+  ],
+  "retrieval": [
+    {
+      "questionId": "dev/scope-1/q-1",
+      "requests": 3,
+      "responseBytes": 2410,
+      "elapsedMs": 78.73661800000002,
+      "originalBytes": 2123,
+      "readerBytes": 1293,
+      "sourceIds": [
+        8,
+        9,
+        7,
+        13
+      ],
+      "historyElapsedMs": 15.344490000000008,
+      "historyRequests": 4,
+      "historyResponseBytes": 3611
+    },
+    {
+      "questionId": "dev/scope-1/q-2",
+      "requests": 3,
+      "responseBytes": 2410,
+      "elapsedMs": 7.982234000000005,
+      "originalBytes": 2123,
+      "readerBytes": 1293,
+      "sourceIds": [
+        8,
+        9,
+        7,
+        13
+      ],
+      "historyElapsedMs": 9.87918499999995,
+      "historyRequests": 4,
+      "historyResponseBytes": 3611
+    },
+    {
+      "questionId": "dev/scope-1/q-3",
+      "requests": 3,
+      "responseBytes": 2410,
+      "elapsedMs": 10.911685999999975,
+      "originalBytes": 2123,
+      "readerBytes": 1293,
+      "sourceIds": [
+        8,
+        9,
+        7,
+        13
+      ],
+      "historyElapsedMs": 13.963863000000003,
+      "historyRequests": 4,
+      "historyResponseBytes": 3611
+    },
+    {
+      "questionId": "dev/scope-1/q-4",
+      "requests": 3,
+      "responseBytes": 2410,
+      "elapsedMs": 6.2117170000000215,
+      "originalBytes": 2123,
+      "readerBytes": 1293,
+      "sourceIds": [
+        8,
+        9,
+        7,
+        13
+      ],
+      "historyElapsedMs": 13.048848999999962,
+      "historyRequests": 4,
+      "historyResponseBytes": 3611
+    },
+    {
+      "questionId": "dev/scope-1/q-5",
+      "requests": 3,
+      "responseBytes": 2410,
+      "elapsedMs": 7.124588000000017,
+      "originalBytes": 2123,
+      "readerBytes": 1293,
+      "sourceIds": [
+        8,
+        9,
+        7,
+        13
+      ],
+      "historyElapsedMs": 8.468680000000006,
+      "historyRequests": 4,
+      "historyResponseBytes": 3611
+    },
+    {
+      "questionId": "dev/scope-1/q-6",
+      "requests": 3,
+      "responseBytes": 2410,
+      "elapsedMs": 5.647334000000001,
+      "originalBytes": 2123,
+      "readerBytes": 1293,
+      "sourceIds": [
+        8,
+        9,
+        7,
+        13
+      ],
+      "historyElapsedMs": 7.364520000000084,
+      "historyRequests": 4,
+      "historyResponseBytes": 3611
+    },
+    {
+      "questionId": "dev/scope-1/q-7",
+      "requests": 3,
+      "responseBytes": 2410,
+      "elapsedMs": 6.038354000000027,
+      "originalBytes": 2123,
+      "readerBytes": 1293,
+      "sourceIds": [
+        8,
+        9,
+        7,
+        13
+      ],
+      "historyElapsedMs": 8.921205999999984,
+      "historyRequests": 4,
+      "historyResponseBytes": 3611
+    },
+    {
+      "questionId": "dev/scope-2/q-1",
+      "requests": 3,
+      "responseBytes": 2430,
+      "elapsedMs": 7.131798000000003,
+      "originalBytes": 2133,
+      "readerBytes": 1303,
+      "sourceIds": [
+        17,
+        18,
+        16,
+        22
+      ],
+      "historyElapsedMs": 11.854522999999972,
+      "historyRequests": 4,
+      "historyResponseBytes": 3629
+    },
+    {
+      "questionId": "dev/scope-2/q-2",
+      "requests": 3,
+      "responseBytes": 2430,
+      "elapsedMs": 8.547109000000091,
+      "originalBytes": 2133,
+      "readerBytes": 1303,
+      "sourceIds": [
+        17,
+        18,
+        16,
+        22
+      ],
+      "historyElapsedMs": 12.297742999999969,
+      "historyRequests": 4,
+      "historyResponseBytes": 3629
+    },
+    {
+      "questionId": "dev/scope-2/q-3",
+      "requests": 3,
+      "responseBytes": 2430,
+      "elapsedMs": 13.737481000000002,
+      "originalBytes": 2133,
+      "readerBytes": 1303,
+      "sourceIds": [
+        17,
+        18,
+        16,
+        22
+      ],
+      "historyElapsedMs": 9.085594000000015,
+      "historyRequests": 4,
+      "historyResponseBytes": 3629
+    },
+    {
+      "questionId": "dev/scope-2/q-4",
+      "requests": 3,
+      "responseBytes": 2430,
+      "elapsedMs": 9.966086000000018,
+      "originalBytes": 2133,
+      "readerBytes": 1303,
+      "sourceIds": [
+        17,
+        18,
+        16,
+        22
+      ],
+      "historyElapsedMs": 9.009118999999941,
+      "historyRequests": 4,
+      "historyResponseBytes": 3629
+    },
+    {
+      "questionId": "dev/scope-2/q-5",
+      "requests": 3,
+      "responseBytes": 2430,
+      "elapsedMs": 7.489980999999943,
+      "originalBytes": 2133,
+      "readerBytes": 1303,
+      "sourceIds": [
+        17,
+        18,
+        16,
+        22
+      ],
+      "historyElapsedMs": 11.469360000000052,
+      "historyRequests": 4,
+      "historyResponseBytes": 3629
+    },
+    {
+      "questionId": "dev/scope-2/q-6",
+      "requests": 3,
+      "responseBytes": 2430,
+      "elapsedMs": 9.270724000000087,
+      "originalBytes": 2133,
+      "readerBytes": 1303,
+      "sourceIds": [
+        17,
+        18,
+        16,
+        22
+      ],
+      "historyElapsedMs": 14.15433100000007,
+      "historyRequests": 4,
+      "historyResponseBytes": 3629
+    },
+    {
+      "questionId": "dev/scope-2/q-7",
+      "requests": 3,
+      "responseBytes": 2430,
+      "elapsedMs": 7.440626000000066,
+      "originalBytes": 2133,
+      "readerBytes": 1303,
+      "sourceIds": [
+        17,
+        18,
+        16,
+        22
+      ],
+      "historyElapsedMs": 11.68594799999994,
+      "historyRequests": 4,
+      "historyResponseBytes": 3629
+    },
+    {
+      "questionId": "heldout/scope-3/q-1",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.801446000000055,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        26,
+        27,
+        25,
+        31
+      ],
+      "historyElapsedMs": 13.491838999999914,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-3/q-2",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 9.167538000000036,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        26,
+        27,
+        25,
+        31
+      ],
+      "historyElapsedMs": 10.299029000000019,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-3/q-3",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 10.574304999999981,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        26,
+        27,
+        25,
+        31
+      ],
+      "historyElapsedMs": 6.684301000000005,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-3/q-4",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.5682030000000395,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        26,
+        27,
+        25,
+        31
+      ],
+      "historyElapsedMs": 6.719594000000029,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-3/q-5",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.589165000000094,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        26,
+        27,
+        25,
+        31
+      ],
+      "historyElapsedMs": 12.832691999999952,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-3/q-6",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 9.040485000000103,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        26,
+        27,
+        25,
+        31
+      ],
+      "historyElapsedMs": 8.864518999999973,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-3/q-7",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 7.955443999999943,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        26,
+        27,
+        25,
+        31
+      ],
+      "historyElapsedMs": 12.805871999999908,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-4/q-1",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 8.064049000000068,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        35,
+        36,
+        34,
+        40
+      ],
+      "historyElapsedMs": 8.125782000000072,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-4/q-2",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 4.9583500000001095,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        35,
+        36,
+        34,
+        40
+      ],
+      "historyElapsedMs": 7.923165000000154,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-4/q-3",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 7.737655000000132,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        35,
+        36,
+        34,
+        40
+      ],
+      "historyElapsedMs": 13.69751999999994,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-4/q-4",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.435474999999997,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        35,
+        36,
+        34,
+        40
+      ],
+      "historyElapsedMs": 14.239859999999908,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-4/q-5",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 11.350750999999946,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        35,
+        36,
+        34,
+        40
+      ],
+      "historyElapsedMs": 10.629558999999972,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-4/q-6",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.288904000000002,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        35,
+        36,
+        34,
+        40
+      ],
+      "historyElapsedMs": 9.337123999999903,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-4/q-7",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.269453000000112,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        35,
+        36,
+        34,
+        40
+      ],
+      "historyElapsedMs": 8.286235000000033,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-5/q-1",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 10.468957000000046,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        44,
+        45,
+        43,
+        49
+      ],
+      "historyElapsedMs": 8.620470000000068,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-5/q-2",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.596728999999868,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        44,
+        45,
+        43,
+        49
+      ],
+      "historyElapsedMs": 10.049833000000035,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-5/q-3",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 7.149424999999837,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        44,
+        45,
+        43,
+        49
+      ],
+      "historyElapsedMs": 7.726897999999892,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-5/q-4",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.528684000000112,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        44,
+        45,
+        43,
+        49
+      ],
+      "historyElapsedMs": 12.08836599999995,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-5/q-5",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.428345000000036,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        44,
+        45,
+        43,
+        49
+      ],
+      "historyElapsedMs": 8.51548200000002,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-5/q-6",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.822967999999946,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        44,
+        45,
+        43,
+        49
+      ],
+      "historyElapsedMs": 17.17608199999995,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-5/q-7",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.935379000000012,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        44,
+        45,
+        43,
+        49
+      ],
+      "historyElapsedMs": 6.936071999999967,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-6/q-1",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.411679000000049,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        53,
+        54,
+        52,
+        58
+      ],
+      "historyElapsedMs": 5.737238999999818,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-6/q-2",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 7.1989300000000185,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        53,
+        54,
+        52,
+        58
+      ],
+      "historyElapsedMs": 11.841703000000052,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-6/q-3",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 8.310090000000173,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        53,
+        54,
+        52,
+        58
+      ],
+      "historyElapsedMs": 8.790737000000036,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-6/q-4",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.862752,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        53,
+        54,
+        52,
+        58
+      ],
+      "historyElapsedMs": 10.419883000000027,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-6/q-5",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.555082999999968,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        53,
+        54,
+        52,
+        58
+      ],
+      "historyElapsedMs": 7.761940999999979,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-6/q-6",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 5.00285800000006,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        53,
+        54,
+        52,
+        58
+      ],
+      "historyElapsedMs": 8.416871999999785,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    },
+    {
+      "questionId": "heldout/scope-6/q-7",
+      "requests": 3,
+      "responseBytes": 2441,
+      "elapsedMs": 6.675948999999946,
+      "originalBytes": 2139,
+      "readerBytes": 1309,
+      "sourceIds": [
+        53,
+        54,
+        52,
+        58
+      ],
+      "historyElapsedMs": 7.117647000000034,
+      "historyRequests": 4,
+      "historyResponseBytes": 3648
+    }
+  ],
+  "literalQuestionProbe": [
+    {
+      "questionId": "dev/scope-1/q-1",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-1/q-2",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-1/q-3",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-1/q-4",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-1/q-5",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-1/q-6",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-1/q-7",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-2/q-1",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-2/q-2",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-2/q-3",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-2/q-4",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-2/q-5",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-2/q-6",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "dev/scope-2/q-7",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-3/q-1",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-3/q-2",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-3/q-3",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-3/q-4",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-3/q-5",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-3/q-6",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-3/q-7",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-4/q-1",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-4/q-2",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-4/q-3",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-4/q-4",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-4/q-5",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-4/q-6",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-4/q-7",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-5/q-1",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-5/q-2",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-5/q-3",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-5/q-4",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-5/q-5",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-5/q-6",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-5/q-7",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-6/q-1",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-6/q-2",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-6/q-3",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-6/q-4",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-6/q-5",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-6/q-6",
+      "returnedFacts": 0
+    },
+    {
+      "questionId": "heldout/scope-6/q-7",
+      "returnedFacts": 0
+    }
+  ],
+  "cleanup": {
+    "temporaryDatabaseDropped": true
+  },
+  "finishedAt": "2026-11-06T15:38:36.644Z",
+  "inputSha256": "b145dbebf631089887d3d21a6facc313befd27c2d4826ebb4a70ad3b59d966cf",
+  "goldSha256": "f9ab279a5cc98e9c0240bedc3dd6e41c2927933c492f164a52d1488dc0900189"
+}

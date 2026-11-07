@@ -51,7 +51,7 @@ schemaVersion 2 的每个事实保留 `id`、`subject`、`predicate`、`value`�
 
 ## 验证与消融接口
 
-固定同一合成数据库、查询、条数、预算和身份，分别运行下表四组。`readContext` 已有 `fetchImpl(url,options)` 注入点，可用包装的原生 fetch 统计请求数及响应体字节；计时应涵盖完整 readContext 调用。输出字节应使用 `Buffer.byteLength(JSON.stringify(context,null,2)+'\n')`，不能当作模型 token 数。
+固定同一合成数据库、查询、条数、预算和身份，分别运行下表六组。`readContext` 已有 `fetchImpl(url,options)` 注入点，可用包装的原生 fetch 统计请求数及响应体字节；计时应涵盖完整 readContext 调用。输出字节应使用 `Buffer.byteLength(JSON.stringify(context,null,2)+'\n')`，不能当作模型 token 数。
 
 | provenanceMode | sourceMode | 比较目的 |
 | --- | --- | --- |
@@ -59,6 +59,8 @@ schemaVersion 2 的每个事实保留 `id`、`subject`、`predicate`、`value`�
 | batch | inline | 单独衡量批量传输 |
 | individual | deduplicated | 单独衡量来源输出去重 |
 | batch | deduplicated | 两项组合 |
+| snapshot | inline | 单请求快照与传输去重，最终仍内联 |
+| snapshot | deduplicated | 单请求快照及最终来源字典 |
 
 预算相同时，两种 schema 可能容纳不同数量的完整事实；既要记录字节数，也要记录实际返回事实数和来源数。无预算时，把去重结果重建为内联事实后逐字段比对；不能只比较条数。来源共享率、原文长度、事实数、网络往返和数据库状态都会影响结果。单来源短文本可能因 schema 元数据出现更大输出，不承诺所有输入都节省字节。
 

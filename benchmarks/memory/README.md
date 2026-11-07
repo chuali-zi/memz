@@ -1,6 +1,6 @@
 # 长期记忆 benchmark 准备
 
-本目录保留 2026-11-05 的基准准备，并新增 2026-11-06 的研究、可选上下文优化及离线评测入口。按最新要求优先优化，完整模型实验延后；没有真实模型质量、加速或 token 节省结论，也不自动审批候选。
+本目录保留 2026-11-05 的公开基准准备与后续研究，并新增已实际调用DeepSeek的原创合成产品实验。最新结果见 [DEEPSEEK_RESULTS.md](DEEPSEEK_RESULTS.md)，协议见 [DEEPSEEK_PROTOCOL.md](DEEPSEEK_PROTOCOL.md)，工程入口见 [model-memory-evaluation](../../docs/model-memory-evaluation.md)。公开基准的完整模型实验仍未完成；本轮不自动抽取或审批真实候选。
 
 本轮交付见 [优化与验证记录](OPTIMIZATION_2026-11-06.md)、[原始来源研究](RESEARCH_UPDATE_2026-11-06.md)、[离线检索通路](OFFLINE_RETRIEVAL.md) 与 [GLM 适配器（未实调用）](GLM_ADAPTER.md)。
 
@@ -12,7 +12,7 @@
 
 ## 分发范围与许可
 
-仓库只包含本项目编写的说明、适配/校验脚本、来源元数据、空白结果表和不含题目/答案的汇总结果。**不包含数据集、规范化语料、逐题输出、第三方源码、模型、缓存或压缩包。** `data/`、`sources/`、`prepared/`、`reports/` 和下载/打包产物均被忽略。
+仓库只包含本项目编写的说明、适配/校验脚本、来源元数据、空白结果表和不含题目/答案的汇总结果。**不包含第三方数据集、其规范化语料/逐题输出、第三方源码、模型或缓存。** 新增 `evidence/deepseek-2026-11-06/` 是本项目原创合成数据的输入、gold和真实模型逐题回执，已检查不含认证信息；这是可分发合成证据，区别于不可随仓库分发的外部基准数据。 `data/`、`sources/`、`prepared/`、`reports/` 和下载/打包产物均被忽略。
 
 - [sources.lock.json](sources.lock.json)：OpenViking、LongMemEval、LoCoMo、MemoryAgentBench、LongMemEval-V2 的官方地址、精确 commit、许可证和调研范围，仅引用源码。
 - [manifest.lock.json](manifest.lock.json)：数据官方来源、固定 revision、已知字节数、SHA256 和访问条件。未知字段为 null；不把引用条目当成已下载。
@@ -25,7 +25,7 @@
 
 LongMemEval S/oracle/M、MAB parquet/entity2id 和 V2 数据在该环境均未取得；Hugging Face 的官方 oracle HEAD 预检被受管云网络政策拒绝（CONNECT 403）。没有重试、改变代理或绕过限制。这里不分发已取得的 LoCoMo 文件；新 checkout 应通过官方来源获取或从有授权的本地副本导入后校验。本次整理和推送没有恢复任何数据下载。
 
-当前 memz 基线仍是需要审批的结构化事实演示，使用整段子串检索，尚无自动抽取/摘要或模型接入。因此完整真实模型实验仍需要独立的历史→候选→审批→检索 adapter。本轮已实现批量固定版本来源读取、独立来源去重及同事实合成消融；下述旧脚本仍是离线加载/通路准备，不是 memz 的完整模型 benchmark。
+当前 memz 基线仍是需要审批的结构化事实演示，默认使用整段子串检索，尚无自动抽取/摘要；新DeepSeek适配器已实际验证读取阶段。因此完整真实模型实验仍需要独立的历史→候选→审批→检索 adapter。本轮已实现批量固定版本来源读取、独立来源去重及同事实合成消融；下述旧脚本仍是离线加载/通路准备，不是 memz 的完整模型 benchmark。
 
 ## 目录与运行条件
 
