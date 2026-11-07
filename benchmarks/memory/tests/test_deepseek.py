@@ -28,15 +28,15 @@ class DeepSeekTests(unittest.TestCase):
             self.assertEqual(set(json.loads(request['messages'][1]['content'])), {'query', 'context'})
             return {'body': json.dumps({'model': 'deepseek-flash', 'id': 'receipt', 'choices': [{'finish_reason': 'stop', 'message': {'content': '{"answer":[],"abstain":true,"source_ids":[]}'}}],
                 'usage': {'prompt_tokens': 20, 'completion_tokens': 10, 'total_tokens': 30, 'prompt_cache_hit_tokens': 5, 'prompt_cache_miss_tokens': 15}}).encode()}
-        with patch.dict('os.environ', {'DEEPSEEK_API_KEY': 'test-only'}):
-            result = complete(self.row, execute=True, transport_fn=transport)
+        with patch('deepseek_adapter.read_credential', side_effect=AssertionError('simulation must not read credentials')):
+            result = complete(self.row, execute=True, simulation=True, transport_fn=transport)
         self.assertEqual(result['status'], 'ok'); self.assertEqual(result['usage']['prompt_cache_hit_tokens'], 5)
         self.assertNotIn('test-only', json.dumps(result))
 
     def test_provider_errors_and_malformed_responses_not_successful(self):
         for reply in ({'error': 'http_error', 'http_status': 401}, {'body': b'not-json'}):
-            with patch.dict('os.environ', {'DEEPSEEK_API_KEY': 'test-only'}):
-                result = complete(self.row, execute=True, transport_fn=lambda *args: reply)
+            with patch('deepseek_adapter.read_credential', side_effect=AssertionError('simulation must not read credentials')):
+                result = complete(self.row, execute=True, simulation=True, transport_fn=lambda *args: reply)
             self.assertEqual(result['status'], 'error'); self.assertEqual(result['attempts'], 1)
 
     def test_scoring_requires_exact_answers_valid_json_and_citations(self):

@@ -12,8 +12,15 @@ import os
 from pathlib import Path
 import re
 import time
+import threading
 import urllib.error
 import urllib.request
+if __package__:
+    from .spend_guard import (AdapterError, parse_usage, reject_credential_reflection,
+                             require_usage, reserve_spend, validate_spend_config)
+else:
+    from spend_guard import (AdapterError, parse_usage, reject_credential_reflection,
+                            require_usage, reserve_spend, validate_spend_config)
 
 ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 SYSTEM_PROMPT = (
@@ -24,9 +31,6 @@ SYSTEM_PROMPT = (
 MAX_FILE_BYTES = 64 * 1024 * 1024
 SIMULATION_CREDENTIAL = "synthetic-not-a-real-key"
 
-
-class AdapterError(Exception):
-    """Messages are fixed safe codes, never provider/transport exception strings."""
 
 
 def read_credential():
@@ -78,30 +82,7 @@ def validate_config(config):
         raise AdapterError("invalid_thinking")
     if "strict_usage" in config and type(config["strict_usage"]) is not bool:
         raise AdapterError("invalid_strict_usage")
-    pricing = config.get("pricing")
-    if pricing is not None:
-        if not isinstance(pricing, dict) or set(pricing) != {"currency", "input_per_million", "output_per_million"}:
-            raise AdapterError("invalid_pricing")
-        if not isinstance(pricing["currency"], str) or not re.fullmatch(r"[A-Z]{3}", pricing["currency"]):
-            raise AdapterError("invalid_pricing")
-        for key in ("input_per_million", "output_per_million"):
-            value = pricing[key]
-            if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1000000:
-                raise AdapterError("invalid_pricing")
-    guard = config.get("spend_guard")
-    if guard is not None:
-        if (not isinstance(guard, dict) or set(guard) != {
-                "tokenizer_id", "max_input_tokens", "max_total_input_tokens", "max_cost"}
-                or pricing is None):
-            raise AdapterError("invalid_spend_guard")
-        if (not isinstance(guard["tokenizer_id"], str)
-                or not re.fullmatch(r"[A-Za-z0-9_.:/-]{1,200}", guard["tokenizer_id"])
-                or not positive_int(guard["max_input_tokens"], 10**7)
-                or not positive_int(guard["max_total_input_tokens"], 10**11)):
-            raise AdapterError("invalid_spend_guard")
-        maximum = guard["max_cost"]
-        if type(maximum) not in (int, float) or not math.isfinite(maximum) or not 0 < maximum <= 10**6:
-            raise AdapterError("invalid_spend_guard")
+    validate_spend_config(config)
     return json.loads(encode(config))
 
 
@@ -214,25 +195,6 @@ def prepare_request(row, config):
     return body, input_bytes
 
 
-def reject_credential_reflection(data, credential):
-    """Inspect decoded values in memory, before any provider text can be retained.
-
-    This catches literal and JSON-escaped echoes, not arbitrary encodings or
-    transformations of secrets. Unknown provider fields are never persisted.
-    """
-    if not credential:
-        return
-    pending = [data]
-    while pending:
-        value = pending.pop()
-        if isinstance(value, str) and credential in value:
-            raise AdapterError("credential_reflection_detected")
-        if isinstance(value, dict):
-            pending.extend(value.keys())
-            pending.extend(value.values())
-        elif isinstance(value, list):
-            pending.extend(value)
-
 
 def parse_response(body, config, *, credential=None):
     if not isinstance(body, bytes) or len(body) > config["max_response_bytes"]:
@@ -249,27 +211,7 @@ def parse_response(body, config, *, credential=None):
         reported = data.get("model")
         if reported is not None and (not isinstance(reported, str) or len(reported) > 200):
             raise ValueError()
-        usage = data.get("usage")
-        details = {"cached_tokens": None, "reasoning_tokens": None}
-        if usage is not None:
-            if not isinstance(usage, dict):
-                raise ValueError()
-            for parent, key, total in [("prompt_tokens_details", "cached_tokens", "prompt_tokens"),
-                                       ("completion_tokens_details", "reasoning_tokens", "completion_tokens")]:
-                nested = usage.get(parent)
-                if nested is not None:
-                    if not isinstance(nested, dict):
-                        raise ValueError()
-                    value = nested.get(key)
-                    if value is not None:
-                        if type(value) is not int or not 0 <= value <= 10**12:
-                            raise ValueError()
-                        if type(usage.get(total)) is int and value > usage[total]:
-                            raise ValueError()
-                    details[key] = value
-            usage = {key: usage.get(key) for key in ("prompt_tokens", "completion_tokens", "total_tokens")}
-            if any(v is not None and (type(v) is not int or not 0 <= v <= 10**12) for v in usage.values()):
-                raise ValueError()
+        usage, details = parse_usage(data.get("usage"))
         finish_reason = choice.get("finish_reason")
         if finish_reason is not None and (not isinstance(finish_reason, str) or len(finish_reason) > 100):
             raise ValueError()
@@ -312,6 +254,7 @@ class GLMAdapter:
         self.reserved_input_tokens = 0
         self.reserved_cost = Decimal(0)
         self.halted = False
+        self._admission_lock = threading.Lock()
         self.config_sha256 = hashlib.sha256(encode(self.config)).hexdigest()
 
     def reserve_spend(self, body):
@@ -322,31 +265,30 @@ class GLMAdapter:
         No character/byte approximation or automatic tokenizer download exists.
         Reservations are never refunded, even for failures or short completions.
         """
-        guard = self.config.get("spend_guard")
-        if guard is None:
-            return None
-        if (not callable(self.token_counter)
-                or getattr(self.token_counter, "tokenizer_id", None) != guard["tokenizer_id"]):
-            raise AdapterError("token_counter_unavailable")
-        count = self.token_counter(body)
-        if not positive_int(count, 10**7):
-            raise AdapterError("invalid_token_count")
-        if count > guard["max_input_tokens"]:
-            raise AdapterError("input_token_budget_exceeded")
-        if self.reserved_input_tokens + count > guard["max_total_input_tokens"]:
-            raise AdapterError("total_input_token_budget_exceeded")
-        pricing = self.config["pricing"]
-        cost = (Decimal(count) * Decimal(str(pricing["input_per_million"]))
-                + Decimal(self.config["max_output_tokens"]) * Decimal(str(pricing["output_per_million"]))) / Decimal(10**6)
-        if self.reserved_cost + cost > Decimal(str(guard["max_cost"])):
-            raise AdapterError("cost_budget_exceeded")
-        self.reserved_input_tokens += count
-        self.reserved_cost += cost
-        return {"tokenizer_id": guard["tokenizer_id"], "input_tokens": count,
-                "cumulative_input_tokens": self.reserved_input_tokens,
-                "currency": pricing["currency"], "request_cost_reservation": str(cost),
-                "cumulative_cost_reservation": str(self.reserved_cost),
-                "basis": "verified_tokenizer_and_configured_rates_required_not_invoice"}
+        return reserve_spend(self, body)
+
+    def _admit(self, row, result):
+        with self._admission_lock:
+            try:
+                if self.halted:
+                    raise AdapterError("adapter_halted")
+                body, size = prepare_request(row, self.config)
+                result.update(id=row["id"], request_sha256=hashlib.sha256(body).hexdigest(), request_bytes=len(body))
+                if self.calls >= self.config["max_calls"]:
+                    raise AdapterError("call_budget_exceeded")
+                if self.input_bytes + size > self.config["max_total_input_bytes"]:
+                    raise AdapterError("input_budget_exceeded")
+                if self.reserved_output_tokens + self.config["max_output_tokens"] > self.config["max_total_output_tokens"]:
+                    raise AdapterError("output_budget_exceeded")
+                result["spend_reservation"] = self.reserve_spend(body)
+                # Reservations also apply to dry runs; failures never refund reservations.
+                self.calls += 1
+                self.input_bytes += size
+                self.reserved_output_tokens += self.config["max_output_tokens"]
+                return body
+            except Exception:
+                self.halted = True
+                raise
 
     def complete(self, row):
         started = time.monotonic()
@@ -360,21 +302,7 @@ class GLMAdapter:
                   "config_sha256": self.config_sha256, "id": None,
                   "input_tokens": None, "request_sha256": None, "request_bytes": None}
         try:
-            if self.halted:
-                raise AdapterError("adapter_halted")
-            body, size = prepare_request(row, self.config)
-            result.update(id=row["id"], request_sha256=hashlib.sha256(body).hexdigest(), request_bytes=len(body))
-            if self.calls >= self.config["max_calls"]:
-                raise AdapterError("call_budget_exceeded")
-            if self.input_bytes + size > self.config["max_total_input_bytes"]:
-                raise AdapterError("input_budget_exceeded")
-            if self.reserved_output_tokens + self.config["max_output_tokens"] > self.config["max_total_output_tokens"]:
-                raise AdapterError("output_budget_exceeded")
-            result["spend_reservation"] = self.reserve_spend(body)
-            # Reservations also apply to dry runs; failures never refund reservations.
-            self.calls += 1
-            self.input_bytes += size
-            self.reserved_output_tokens += self.config["max_output_tokens"]
+            body = self._admit(row, result)
             if not self.execute:
                 result["status"] = "dry_run"
                 return result
@@ -397,12 +325,8 @@ class GLMAdapter:
                 if completion is not None and completion > self.config["max_output_tokens"]:
                     raise AdapterError("provider_output_budget_exceeded")
             if self.config.get("strict_usage", False) or self.config.get("spend_guard") is not None:
-                usage = result["usage"]
-                if (usage is None or any(v is None for v in usage.values())
-                        or usage["prompt_tokens"] + usage["completion_tokens"] != usage["total_tokens"]):
-                    # Retain safe available accounting and answer for the failure
-                    # denominator, but prohibit the next paid request.
-                    raise AdapterError("usage_unverifiable")
+                # Preserve safe partial accounting, but stop the paid run.
+                require_usage(result["usage"])
             if (result["spend_reservation"] is not None
                     and result["input_tokens"] > result["spend_reservation"]["input_tokens"]):
                 # A mismatched tokenizer/provider invalidates the preflight
@@ -416,14 +340,16 @@ class GLMAdapter:
                     "output_budget_exceeded", "credential_unavailable", "invalid_response", "redirect_blocked",
                     "http_error", "response_too_large", "unsupported_encoding", "endpoint_not_allowed",
                     "timeout", "transport_error", "provider_output_budget_exceeded",
-                    "credential_reflection_detected", "usage_unverifiable",
+                    "credential_reflection_detected", "credential_scan_limit_exceeded", "usage_unverifiable",
                     "token_counter_unavailable", "invalid_token_count", "input_token_budget_exceeded",
                     "total_input_token_budget_exceeded", "cost_budget_exceeded", "provider_input_budget_exceeded"}
             result.update(status="error", error=str(exc) if str(exc) in safe else "transport_error")
-            self.halted = True
+            with self._admission_lock:
+                self.halted = True
         except Exception:
             result.update(status="error", error="transport_error")
-            self.halted = True
+            with self._admission_lock:
+                self.halted = True
         finally:
             result["latency_seconds"] = time.monotonic() - started
         return result

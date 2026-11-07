@@ -145,7 +145,12 @@ and isolates the single HTTP attempt in a killable worker with a wall deadline
 (plus up to 0.2 seconds bounded worker cleanup). It never reads HTTP error bodies.
 CLI diagnostics expose only fixed codes; raw exceptions, headers, Authorization,
 and request text are not logged. Decoded successful responses are checked in memory
-for literal or JSON-escaped echoes of the transmitted credential. Any such echo
+for literal or JSON-escaped echoes of the transmitted credential, including the
+normal inner JSON answer string and its keys/unknown fields. Inner decoding
+preserves duplicate key/value pairs and never rewrites the returned answer.
+Scanning is limited to 64 JSON parses, 16 MiB cumulative parse input, 32 MiB
+cumulative text, depth 32 and 100,000 nodes. Exceeding any limit discards the
+whole response with `credential_scan_limit_exceeded`. Any echo
 discards the response with `credential_reflection_detected` and halts. This is not
 a detector for arbitrary encodings or transformed secrets. CLI output files are
 created exclusively with owner-only permissions (`0600`, subject to a more
@@ -189,6 +194,15 @@ Before reading credentials or making a request, the guard checks per-call and
 cumulative input tokens and reserves:
 
 `(counted_input × input_price + max_output_tokens × output_price) / 1,000,000`.
+
+The shared `spend_guard.py` policy now also protects DeepSeek; its current
+entry points and limits are described in [DEEPSEEK_GUARD.md](DEEPSEEK_GUARD.md).
+GLM's existing receipt shape and sequential CLI remain compatible. A per-instance
+lock makes halt checks, preparation and all reservations atomic for module
+callers too, and publishes admission failure before unlocking. Money arithmetic
+uses an independent 512-digit Decimal context, covering the accepted numeric
+bounds even with subnormal float rates, without inheriting thread rounding,
+precision or traps. Separate instances/processes are separate ledgers.
 
 Decimal arithmetic avoids binary rounding at the budget boundary. Reservations
 are never refunded for shorter answers, failed requests or timeouts. A cap
