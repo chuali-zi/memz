@@ -16,8 +16,9 @@
 | project_id | int | 是 | 外键 → projects.id；与 user_id 构成主键 |
 | user_id | int | 是 | 演示账号 ID；没有独立 users 表 |
 | role | text | 是 | CHECK：owner/member/viewer |
+| active | boolean | 是/true | 普通列；false停用此项目成员，保留行、原角色及历史引用；迁移003添加 |
 
-账户与密码在服务端合成账号表中，membership 只表达项目授权，不存储密码。`member_role(project_id)` 是固定 search_path 的 SECURITY DEFINER 查询函数，读取事务身份并返回该用户在项目中的角色，避免 RLS 查询 memberships 时递归。
+账户与密码在服务端合成账号表中，membership 只表达项目授权，不存储密码。`member_role(project_id)` 是固定 search_path 的 SECURITY DEFINER 查询函数，读取事务身份，仅在该用户此项目的active IS TRUE时返回原角色，否则返回NULL，避免 RLS 查询 memberships 时递归。本文“项目成员”权限均以此有效成员合同为前提。停用只影响后续请求/新快照，不删除成员，不取消已有快照；不等于禁用公开演示账号。应用对memberships仍只有SELECT，没有UPDATE或成员管理API，维护步骤见[权限边界](demo-boundary.md#项目成员停用)。
 
 ## sources：证据来源
 
@@ -111,4 +112,4 @@ UNIQUE(project_id,id) 供 revisions 引用。数据库 RLS 要求提出者与事
 
 由迁移002添加；新schema直接包含。字段project_id(int)、actor_id(int)、operation(text，sources/candidates)、request_key(text，1–128个限定ASCII字符)组成主键；project_id引用projects，(project_id,actor_id)引用memberships。request_hash为64位小写十六进制SHA-256字符串；response为必填JSONB对象；created_at为必填timestamptz，默认now()。
 
-应用只授予SELECT/INSERT，RLS要求actor与事务身份一致且是项目owner/member；不授予UPDATE/DELETE。主键提供范围唯一性，配合事务锁和业务事务实现重试，详见idempotent-creation.md。它保存原创建响应，不是候选实时状态；目前无TTL和自动清理。
+应用只授予SELECT/INSERT，RLS要求actor与事务身份一致且是有效项目owner/member（active IS TRUE）；不授予UPDATE/DELETE。主键提供范围唯一性，配合事务锁和业务事务实现重试，详见idempotent-creation.md。它保存原创建响应，不是候选实时状态；目前无TTL和自动清理。

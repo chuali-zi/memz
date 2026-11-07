@@ -41,7 +41,7 @@ docker compose up -d --wait
 
 ## 保留数据升级
 
-`001-current-revision-integrity.sql` 加强当前修订约束，`002-create-idempotency.sql` 增加创建回执表；二者支持原始schema与当前新安装版本，可重复执行，不修改已有事实、来源、候选、历史、审计或序列。每个脚本是独立事务，按编号顺序执行。先暂停应用写入，在仓库根目录、确认当前 Compose 项目就是待维护数据库后创建备份：
+`001-current-revision-integrity.sql` 加强当前修订约束，`002-create-idempotency.sql` 增加创建回执表，`003-membership-active.sql` 增加可停用的项目成员及对应权限过滤；三者支持原始schema与当前新安装版本，可重复执行，不修改已有事实、来源、候选、历史、审计或序列。每个脚本是独立事务，按编号顺序执行。先暂停应用写入，在仓库根目录、确认当前 Compose 项目就是待维护数据库后创建备份：
 
 ```sh
 memz_backup=$(sh scripts/backup-before-migration.sh) &&
@@ -56,12 +56,15 @@ printf '备份保存于：%s\n' "$memz_backup"
 test -n "${memz_backup:-}" &&
 test -s "$memz_backup" &&
 docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/001-current-revision-integrity.sql &&
-docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/002-create-idempotency.sql
+docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/002-create-idempotency.sql &&
+docker compose exec -T db psql -U postgres -d memz -v ON_ERROR_STOP=1 < db/migrations/003-membership-active.sql
 ```
 
-这两个 `test` 只防止备份步骤失败或文件丢失后误继续，不是恢复核验。备份失败会清空本次变量；任一前提或001失败都会短路后续迁移，不依赖 `set -e`。已有库和旧备份始终保留，不自动恢复或降级。
+这两个 `test` 只防止备份步骤失败或文件丢失后误继续，不是恢复核验。备份失败会清空本次变量；任一前提或001/002失败都会短路后续迁移；003失败也以非零状态结束，不依赖 `set -e`。已有库和旧备份始终保留，不自动恢复或降级。
 
-迁移在单事务内锁定 facts/revisions 并验证既有数据。锁等待超过 5 秒或单条语句超过 60 秒即失败；安排维护窗口，确认没有活跃长事务后重试。若现有指针指向错误事实、版本不匹配或正版本缺少指针，迁移会报错并整体回滚，业务数据保留；不要用删除数据来绕过校验，应先核对来源与历史。迁移成功后再启动应用。此脚本不提供自动降级，不是通用迁移框架。
+001在单事务内锁定 facts/revisions 并验证既有数据；003在独立事务中更新 memberships 结构与成员角色函数，保留原角色、成员行及历史引用。锁等待超过 5 秒或单条语句超过 60 秒即失败；安排维护窗口，确认没有活跃长事务后重试。若现有指针指向错误事实、版本不匹配或正版本缺少指针，迁移会报错并整体回滚，业务数据保留；不要用删除数据来绕过校验，应先核对来源与历史。迁移成功后再启动应用。这些脚本不提供自动降级，不是通用迁移框架。
+
+停用由可信 schema owner 在维护窗口按确定项目和用户参数化更新，不增加应用权限或管理API；新请求生效，不取消已有事务快照。操作与边界见[项目成员停用](docs/demo-boundary.md#项目成员停用)。回退旧应用二进制时必须保留003的 `active` 与过滤后的 `member_role`，存在撤权时不得删除列或恢复未过滤函数。恢复旧备份可能重新授予备份后已撤销的访问，恢复流量前必须核对并补回撤权，详见[备份恢复](docs/backup-recovery.md)。
 
 ## 验证
 

@@ -11,7 +11,8 @@ memz_backup_cwd=$(pwd -P) || fail
 [ "$memz_backup_cwd" = "$memz_backup_root" ] || fail
 [ -f compose.yml ] && [ -f db/schema.sql ] &&
   [ -f db/migrations/001-current-revision-integrity.sql ] &&
-  [ -f db/migrations/002-create-idempotency.sql ] || fail
+  [ -f db/migrations/002-create-idempotency.sql ] &&
+  [ -f db/migrations/003-membership-active.sql ] || fail
 
 umask 077
 mkdir -p backups 2>/dev/null || fail

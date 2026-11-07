@@ -29,7 +29,10 @@ test('read-only setup check reports missing migration before a legacy database c
     const report=await checkSetup(url);assert.equal(report.code,'MIGRATION_REQUIRED');assert.equal(report.ok,false);assert.deepEqual(report.details.missing,['idempotency_requests']);
     assert.deepEqual(await snapshot(owner),before,'diagnosis and failed write leave original rows untouched');
     for(const file of ['001-current-revision-integrity.sql','002-create-idempotency.sql'])await owner.query(fs.readFileSync('db/migrations/'+file,'utf8'));
-    assert.equal((await checkSetup(url)).code,'BASIC_CHECKS_PASSED');assert.deepEqual(await snapshot(owner),before);
+    const needs003=await checkSetup(url);assert.equal(needs003.code,'MIGRATION_REQUIRED');assert.match(needs003.message,/001、002、003/);assert.equal(needs003.details,undefined);
+    await owner.query(fs.readFileSync('db/migrations/003-membership-active.sql','utf8'));
+    assert.equal((await checkSetup(url)).code,'BASIC_CHECKS_PASSED');
+    assert.deepEqual(await snapshot(owner),{...before,memberships:before.memberships.map(row=>({...row,active:true}))});
   });
 });
 test('setup diagnostic rejects administrator and disabled RLS, and prints no connection secrets',async()=>{

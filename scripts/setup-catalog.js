@@ -12,18 +12,30 @@ const columns={
   idempotency_requests:{project_id:'int4',actor_id:'int4',operation:'text',request_key:'text',request_hash:'text',response:'jsonb',created_at:'timestamptz'}
 };
 const requiredColumns=JSON.stringify(Object.entries(columns).flatMap(([table_name,fields])=>Object.entries(fields).map(([column_name,type_name])=>({table_name,column_name,type_name}))));
+// Migration 003's supported definition, not a general SQL-body security audit.
+// Compare the stored source exactly: CREATE OR REPLACE can retain an old marker.
+const MEMBER_ROLE_SOURCE="SELECT role FROM public.memberships WHERE project_id=p AND user_id=nullif(pg_catalog.current_setting('app.user_id',true),'')::pg_catalog.int4 AND active IS TRUE";
+const MEMBER_ROLE_MARKER='memz:member-role-active-v1';
 const CATALOG_SQL=`WITH required AS (SELECT pg_catalog.unnest($1::pg_catalog.text[]) AS name),
   relations AS (
-    SELECT required.name,c.oid,c.relrowsecurity,
+    SELECT required.name,c.oid,c.relrowsecurity,c.relowner,c.relforcerowsecurity,c.relnamespace,
       (pg_catalog.pg_has_role(current_user,c.relowner,'USAGE') OR pg_catalog.pg_has_role(session_user,c.relowner,'USAGE')) AS owner_access,
       pg_catalog.has_table_privilege(current_user,c.oid,'SELECT') AS can_read
     FROM required LEFT JOIN pg_catalog.pg_namespace n ON n.nspname OPERATOR(pg_catalog.=) 'public'
     LEFT JOIN pg_catalog.pg_class c ON c.relnamespace OPERATOR(pg_catalog.=) n.oid AND c.relname OPERATOR(pg_catalog.=) required.name AND c.relkind OPERATOR(pg_catalog.=) 'r'
   ), identity_function AS (
-    SELECT p.oid AS id FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid OPERATOR(pg_catalog.=) p.pronamespace
+    SELECT p.oid AS id,p.proowner,p.prosrc,p.prorettype,p.prolang,p.provolatile,p.prosecdef,p.proconfig,
+      p.proretset,p.proargnames,p.proargmodes,p.provariadic,p.pronargdefaults
+    FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid OPERATOR(pg_catalog.=) p.pronamespace
     WHERE n.nspname OPERATOR(pg_catalog.=) 'public' AND p.proname OPERATOR(pg_catalog.=) 'member_role'
       AND p.pronargs OPERATOR(pg_catalog.=) 1 AND p.proargtypes[0] OPERATOR(pg_catalog.=) 'pg_catalog.int4'::pg_catalog.regtype::pg_catalog.oid
       AND p.prokind OPERATOR(pg_catalog.=) 'f'
+  ), membership_active AS (
+    SELECT a.attnum,a.atttypid,a.attnotnull,a.attgenerated,a.attidentity,d.adbin,d.adrelid
+    FROM relations r LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid OPERATOR(pg_catalog.=) r.oid
+      AND a.attname OPERATOR(pg_catalog.=) 'active' AND a.attnum OPERATOR(pg_catalog.>) 0 AND NOT a.attisdropped
+    LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid OPERATOR(pg_catalog.=) a.attrelid AND d.adnum OPERATOR(pg_catalog.=) a.attnum
+    WHERE r.name OPERATOR(pg_catalog.=) 'memberships'
   )
   SELECT
     COALESCE((SELECT pg_catalog.bool_and(NOT (rolsuper OR rolbypassrls OR rolcreaterole)) FROM pg_catalog.pg_roles
@@ -54,9 +66,29 @@ const CATALOG_SQL=`WITH required AS (SELECT pg_catalog.unnest($1::pg_catalog.tex
       AND (SELECT pg_catalog.bool_and(COALESCE(pg_catalog.to_regclass(name)::pg_catalog.oid OPERATOR(pg_catalog.=) oid,false)) FROM relations)
       AND CASE WHEN pg_catalog.has_schema_privilege(current_user,(SELECT oid FROM pg_catalog.pg_namespace WHERE nspname OPERATOR(pg_catalog.=) 'public'),'USAGE')
         THEN pg_catalog.to_regprocedure('member_role(pg_catalog.int4)')::pg_catalog.oid OPERATOR(pg_catalog.=) (SELECT id FROM identity_function)
-        ELSE false END,false) AS runtime_valid`;
+        ELSE false END,false) AS runtime_valid,
+    EXISTS(SELECT 1 FROM membership_active WHERE attnum IS NOT NULL) AS active_present,
+    COALESCE((SELECT atttypid OPERATOR(pg_catalog.=) 'pg_catalog.bool'::pg_catalog.regtype::pg_catalog.oid
+      AND attnotnull AND attgenerated OPERATOR(pg_catalog.=) '' AND attidentity OPERATOR(pg_catalog.=) ''
+      AND pg_catalog.pg_get_expr(adbin,adrelid) OPERATOR(pg_catalog.=) 'true'
+      FROM membership_active),false) AS active_valid,
+    COALESCE((SELECT prosrc OPERATOR(pg_catalog.=) $4::pg_catalog.text
+      AND pg_catalog.obj_description(id,'pg_proc') OPERATOR(pg_catalog.=) $5::pg_catalog.text
+      AND prorettype OPERATOR(pg_catalog.=) 'pg_catalog.text'::pg_catalog.regtype::pg_catalog.oid
+      AND prolang OPERATOR(pg_catalog.=) (SELECT oid FROM pg_catalog.pg_language WHERE lanname OPERATOR(pg_catalog.=) 'sql')
+      AND provolatile OPERATOR(pg_catalog.=) 's' AND prosecdef AND NOT proretset
+      AND proconfig OPERATOR(pg_catalog.=) ARRAY['search_path=public, pg_temp']::pg_catalog.text[]
+      AND proargnames OPERATOR(pg_catalog.=) ARRAY['p']::pg_catalog.text[] AND proargmodes IS NULL
+      AND provariadic OPERATOR(pg_catalog.=) 0 AND pronargdefaults OPERATOR(pg_catalog.=) 0
+      FROM identity_function),false) AS identity_contract,
+    COALESCE((SELECT owner_role.rolsuper OR (
+      pg_catalog.has_schema_privilege(f.proowner,r.relnamespace,'USAGE')
+      AND pg_catalog.has_table_privilege(f.proowner,r.oid,'SELECT')
+      AND (owner_role.rolbypassrls OR (NOT r.relforcerowsecurity AND pg_catalog.pg_has_role(f.proowner,r.relowner,'USAGE')))
+      ) FROM identity_function f JOIN pg_catalog.pg_roles owner_role ON owner_role.oid OPERATOR(pg_catalog.=) f.proowner
+      CROSS JOIN relations r WHERE r.name OPERATOR(pg_catalog.=) 'memberships'),false) AS identity_owner_valid`;
 function classify(row){
-  const booleans=['safe_role','owner_access','rls','can_read','migrated','function_execute','columns_valid','read_policies','runtime_valid'];
+  const booleans=['safe_role','owner_access','rls','can_read','migrated','function_execute','columns_valid','read_policies','runtime_valid','active_present','active_valid','identity_contract','identity_owner_valid'];
   if(!row||booleans.some(key=>typeof row[key]!=='boolean')||!Array.isArray(row.missing)||row.missing.some(name=>!TABLES.includes(name))||new Set(row.missing).size!==row.missing.length)throw new Error('SETUP_CATALOG_INVALID');
   const answer=(code,details)=>({code,...(details?{details}:{})});
   // Preserve the doctor's existing classification priority and missing list.
@@ -69,10 +101,15 @@ function classify(row){
   if(!row.migrated)return answer('MIGRATION_REQUIRED');
   if(!row.function_execute)return answer('SCHEMA_PERMISSIONS');
   if(!row.columns_valid||!row.read_policies||!row.runtime_valid)return answer('SCHEMA_PREREQUISITES');
+  // Reapplying 003 preserves function ownership and cannot repair this case.
+  if(!row.identity_owner_valid)return answer('SCHEMA_PREREQUISITES');
+  if(!row.active_present)return answer('MIGRATION_REQUIRED');
+  if(!row.active_valid)return answer('SCHEMA_PREREQUISITES');
+  if(!row.identity_contract)return answer('MIGRATION_REQUIRED');
   return answer('BASIC_CHECKS_PASSED');
 }
 async function inspectSetupCatalog(client){
-  const result=await client.query(CATALOG_SQL,[TABLES,requiredColumns,['facts_current_revision_fk','facts_current_revision_state']]);
+  const result=await client.query(CATALOG_SQL,[TABLES,requiredColumns,['facts_current_revision_fk','facts_current_revision_state'],MEMBER_ROLE_SOURCE,MEMBER_ROLE_MARKER]);
   if(result.rows.length!==1)throw new Error('SETUP_CATALOG_INVALID');
   return classify(result.rows[0]);
 }

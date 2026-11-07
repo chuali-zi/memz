@@ -110,6 +110,7 @@ test('full HTTP integration suite works against an upgraded legacy database',asy
   await fixture('test/fixtures/schema-5317607.sql',async(c,url)=>{
     await migrate(c);
     await migrate(c,fs.readFileSync('db/migrations/002-create-idempotency.sql','utf8'));
+    await migrate(c,fs.readFileSync('db/migrations/003-membership-active.sql','utf8'));
     const appUrl=new URL(url);appUrl.username='memz_app';appUrl.password='memz_demo_only';
     const execFile=require('node:util').promisify(require('node:child_process').execFile);
     const childEnv={...process.env,DATABASE_URL:appUrl.href};
@@ -135,6 +136,7 @@ test('idempotent creates work on fresh and upgraded databases; migration 002 pre
     const oldPolicies=rows=>rows.filter(r=>r.tablename!=='idempotency_requests');
     const oldGrants=rows=>rows.filter(r=>r.table_name!=='idempotency_requests');
     assert.deepEqual(oldPolicies(after.policies),oldPolicies(before.policies));assert.deepEqual(oldGrants(after.grants),oldGrants(before.grants));
+    await migrate(c,fs.readFileSync('db/migrations/003-membership-active.sql','utf8'));
     const appUrl=new URL(url);appUrl.username='memz_app';appUrl.password='memz_demo_only';
     const childEnv={...process.env,DATABASE_URL:appUrl.href};delete childEnv.NODE_TEST_CONTEXT;
     const execFile=require('node:util').promisify(require('node:child_process').execFile);

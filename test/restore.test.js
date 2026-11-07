@@ -36,6 +36,11 @@ test('custom backup restores revisions, idempotency, RLS and future writes in is
     const proposal=await call(beforeApp.baseURL,owner,'/api/projects/1/candidates',{subject:'项目',predicate:'截止日',value:'15号',expected_version:1,source_id:created.data.id},'restore-candidate-1');assert.equal(proposal.status,200);
     assert.equal((await call(beforeApp.baseURL,owner,`/api/projects/1/candidates/${proposal.data.id}/approve`,{})).status,200);
     const context=await readContext({baseURL:beforeApp.baseURL,query:'项目'});assert.equal(context.facts[0].version,2);
+    const member=await login(beforeApp.baseURL,'member');
+    const memberSourceBody={title:'停用成员的恢复演练来源',content:'原创合成记录；成员停用后不得重放创建回执。'};
+    const memberSource=await call(beforeApp.baseURL,member,'/api/projects/1/sources',memberSourceBody,'restore-revoked-member-source');assert.equal(memberSource.status,200);
+    const revoked=await source.query('UPDATE public.memberships SET active=false WHERE project_id=$1 AND user_id=$2 AND active IS TRUE RETURNING project_id,user_id,role,active',[1,2]);
+    assert.equal(revoked.rowCount,1);assert.deepEqual(revoked.rows,[{project_id:1,user_id:2,role:'member',active:false}]);
     await beforeApp.close();services.pop();const before=await snapshot(source);
     const dump=await pgTool('pg_dump',urls[0]);assert.equal(dump.code,0);assert.ok(dump.bytes.length>16);
     const bad=await pgTool('pg_restore',urls[1],dump.bytes.subarray(0,16));assert.notEqual(bad.code,0);
@@ -43,9 +48,15 @@ test('custom backup restores revisions, idempotency, RLS and future writes in is
     assert.equal((await pgTool('pg_restore',urls[1],dump.bytes)).code,0);
     assert.deepEqual(await snapshot(target),before,'all business rows, sequence positions, policies, grants and constraints survive');
     const restored=await service(urls[1]);services.push(restored);const restoredOwner=await login(restored.baseURL,'owner');
+    const ready=await fetch(restored.baseURL+'/health/ready');assert.equal(ready.status,200);await ready.arrayBuffer();
     assert.deepEqual(await readContext({baseURL:restored.baseURL,query:'项目'}),context);
     const replay=await call(restored.baseURL,restoredOwner,'/api/projects/1/sources',sourceBody,'restore-source-1');assert.deepEqual(replay,created);
     assert.deepEqual(await snapshot(target),before,'idempotent replay after restore changes no business rows or sequence positions');
+    const restoredMember=await login(restored.baseURL,'member');
+    assert.equal((await call(restored.baseURL,restoredMember,'/api/projects/1/facts')).status,403,'restored inactive member can log in but cannot read project facts');
+    assert.equal((await call(restored.baseURL,restoredMember,'/api/projects/1/sources',memberSourceBody,'restore-revoked-member-source')).status,403,'restored revocation takes precedence over the original creation receipt');
+    assert.deepEqual((await target.query('SELECT project_id,user_id,role,active FROM public.memberships WHERE project_id=$1 AND user_id=$2',[1,2])).rows,revoked.rows,'inactive actor row and original role survive');
+    assert.deepEqual(await snapshot(target),before,'rejected inactive member reads and replay change no rows, receipts, audit or sequences');
     await assert.rejects(()=>readContext({baseURL:restored.baseURL,username:'other',password:'demo-other'}),e=>e.status===403);
     const u=new URL(urls[1]);u.username='memz_app';u.password='memz_demo_only';const appClient=new Client({connectionString:u.href});await appClient.connect();
     try{assert.equal((await appClient.query('SELECT * FROM facts')).rowCount,0);await appClient.query('BEGIN');await appClient.query("SELECT set_config('app.user_id','4',true)");assert.equal((await appClient.query('SELECT * FROM facts WHERE project_id=1')).rowCount,0);await appClient.query('ROLLBACK')}finally{await appClient.end()}
@@ -55,7 +66,7 @@ test('custom backup restores revisions, idempotency, RLS and future writes in is
     assert.equal((await readContext({baseURL:restored.baseURL,query:'项目'})).facts[0].version,3);
     const old=await call(restored.baseURL,restoredOwner,'/api/projects/1/facts/1/provenance?version=2');assert.equal(old.status,200);assert.equal(old.data.source.id,created.data.id);assert.equal(old.data.revision.value,'15号');
     assert.deepEqual(await snapshot(source),before,'source database remains unchanged by recovery');
-    t.diagnostic(`Synthetic custom archive: ${dump.bytes.length} bytes; sha256=${crypto.createHash('sha256').update(dump.bytes).digest('hex')}; corrupt archive rejected; restored data and continuation verified`);
+    t.diagnostic(`Synthetic custom archive: ${dump.bytes.length} bytes; sha256=${crypto.createHash('sha256').update(dump.bytes).digest('hex')}; corrupt archive rejected; restored revocation, data and continuation verified`);
   }finally{
     for(const app of services)await app.close();for(const c of clients)await c.end();for(const name of names)await admin.query(`DROP DATABASE ${name}`);await admin.end();
     t.diagnostic('Both random recovery databases and child services cleaned up');

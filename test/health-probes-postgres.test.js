@@ -103,6 +103,60 @@ test('missing columns, incompatible basic types and missing/inapplicable SELECT 
   ]){await change(sql,undo,async()=>{await expected(503);await doctor('SCHEMA_PREREQUISITES')});await expected(200)}
   await change('ALTER POLICY read_project ON sources TO PUBLIC','ALTER POLICY read_project ON sources TO memz_app',async()=>{await expected(200);await doctor('BASIC_CHECKS_PASSED')});
 });
+test('membership migration metadata rejects missing or incompatible active columns without reading membership rows',async()=>{
+  const before=await fingerprint();
+  await change('ALTER TABLE public.memberships DROP COLUMN active','ALTER TABLE public.memberships ADD COLUMN active boolean NOT NULL DEFAULT true',async()=>{
+    await expected(503);const report=await doctor('MIGRATION_REQUIRED');assert.match(report.message,/001、002、003/);
+  });
+  for(const [sql,undo] of [
+    ['ALTER TABLE public.memberships ALTER COLUMN active DROP NOT NULL','ALTER TABLE public.memberships ALTER COLUMN active SET NOT NULL'],
+    ['ALTER TABLE public.memberships ALTER COLUMN active DROP DEFAULT','ALTER TABLE public.memberships ALTER COLUMN active SET DEFAULT true'],
+    ['ALTER TABLE public.memberships ALTER COLUMN active SET DEFAULT false','ALTER TABLE public.memberships ALTER COLUMN active SET DEFAULT true'],
+    ["ALTER TABLE public.memberships ALTER COLUMN active DROP DEFAULT; ALTER TABLE public.memberships ALTER COLUMN active TYPE text USING active::text; ALTER TABLE public.memberships ALTER COLUMN active SET DEFAULT 'true'::text",'ALTER TABLE public.memberships ALTER COLUMN active DROP DEFAULT; ALTER TABLE public.memberships ALTER COLUMN active TYPE boolean USING active::boolean; ALTER TABLE public.memberships ALTER COLUMN active SET DEFAULT true'],
+    ['ALTER TABLE public.memberships DROP COLUMN active; ALTER TABLE public.memberships ADD COLUMN active boolean GENERATED ALWAYS AS (true) STORED NOT NULL','ALTER TABLE public.memberships DROP COLUMN active; ALTER TABLE public.memberships ADD COLUMN active boolean NOT NULL DEFAULT true']
+  ]){await change(sql,undo,async()=>{await expected(503);await doctor('SCHEMA_PREREQUISITES')});await expected(200)}
+  assert.deepEqual(await fingerprint(),before);
+});
+test('the canonical active-aware identity definition is required even when an old body preserves its marker',async()=>{
+  const identity="'public.member_role(pg_catalog.int4)'::pg_catalog.regprocedure";
+  const prior=(await owner.query(`SELECT pg_catalog.pg_get_functiondef(${identity}) AS ddl,pg_catalog.obj_description(${identity},'pg_proc') AS marker`)).rows[0];
+  assert.equal(prior.marker,'memz:member-role-active-v1');
+  const oldBody="CREATE OR REPLACE FUNCTION public.member_role(p int) RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$SELECT role FROM public.memberships WHERE project_id=p AND user_id=nullif(pg_catalog.current_setting('app.user_id',true),'')::pg_catalog.int4$$";
+  await change(oldBody,prior.ddl,async()=>{
+    const row=(await owner.query(`SELECT pg_catalog.obj_description(${identity},'pg_proc') AS marker`)).rows[0];assert.equal(row.marker,prior.marker,'CREATE OR REPLACE must actually retain the migration marker');
+    await expected(503);await doctor('MIGRATION_REQUIRED');
+  });await expected(200);
+  for(const sql of [
+    'ALTER FUNCTION public.member_role(int) SECURITY INVOKER',
+    'ALTER FUNCTION public.member_role(int) VOLATILE',
+    'ALTER FUNCTION public.member_role(int) SET search_path=pg_catalog,public,pg_temp',
+    "ALTER FUNCTION public.member_role(int) SET statement_timeout='1s'"
+  ]){await change(sql,prior.ddl,async()=>{await expected(503);await doctor('MIGRATION_REQUIRED')});await expected(200)}
+  await change('COMMENT ON FUNCTION public.member_role(int) IS NULL',"COMMENT ON FUNCTION public.member_role(int) IS 'memz:member-role-active-v1'",async()=>{await expected(503);await doctor('MIGRATION_REQUIRED')});await expected(200);
+});
+test('all memberships may be inactive while catalog readiness and liveness remain healthy',async()=>{
+  const before=await fingerprint();
+  await change('UPDATE public.memberships SET active=false','UPDATE public.memberships SET active=true',async()=>{
+    await expected(200);await doctor('BASIC_CHECKS_PASSED');assert.equal((await probe(base,{path:'/health/live'})).status,200);
+  });
+  assert.deepEqual(await fingerprint(),before);assert.equal(sessionCreates,0);assert.equal(writes,0);
+});
+test('security-definer owner must be able to read memberships outside its recursive RLS policy',async()=>{
+  const before=await fingerprint();
+  await owner.query('ALTER FUNCTION public.member_role(integer) OWNER TO memz_app');
+  try{await expected(503);await doctor('SCHEMA_PREREQUISITES')}
+  finally{
+    // OWNER reassignment rewrites ACL grantors. Restore only this fixture's
+    // original owner and explicit application grant; never alter product ACLs.
+    await owner.query('ALTER FUNCTION public.member_role(integer) OWNER TO CURRENT_USER; REVOKE ALL ON FUNCTION public.member_role(integer) FROM PUBLIC; GRANT EXECUTE ON FUNCTION public.member_role(integer) TO memz_app');
+  }
+  await expected(200);
+  const bypass=(await owner.query('SELECT rolsuper OR rolbypassrls AS bypass FROM pg_catalog.pg_roles WHERE rolname=CURRENT_USER')).rows[0].bypass;
+  await change('ALTER TABLE public.memberships FORCE ROW LEVEL SECURITY','ALTER TABLE public.memberships NO FORCE ROW LEVEL SECURITY',async()=>{
+    await expected(bypass?200:503);await doctor(bypass?'BASIC_CHECKS_PASSED':'SCHEMA_PREREQUISITES');
+  });
+  await expected(200);assert.deepEqual(await fingerprint(),before);
+});
 test('public schema USAGE, row_security and actual unqualified name resolution are required without leaking settings',async()=>{
   await change('REVOKE USAGE ON SCHEMA public FROM PUBLIC,memz_app','GRANT USAGE ON SCHEMA public TO PUBLIC',async()=>{await expected(503);await doctor('SCHEMA_PREREQUISITES')});await expected(200);
   for(const options of ['-c row_security=off','-c search_path=pg_catalog']){

@@ -6,7 +6,7 @@ const messages={
   DATABASE_UNAVAILABLE:'无法完成数据库连接或查询；请检查本机服务、认证和连接配置。连接串不会输出。',
   UNSAFE_DATABASE_ROLE:'应用连接使用了管理员、可绕过 RLS 或表 owner 权限；请改用 memz_app 应用连接，管理员仅用于备份与迁移。',
   SCHEMA_MISSING:'缺少基本表；请核对是否连接正确数据库。只有全新空库才执行首次初始化，不要覆盖或删除已有数据。',
-  MIGRATION_REQUIRED:'缺少迁移前提；暂停写入并备份，按 README 顺序执行 001、002 增量迁移，不要重跑 schema.sql 或删除卷。',
+  MIGRATION_REQUIRED:'缺少迁移前提；暂停写入并备份，按 README 顺序执行 001、002、003 增量迁移，不要重跑 schema.sql 或删除卷。',
   RLS_DISABLED:'所需表未启用 RLS；请由维护者核对 schema 和迁移，不自动改变权限。',
   SCHEMA_PERMISSIONS:'应用角色缺少所需读取或身份函数权限；请核对应用连接与 schema 授权。',
   SCHEMA_PREREQUISITES:'列、类型、读取策略或运行时 schema/RLS 前提不符；请由维护者核对 schema、授权和连接设置，不自动修复。',

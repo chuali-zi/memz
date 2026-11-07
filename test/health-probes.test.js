@@ -3,7 +3,7 @@ const express=require('express'),http=require('node:http');
 const {inspectSetupCatalog}=require('../scripts/setup-catalog');
 const {createHealthProbes}=require('../scripts/health-probes');
 const {createShutdownGate}=require('../scripts/server-lifecycle');
-const good=()=>({safe_role:true,missing:[],owner_access:false,rls:true,can_read:true,migrated:true,function_execute:true,columns_valid:true,read_policies:true,runtime_valid:true});
+const good=()=>({safe_role:true,missing:[],owner_access:false,rls:true,can_read:true,migrated:true,function_execute:true,columns_valid:true,read_policies:true,runtime_valid:true,active_present:true,active_valid:true,identity_contract:true,identity_owner_valid:true});
 async function inspect(row){let queries=0;const result=await inspectSetupCatalog({query:async(sql,params)=>{queries++;assert.equal(params[0].length,8);assert.ok(Buffer.byteLength(JSON.stringify(params))<8192);return {rows:[row]}}});assert.equal(queries,1);return result}
 test('one bounded catalog result preserves old diagnostic priorities and adds fixed schema prerequisites',async()=>{
   assert.deepEqual(await inspect(good()),{code:'BASIC_CHECKS_PASSED'});

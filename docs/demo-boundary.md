@@ -35,3 +35,23 @@ Host校验是请求地址边界，不是身份认证：能自行构造HTTP请求
 创建重试必须保持原路径、内容、账号和幂等键；修改内容是新意图。审批等非创建操作应重新读取状态和版本后决定下一步，不盲目重复。测试没有证明活动事务在任意中断点的结果，也没有覆盖长时间网络黑洞、自动故障转移或生产高可用；目前没有自动重试循环，也没有跨页面刷新保存幂等键。
 
 停机演练还会启动真实 Chromium（先执行 `npx playwright install --with-deps chromium`，或设置 CHROMIUM_PATH），在390px视口验证来源读取失败、写入不确定、输入保留、恢复后人工重试，以及真实提交后拦截丢弃响应的场景。四张截图随 outage-evidence 上传；这是独立演练证据，不计入常规31张UI截图。已检查写入提示可见、无横向溢出。创建失败提示现在说明保持本页和内容不变后再次提交，页面负责复用请求；不要求普通用户自行管理幂等键。不自动重试，不承诺刷新或改写内容后仍保持原关联。
+
+## 项目成员停用
+
+迁移003为memberships增加active（boolean、NOT NULL、默认true），member_role只为active IS TRUE的成员返回原角色。停用保留成员行、角色、来源/候选/审计/回执的actor外键与历史，不通过删除成员撤权。不增加应用更新memberships的权限，也没有成员管理HTTP或MCP工具；固定公开账号仍不构成生产认证系统。
+
+可信schema owner可在维护窗口使用已经确认的维护连接，以确定的项目ID和用户ID参数化更新。下面仅展示单条原子维护语句，不创建连接、不自动选择用户或项目；调用者必须先核对目标、备份与维护记录：
+
+```js
+const changed = await ownerClient.query(
+  'UPDATE public.memberships SET active = false WHERE project_id = $1 AND user_id = $2 AND active IS TRUE RETURNING project_id, user_id, role, active',
+  [projectId, userId]
+);
+if (changed.rowCount !== 1) throw new Error('Expected exactly one active membership');
+```
+
+rowCount=1表示本次确实将一个指定成员从true改为false；0表示没有改变，可能是该组合不存在或已经false，不能据此区分两者。示例对0报错并要求人工核对，不扩大WHERE范围。重新授予访问必须由owner再次显式限定同一项目/用户设置active=true，保留的原role随之重新生效；不能把恢复访问默认为诊断或应用自动修复。手动维护不自动产生应用audit记录，须保留可信的维护记录供恢复后核对。
+
+公开演示账号仍可登录，已有登录会话不会因停用自动退出；后续项目请求按新事务身份与成员状态判断；停用不是账号停用或强制登出，不撤回已交付数据，也不主动取消在途事务和已有快照。权限边界仍依赖可信服务设置身份，不能抵御已掌握数据库凭据的进程。
+
+回退旧应用二进制时须保留active列和新member_role过滤函数；仍有停用成员时绝不能删除active或恢复未过滤函数，以免重新授予访问。恢复旧备份同样可能重授备份后已撤销的权限，开放流量前要按可信项目/用户维护记录核对和补回；详见[备份恢复](backup-recovery.md#撤权状态与回退)。
