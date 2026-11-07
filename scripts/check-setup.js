@@ -15,7 +15,11 @@ const result=(code,details)=>({ok:code==='BASIC_CHECKS_PASSED',code,message:mess
 async function checkSetup(connectionString=process.env.DATABASE_URL||'postgres://memz_app:memz_demo_only@127.0.0.1:5432/memz'){
   let client,transaction=false;
   try{
-    client=new Client({connectionString,connectionTimeoutMillis:5000,query_timeout:5000,statement_timeout:5000});
+    // pg merges URL parameters over connection settings. The diagnostic owns
+    // its deadlines; retain unrelated parameters for resolved-target validation.
+    const boundedURL=new URL(connectionString);
+    for(const key of ['connectionTimeoutMillis','query_timeout','statement_timeout'])boundedURL.searchParams.delete(key);
+    client=new Client({connectionString:boundedURL.href,connectionTimeoutMillis:5000,query_timeout:5000,statement_timeout:5000});
     // Validate pg's resolved target, including connection-string query overrides.
     if(!['127.0.0.1','localhost','::1','[::1]'].includes(client.host)||!Number.isInteger(Number(client.port))||Number(client.port)<1||Number(client.port)>65535)return result('LOCAL_DATABASE_REQUIRED');
     client.on('error',()=>{});await client.connect();

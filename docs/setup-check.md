@@ -16,6 +16,10 @@ node scripts/check-setup.js && npm start
 
 检查使用应用角色和只读事务，最后回滚并关闭连接。它只读取角色及系统目录，不读取业务原文、创建会话、生成候选、执行迁移或修改权限；没有自动重试或自动修复。连接和查询分别设 5 秒超时。已有 `npm start` 行为保持兼容，不会隐式执行诊断。
 
+诊断会从连接 URL 删除所有 `connectionTimeoutMillis`、`query_timeout` 和 `statement_timeout` 同名参数，再应用自己的5秒期限，包括重复参数。其他参数保留，因此实际 host/port 的查询覆盖仍参与本机目标校验，`application_name` 等正常设置也不丢失。不改变应用连接池的生产期限。5秒是分别作用于连接或单次查询的期限，不是整个诊断过程的总时限；失败后的回滚也属于单独一次查询。
+
+曾用只在回环地址监听的原创协议对端复现：对端完成 PostgreSQL 启动后不响应 `BEGIN READ ONLY`，旧命令的 URL 参数 `query_timeout=60000&statement_timeout=0` 使其在6.2秒探针截止时仍未返回。现在同类对端会由固定查询 deadline 结束并输出固定 `DATABASE_UNAVAILABLE`。`test/setup-check-deadlines.test.js` 同时验证启动不响应和查询不响应两条路径、重复覆盖、实际目标校验保留及日志不回显合成口令；它不连接真实数据库、不伪称 PostgreSQL/RLS 验收。真实数据库诊断兼容仍由既有隔离 setup-check 测试验证。
+
 ## 覆盖范围
 
 - 能否连接并查询数据库；连接/认证错误只输出固定提示。
