@@ -1,12 +1,27 @@
 // Real Chromium checks of client interaction with explicitly synthetic, controlled HTTP responses.
 // No database, external service, model, or existing demo data is used.
-const {test,before,after}=require('node:test');
+const {test:runTest,before,after}=require('node:test');
+const test=(name,fn)=>runTest(name,{timeout:60000},fn);
 const assert=require('node:assert/strict');
 const http=require('node:http');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 const {chromium}=require('playwright');
-let server,browser,baseURL;
+let server,browser,browserServer,baseURL;
+const pageCleanups=new Map();
+async function bounded(promise,label,milliseconds=5000){
+  let timer;
+  try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} exceeded ${milliseconds}ms`)),milliseconds)})])}
+  finally{clearTimeout(timer)}
+}
+function cancelPageGates(page){for(const cancel of pageCleanups.get(page)||[])cancel();pageCleanups.delete(page)}
+async function closePage(page){
+  cancelPageGates(page);
+  const failures=[];
+  try{await bounded(page.unrouteAll({behavior:'wait'}),'draining test routes',3000)}catch(error){failures.push(error)}
+  finally{try{await bounded(page.close(),'closing test page',3000)}catch(error){failures.push(error)}}
+  if(failures.length)throw new AggregateError(failures,'Test page cleanup failed');
+}
 before(async()=>{
   server=http.createServer(async(req,res)=>{
     // Deliberately unfinished responses exist only in this local test server.
@@ -19,11 +34,32 @@ before(async()=>{
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   baseURL=`http://127.0.0.1:${server.address().port}`;
-  browser=await chromium.launch({...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),headless:true,args:['--no-sandbox']});
-});
-after(async()=>{await browser?.close();if(server)await new Promise(resolve=>server.close(resolve))});
+  browserServer=await chromium.launchServer({...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),host:'127.0.0.1',timeout:15000,headless:true,args:['--no-sandbox']});
+  browser=await chromium.connect(browserServer.wsEndpoint(),{timeout:5000});
+},{timeout:30000});
+async function closeFixture({browser,browserServer,server}){
+  const failures=[];
+  try{if(browser)await bounded(browser.close(),'closing test browser',5000)}catch(error){failures.push(error)}
+  finally{
+    try{if(browserServer&&browserServer.process().exitCode===null)await bounded(browserServer.kill(),'terminating owned test browser',3000)}
+    catch(error){failures.push(error);browserServer?.process().kill('SIGKILL')}
+    finally{
+      if(server){
+        const closed=new Promise(resolve=>server.close(resolve));server.closeAllConnections();
+        try{await bounded(closed,'closing test HTTP server',2000)}catch(error){failures.push(error)}
+      }
+    }
+  }
+  if(failures.length)throw new AggregateError(failures,'Product test fixture cleanup failed');
+}
+after(async()=>{
+  for(const page of pageCleanups.keys())cancelPageGates(page);
+  await closeFixture({browser,browserServer,server});
+},{timeout:12000});
+
 async function openPage(){
   const page=await browser.newPage({viewport:{width:390,height:844},locale:'zh-CN'}),errors=[];
+  pageCleanups.set(page,new Set());
   page.setDefaultTimeout(5000);page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/api/**',async route=>{
     const request=route.request(),url=new URL(request.url()),resource=url.pathname.split('/').at(-1);
@@ -46,13 +82,14 @@ async function login(page){await page.locator('#loginForm button').click();await
 async function hold(page,pattern,method='POST'){
   let seen,finish;
   const observed=new Promise(resolve=>{seen=resolve}),completion=new Promise(resolve=>{finish=resolve}),requests=[];
+  pageCleanups.get(page).add(()=>{seen();finish({cancelled:true})});
   await page.route(pattern,async route=>{
     if(route.request().method()!==method){await route.fallback();return}
     requests.push(route.request());seen();
-    const {status,body}=await completion;
+    const {status,body,cancelled}=await completion;if(cancelled){await route.abort();return}
     await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
   });
-  return {observed,requests,release:(body,status=200)=>finish({body,status})};
+  return {get observed(){return bounded(observed,`waiting for held ${method} request`)},requests,release:(body,status=200)=>finish({body,status})};
 }
 async function submitTwice(page,selector){await page.evaluate(selector=>{const form=document.querySelector(selector);form.requestSubmit();form.requestSubmit()},selector)}
 async function settled(page,selector){await page.waitForFunction(selector=>document.querySelector(selector).getAttribute('aria-busy')==='false',selector)}
@@ -71,7 +108,7 @@ test('login announces its pending state and only sends one in-flight request',as
     assert.match(await page.locator('#notice').textContent(),/503 合成登录故障/);
     assert.equal(await page.locator('#loginForm [name=password]').inputValue(),'demo-owner');
     assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('uncertain creation retains input and reuses its key after manual retry',async()=>{
@@ -101,7 +138,7 @@ test('uncertain creation retains input and reuses its key after manual retry',as
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'');
     assert.match(await page.locator('#sourceFeedback').textContent(),/来源 #7 已保存/);
     assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('successful source creation preserves a draft edited while its response was pending',async()=>{
@@ -116,7 +153,7 @@ test('successful source creation preserves a draft edited while its response was
     assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'下一份来源草稿');
     assert.equal(await page.locator('#sourceSelect').inputValue(),'8');
     assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('a late candidate response cannot announce success or reload another project',async()=>{
@@ -138,7 +175,7 @@ test('a late candidate response cannot announce success or reload another projec
     assert.equal(reads,1,'only project selection loads project two');
     assert.equal(await page.locator('#proposal button').isEnabled(),true);
     assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('simulated client has a pending lock and a usable narrow-screen recovery state',async()=>{
@@ -159,7 +196,7 @@ test('simulated client has a pending lock and a usable narrow-screen recovery st
     assert.equal(await page.locator('#sourceForm [name=content]').evaluate(node=>getComputedStyle(node).outlineStyle),'solid');
     if(process.env.PRODUCT_EXPERIENCE_SCREENSHOT)await page.screenshot({path:process.env.PRODUCT_EXPERIENCE_SCREENSHOT,fullPage:true});
     assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 async function conflictFixture(page){
@@ -195,7 +232,7 @@ test('conflict recovery preserves text, version and source edited during its rea
     assert.equal(await prepare.isEnabled(),true);
     assert.equal(await page.locator('#proposalFeedback').textContent(),'');
     assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('unchanged conflict recovery still fills the latest version without submitting',async()=>{
@@ -206,7 +243,7 @@ test('unchanged conflict recovery still fills the latest version without submitt
     await prepare.click();await page.locator('#proposalFeedback').getByText(/已用读取时 v2.*尚未提交/).waitFor();
     assert.equal((await draft(page)).value,'原候选值');assert.equal((await draft(page)).expected_version,'2');assert.equal((await draft(page)).source_id,'1');
     assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('a failed submission during conflict recovery keeps the original retry content',async()=>{
@@ -221,7 +258,7 @@ test('a failed submission during conflict recovery keeps the original retry cont
     assert.deepEqual(await draft(page),original);
     assert.match(await page.locator('#proposalFeedback').textContent(),/写入结果可能不确定/);
     assert.equal(await prepare.isEnabled(),true);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('a source response from an earlier visit cannot select evidence or reload after A to B to A',async()=>{
@@ -239,7 +276,7 @@ test('a source response from an earlier visit cannot select evidence or reload a
     assert.equal(await page.locator('#sourceSelect').inputValue(),'1');
     assert.equal(await page.locator('#sourceFeedback').textContent(),'');
     assert.equal(reads,0);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('an uncertain candidate error from an earlier visit does not replace new visit feedback',async()=>{
@@ -254,7 +291,7 @@ test('an uncertain candidate error from an earlier visit does not replace new vi
     assert.equal(await page.locator('#proposalFeedback').textContent(),'');
     assert.equal(await page.locator('#notice').textContent(),notice);
     assert.equal(await page.locator('#proposal button').isEnabled(),true);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('a simulated lookup from an earlier visit does not create a candidate after returning',async()=>{
@@ -267,7 +304,7 @@ test('a simulated lookup from an earlier visit does not create a candidate after
     lookup.release({sources:[{id:1,title:'合成会议纪要',content:'旧访问的来源。'}],next_after:null});await settled(page,'#stale');
     assert.deepEqual(writes,[]);assert.equal(await page.locator('#notice').textContent(),'');
     assert.equal(await page.locator('#stale').isEnabled(),true);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('a late approval result cannot refresh or announce success in a new visit',async()=>{
@@ -281,7 +318,7 @@ test('a late approval result cannot refresh or announce success in a new visit',
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     assert.equal(await page.locator('#candidateFeedback').textContent(),'');assert.equal(reads,0);
     assert.equal(await page.locator('#project').inputValue(),'1');assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 async function freezeClock(page){
@@ -300,7 +337,7 @@ for(const endpoint of ['pending-headers','pending-body'])test(`fixed deadline co
     await page.waitForFunction(()=>globalThis.deadlineResult!==null);
     assert.match(await page.evaluate(()=>globalThis.deadlineResult),/请求超时（15秒）/);
     assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('creation deadline unlocks the form, preserves input and reuses its key only on manual retry',async()=>{
@@ -318,7 +355,7 @@ test('creation deadline unlocks the form, preserves input and reuses its key onl
     assert.equal(retry.requests[0].headers()['idempotency-key'],pending.requests[0].headers()['idempotency-key']);
     retry.release({id:71});pending.release({id:71});await settled(page,'#proposal');
     assert.match(await page.locator('#proposalFeedback').textContent(),/候选已提交/);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 for(const failure of ['network','invalid-200','invalid-409'])test(`${failure} is localized and retains an uncertain creation key`,async()=>{
@@ -338,7 +375,7 @@ for(const failure of ['network','invalid-200','invalid-409'])test(`${failure} is
     const retry=await hold(page,'**/api/projects/1/sources');await page.locator('#sourceForm button').click();await retry.observed;
     assert.equal(retry.requests[0].headers()['idempotency-key'],sent[0].headers()['idempotency-key']);
     retry.release({id:72,title:'合成网络恢复草稿'});await settled(page,'#sourceForm');assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 const pagedLists=[
@@ -379,7 +416,7 @@ test('all five lists retain their successful page and cursor through consecutive
       assert.equal(await page.locator(`#${config.root}`).textContent(),original);
       assert.equal(cursors.at(-1),'1');assert.equal(await page.locator(`#${config.root}Next`).isEnabled(),true);
       assert.deepEqual(errors,[]);
-    }finally{await page.close()}
+    }finally{await closePage(page)}
   });
 });
 
@@ -402,7 +439,7 @@ test('a timed-out new search retains the accepted query and cursor for subsequen
     search.release({facts:[],next_after:null});
     await page.locator('#factsNext').click();await page.locator('#factsStatus').getByText(/第 2 页/).waitFor();
     assert.deepEqual(queries,[['','0'],['','1']]);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 test('a failed candidate filter keeps the accepted status, role and pending actions',async()=>{
@@ -418,7 +455,7 @@ test('a failed candidate filter keeps the accepted status, role and pending acti
     assert.equal(await page.locator('#candidateFilter').inputValue(),'all');
     assert.equal(await page.locator('#candidates').textContent(),original);
     assert.equal(await page.locator('#candidates').getByRole('button',{name:'批准',exact:true}).isEnabled(),true);assert.deepEqual(errors,[]);
-  }finally{await page.close()}
+  }finally{await closePage(page)}
 });
 
 async function acceptedPage(page,config){
@@ -442,7 +479,7 @@ test('all five lists reject an HTTP 200 empty-object receipt before replacing th
       assert.match(await page.locator(`#${config.root}Status`).textContent(),/分页响应格式异常/);
       recover=true;await page.locator(`#${config.root}Next`).click();await page.locator(`#${config.root}Status`).getByText(/第 2 页/).waitFor();
       assert.deepEqual(cursors,[config.start,'1','1']);assert.equal(await page.locator(`#${config.root}Next`).isDisabled(),true);assert.deepEqual(errors,[]);
-    }finally{await page.close()}
+    }finally{await closePage(page)}
   });
 });
 
@@ -481,6 +518,101 @@ test('all five lists reject malformed JSON page shapes and cursors, then recover
       if(config.root==='facts'||config.root==='sources')assert.ok(retries.every(request=>request.query==='已接受的检索'));
       if(config.root==='candidates')assert.ok(retries.every(request=>request.status==='pending'));
       assert.deepEqual(errors,[]);
-    }finally{await page.close()}
+    }finally{await closePage(page)}
   });
+});
+
+async function projectBoundaryFixture(page){
+  for(const config of pagedLists.filter(config=>['facts','history','audit'].includes(config.root))){
+    await page.route(`**/api/projects/1/${config.root}?*`,route=>route.fulfill({json:{[config.items]:[config.row(1)],[config.next]:null,role:'owner'}}));
+  }
+  await conflictFixture(page);
+  await page.waitForFunction(()=>['facts','history','candidates','sources','audit'].every(id=>document.querySelector(`#${id} .entry`)));
+  await page.locator('#proposal [name=value]').fill('切换期间保留的候选草稿');
+  await page.locator('#addSourceShortcut').click();await page.locator('#sourceForm [name=title]').fill('切换期间保留的来源草稿');
+  await page.locator('#sourceForm [name=content]').fill('尚未提交的原文。');
+  let seen,release,mode='ok',cancelled=false;const observed=new Promise(resolve=>{seen=resolve}),gate=new Promise(resolve=>{release=resolve});
+  pageCleanups.get(page).add(()=>{cancelled=true;seen();release()});
+  await page.route('**/api/projects/2/**',async route=>{
+    const resource=new URL(route.request().url()).pathname.split('/').at(-1);if(resource==='data')seen();
+    await gate;if(cancelled){await route.abort();return}
+    if(mode==='network'){await route.abort();return}
+    if(mode==='403'){await route.fulfill({status:403,json:{error:'合成项目权限拒绝'}});return}
+    const config=pagedLists.find(config=>config.root===resource);
+    await route.fulfill({json:resource==='data'?{role:'owner'}:{[config.items]:[config.row(20)],[config.next]:null,role:'owner'}});
+  });
+  return {get observed(){return bounded(observed,'waiting for project data request')},release:value=>{mode=value;release()},recover:()=>{mode='ok'}};
+}
+async function assertClearedBoundary(page){
+  assert.equal(await page.locator('#project').inputValue(),'2');
+  for(const config of pagedLists){
+    assert.equal(await page.locator(`#${config.root}`).textContent(),'');
+    assert.equal(await page.locator(`#${config.root} button`).count(),0);
+    assert.equal(await page.locator(`#${config.root}Previous`).isDisabled(),true);
+    assert.equal(await page.locator(`#${config.root}Next`).isDisabled(),true);
+  }
+  assert.equal(await page.locator('#sourceSelect option').count(),0);
+  for(const selector of ['#proposal button','#sourceForm button','#stale','#injection'])assert.equal(await page.locator(selector).isDisabled(),true);
+  assert.equal(await page.locator('#proposal [name=value]').inputValue(),'切换期间保留的候选草稿');
+  assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'切换期间保留的来源草稿');
+  assert.equal(await page.locator('#sourceForm [name=content]').inputValue(),'尚未提交的原文。');
+}
+for(const failure of ['403','network'])test(`project switch clears old interactions before delayed data and ${failure}, then recovers`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const pending=await projectBoundaryFixture(page);
+    assert.equal(await page.getByRole('button',{name:'用最新版本填写新候选',exact:true}).count(),1);
+    await page.locator('#project').selectOption('2');await pending.observed;
+    await assertClearedBoundary(page);
+    pending.release(failure);await page.locator('#notice').getByText(failure==='403'?/工作台加载失败：403 合成项目权限拒绝/:/工作台加载失败：网络连接失败/).waitFor();
+    await page.waitForFunction(()=>['facts','history','candidates','sources','audit'].every(id=>document.querySelector(`#${id}`).getAttribute('aria-busy')==='false'));
+    await assertClearedBoundary(page);
+    pending.recover();await page.locator('#refreshWorkspace').click();await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator('#sourceSelect').inputValue(),'20');
+    await page.locator('#candidates').getByText(/合成候选20/).waitFor();
+    assert.doesNotMatch(await page.locator('#candidates').textContent(),/合成冲突/);
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),'切换期间保留的候选草稿');
+    assert.equal(await page.locator('#sourceForm [name=title]').inputValue(),'切换期间保留的来源草稿');
+    assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('late project B data and lists cannot replace project A after returning',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const pending=await projectBoundaryFixture(page);
+    await page.locator('#project').selectOption('2');await pending.observed;await assertClearedBoundary(page);
+    await page.locator('#project').selectOption('1');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled&&['facts','history','candidates','sources','audit'].every(id=>document.querySelector(`#${id}`).getAttribute('aria-busy')==='false'));
+    const original=await page.locator('#workspace').textContent(),selection=await page.locator('#sourceSelect').inputValue();
+    const completed=Promise.all(['data',...pagedLists.map(config=>config.root)].map(resource=>page.waitForResponse(response=>new URL(response.url()).pathname===`/api/projects/2/${resource}`)));
+    pending.release('ok');await bounded(Promise.all((await completed).map(response=>response.finished())),'finishing delayed project responses');
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.locator('#project').inputValue(),'1');
+    assert.equal(await page.locator('#workspace').textContent(),original);
+    assert.equal(await page.locator('#sourceSelect').inputValue(),selection);
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),'切换期间保留的候选草稿');
+    assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('cleanup releases an abandoned held route and closes the page within its deadline',async()=>{
+  const {page}=await openPage();
+  try{
+    const pending=await hold(page,'**/api/login');
+    await submitTwice(page,'#loginForm');await pending.observed;
+    // Model an assertion failing before the normal pending.release() path.
+    await closePage(page);assert.equal(page.isClosed(),true);
+  }finally{if(!page.isClosed())await closePage(page)}
+});
+
+test('browser cleanup failure still destroys an unfinished HTTP connection and remains a failure',async()=>{
+  const isolated=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'application/json'});res.write('{"unfinished":')});
+  let request;
+  try{
+    await new Promise(resolve=>isolated.listen(0,'127.0.0.1',resolve));
+    const response=await bounded(new Promise((resolve,reject)=>{request=http.get(`http://127.0.0.1:${isolated.address().port}`,resolve);request.on('error',reject)}),'opening unfinished test response');
+    const disconnected=new Promise(resolve=>response.once('close',resolve));response.on('error',()=>{});
+    await assert.rejects(closeFixture({browser:{close:async()=>{throw new Error('synthetic browser close failure')}},server:isolated}),error=>error instanceof AggregateError&&error.errors.some(error=>error.message==='synthetic browser close failure'));
+    await bounded(disconnected,'destroying unfinished HTTP connection');assert.equal(isolated.listening,false);
+  }finally{request?.destroy();isolated.closeAllConnections();isolated.close()}
 });
