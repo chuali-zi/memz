@@ -1115,3 +1115,54 @@ test('a complete known logout 401 still returns to the login screen',async()=>{
     assert.equal(await page.locator('#login').isVisible(),true);assert.equal(await page.locator('#workspace').isHidden(),true);assert.equal(await page.evaluate(()=>csrf===''),true);assert.deepEqual(errors,[]);
   }finally{await closePage(page)}
 });
+
+for(const form of ['sourceForm','proposal'])test(`a late ${form} failure preserves the user's current draft focus and caret`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);
+    const input=form==='sourceForm'?'#sourceForm [name=content]':'#proposal [name=value]',feedback=form==='sourceForm'?'#sourceFeedback':'#proposalFeedback',endpoint=form==='sourceForm'?'sources':'candidates';
+    if(form==='sourceForm'){
+      await page.locator('#addSourceShortcut').click();
+      await page.locator('#sourceForm [name=title]').fill('合成待保存来源');
+      await page.locator(input).fill('最初提交的正文');
+    }
+    const pending=await hold(page,`**/api/projects/1/${endpoint}`);
+    await page.locator(`#${form} button`).click();await pending.observed;
+    await page.locator(input).fill('读取期间继续编辑的草稿');await page.keyboard.press('ArrowLeft');
+    const caret=await page.locator(input).evaluate(node=>({start:node.selectionStart,end:node.selectionEnd}));
+    pending.release({error:'合成延迟写入故障'},503);await settled(page,`#${form}`);
+    assert.match(await page.locator(feedback).textContent(),/写入结果可能不确定/);
+    assert.equal(await page.locator(input).inputValue(),'读取期间继续编辑的草稿');
+    assert.equal(await page.locator(input).evaluate(node=>node===document.activeElement),true,'late failure must not take focus from active draft input');
+    assert.deepEqual(await page.locator(input).evaluate(node=>({start:node.selectionStart,end:node.selectionEnd})),caret);
+    await page.keyboard.type('继续');assert.equal(await page.locator(input).inputValue(),'读取期间继续编辑的草继续稿');
+    assert.equal(await page.locator(`#${form} button`).isEnabled(),true);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+for(const form of ['sourceForm','proposal'])test(`a ${form} failure with lost focus keeps feedback and keyboard retry reachable`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);
+    const feedback=form==='sourceForm'?'#sourceFeedback':'#proposalFeedback',endpoint=form==='sourceForm'?'sources':'candidates';
+    if(form==='sourceForm'){
+      await page.locator('#addSourceShortcut').click();
+      await page.locator('#sourceForm [name=title]').fill('合成可重试来源');
+      await page.locator('#sourceForm [name=content]').fill('完整保留的重试正文');
+    }
+    const initial=await page.locator(`#${form}`).evaluate(node=>Object.fromEntries(new FormData(node))),pending=await hold(page,`**/api/projects/1/${endpoint}`);
+    await page.locator(`#${form} button`).focus();await page.keyboard.press('Enter');await pending.observed;
+    // Disabling the submitting button normally leaves BODY active in Chromium.
+    // Explicit blur also covers the lost-focus recovery contract independently.
+    await page.evaluate(()=>document.activeElement.blur());
+    pending.release({error:'合成可重试写入故障'},503);await settled(page,`#${form}`);
+    assert.equal(await page.locator(feedback).evaluate(node=>node===document.activeElement),true);
+    assert.match(await page.locator(feedback).textContent(),/写入结果可能不确定/);
+    await page.keyboard.press('Tab');assert.equal(await page.locator(`#${form} button`).evaluate(node=>node===document.activeElement),true);
+    const retry=await hold(page,`**/api/projects/1/${endpoint}`);await page.keyboard.press('Enter');await retry.observed;
+    assert.equal(retry.requests[0].headers()['idempotency-key'],pending.requests[0].headers()['idempotency-key']);
+    assert.deepEqual(retry.requests[0].postDataJSON(),initial);
+    retry.release(form==='sourceForm'?{id:7,title:initial.title}:{id:8});await settled(page,`#${form}`);
+    assert.match(await page.locator(feedback).textContent(),form==='sourceForm'?/来源 #7 已保存/:/候选已提交/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});

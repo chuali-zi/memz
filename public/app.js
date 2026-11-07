@@ -443,7 +443,18 @@ async function load(){
   }catch(e){if(generation===contextGeneration&&p===projectId)workspaceProblem={project:p,workspace:workspaceGeneration,notice:message(`工作台加载失败：${e.message}。请刷新重试。`)}}
   await Promise.all([facts,history,candidates,sources,audit]);
 }
-async function perform(fn,feedback=null){const p=projectId,workspace=workspaceGeneration;if(feedback){message('');message('',feedback)}try{await fn()}catch(e){if(p===projectId&&workspace===workspaceGeneration){message(e.message,feedback||'#notice');if(feedback)$(feedback).focus()}}}
+async function perform(fn,feedback=null){
+  const p=projectId,workspace=workspaceGeneration;
+  if(feedback){message('');message('',feedback)}
+  try{await fn()}catch(e){
+    if(p===projectId&&workspace===workspaceGeneration){
+      message(e.message,feedback||'#notice');
+      // A late failure is announced by the live region. Only recover lost
+      // focus; the user may already be editing a draft or using another control.
+      if(feedback&&document.activeElement===document.body)$(feedback).focus();
+    }
+  }
+}
 // Lock before awaiting so rapid clicks and keyboard submission share one in-flight action.
 async function submitOnce(target,fn,{feedback=null,progress='正在提交…'}={}){
   if(busyActions.has(target))return;
