@@ -8,6 +8,24 @@
 
 流程只创建两个随机 `memz_restore_*` 数据库，管理员连接指定的原库不作为恢复目标。测试完成关闭子进程与连接并删除自己创建的随机库。
 
+## PostgreSQL 工具版本与 CI
+
+恢复测试分别为 `pg_dump` 和 `pg_restore` 选择工具，顺序如下：
+
+1. 设置 `PG_TOOLS_CONTAINER` 时，两者都通过 `docker exec -i` 在该容器内执行；此设置优先于宿主机工具。
+2. 未设置时，优先使用 `/usr/lib/postgresql/16/bin/` 下对应工具。
+3. 若该文件不存在，使用 PATH 中同名工具。此回退不会验证主版本，不能因命令存在便假定它是 16。
+
+GitHub Actions 的数据库服务使用 `postgres:16`，系统测试步骤以 `PG_TOOLS_CONTAINER: ${{ job.services.postgres.id }}` 选择该服务容器内的两项工具，避免 `ubuntu-latest` 的预装客户端版本变化影响恢复。容器内 `pg_dump --version`、`pg_restore --version` 和服务端 `SHOW server_version` 应均为 16 系列；镜像标签没有固定补丁版本，因此不能据此声称每次都是同一补丁版本。
+
+不要只核对 `pg_dump`。PostgreSQL 17 的归档恢复实现会在设置恢复会话状态时发出 `SET transaction_timeout = 0`，旧服务端可能因此报 `unrecognized configuration parameter "transaction_timeout"`；错误本身不足以判定是哪个客户端被选中。参见 [PostgreSQL 17 官方归档恢复源码](https://github.com/postgres/postgres/blob/REL_17_STABLE/src/bin/pg_dump/pg_backup_archiver.c) 的 `_doSetFixedOutputState`。项目的 PostgreSQL 16 恢复演练应同时选择 16 系列的备份与恢复工具；[pg_dump 官方兼容性说明](https://www.postgresql.org/docs/16/app-pgdump.html#APP-PGDUMP-NOTES)也明确不保证新版工具生成的备份可以加载到旧主版本服务器，即使源服务器就是旧版本。
+
+容器工具仍原样使用测试连接 URL 的 host 和 port，脚本不会把宿主端口转换为容器端口。CI 当前使用 `127.0.0.1:5432`，它在 runner 和 PostgreSQL 服务容器内均指向该测试服务；本机若映射为 `127.0.0.1:55432 → 容器:5432`，直接为该 URL 添加 `PG_TOOLS_CONTAINER` 会失败。此时应使用已安装的本机 16 系列工具，或由维护者配置 runner 与工具容器均可达的地址；不能将改写 URL 后未经验证的路径视为通过。
+
+版本查询只证明工具选择前提，不能替代真实恢复演练。修复 CI 工具选择后，需重新运行完整系统测试，确认恢复测试通过并清理随机库；不应忽略恢复错误、过滤归档 SQL、移除 `--exit-on-error` 或沿用旧成功报告来取得通过状态。
+
+## 实际演练步骤
+
 1. 源测试库初始化，用真实HTTP创建带幂等键的来源和候选，批准截止日从20号v1到15号v2；保存客户端上下文。
 2. 停止该测试应用写入，记录八张业务表、序列位置、外键/检查等约束、RLS策略和权限。用 `pg_dump --format=custom` 生成真实归档。
 3. 将归档截断为16字节，尝试恢复到空目标库；要求非零退出且目标仍无业务表。这是损坏头部负向测试，不声称覆盖所有归档损坏或恢复中断情形。

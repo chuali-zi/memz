@@ -6,7 +6,7 @@ const path=require('node:path');
 const {execFileSync}=require('node:child_process');
 const {hash,uiSources,screenshotNames,evaluationSources,expectedResults,verifyEvidence,verifyPackage,buildPackage}=require('../scripts/package-evidence');
 
-const {sourceFiles,coreTestFiles,parseTap}=require('../scripts/system-evidence');
+const {benchmarkSources,sourceFiles,coreTestFiles,parseTap}=require('../scripts/system-evidence');
 
 // Deliberate unit fixtures, not browser or competition evidence.
 function fixture(fn){
@@ -17,8 +17,9 @@ function fixture(fn){
   try{
     for(const file of new Set([...uiSources,...Object.values(evaluationSources)]))write(file,`unit fixture ${file}`);
     json('evaluation/retrieval-cases.json',dataset);
-    write('test/fixture.test.js','// synthetic fixture');
+    write('test/fixture.test.js',"const assert=require('node:assert/strict');assert.equal(require('../benchmarks/memory/scripts/memz_adapter').synthetic,true);");
     write('test/migrations.js','// synthetic fixture');
+    for(const file of benchmarkSources)write(file,'module.exports={synthetic:true};');
     for(const file of ['scripts/package-evidence.js','scripts/system-evidence.js'])write(file,fs.readFileSync(path.join(__dirname,'..',file)));
     const tap='TAP version 13\nok 1 - synthetic fixture\n# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
     const system={schemaVersion:1,synthetic:true,passed:true,source:{commit,workingTreeDirty:false,files:Object.fromEntries(sourceFiles(root).map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},cleanup:{temporaryDatabaseDropped:true},suites:['core','migrations'].map(name=>({name,testFiles:name==='core'?coreTestFiles(root):['test/migrations.js'],exitCode:0,signal:null,passed:true,stdout:name+'.tap',stderr:name+'.stderr.txt',stdoutSha256:hash(tap),stderrSha256:hash(''),summary:parseTap(tap)}))};
@@ -61,6 +62,23 @@ test('changed code and duplicated retrieval cases are rejected',()=>fixture(({wr
   write('server.js','changed implementation');assert.throws(()=>verifyEvidence(options),/source changed/);
   write('server.js','unit fixture server.js');retrieval.cases[1]=retrieval.cases[0];save();assert.throws(()=>verifyEvidence(options),/case identities/);
 }));
+test('benchmark dependency hashes and exact source coverage reject changed or stale reports',()=>fixture(({write,system,save,options})=>{
+  write(benchmarkSources[0],'module.exports={synthetic:false};');
+  assert.throws(()=>verifyEvidence(options),/System source changed/);
+  write(benchmarkSources[0],'module.exports={synthetic:true};');
+  delete system.source.files[benchmarkSources[0]];save();
+  assert.throws(()=>verifyEvidence(options),/System source coverage changed/);
+}));
+test('required benchmark sources cannot be missing or replaced by symbolic links',()=>fixture(({root})=>{
+  const file=path.join(root,benchmarkSources[0]);fs.unlinkSync(file);
+  assert.throws(()=>sourceFiles(root),/Missing required benchmark source/);
+  fs.mkdirSync(file);assert.throws(()=>sourceFiles(root),/must be a regular file/);fs.rmdirSync(file);
+  fs.symlinkSync(path.join(root,'server.js'),file);
+  assert.throws(()=>sourceFiles(root),/cannot follow symbolic links/);
+  fs.unlinkSync(file);fs.rmSync(path.dirname(file),{recursive:true});
+  fs.symlinkSync(path.join(root,'scripts'),path.dirname(file));
+  assert.throws(()=>sourceFiles(root),/cannot follow symbolic links/);
+}));
 test('package verification detects changed documents and extra files',()=>fixture(({root,write,json,options})=>{
   for(const file of ['index.md','docs/submission-report.md','docs/demo-script.md'])write(file,'unit fixture document');
   const collect=(dir,prefix='')=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?collect(path.join(dir,e.name),prefix+e.name+'/'):[prefix+e.name]);
@@ -75,6 +93,9 @@ test('complete package build excludes ignored files, verifies offline, and rejec
   for(const file of ['docs/submission-report.md','docs/demo-script.md'])write(file,'unit fixture document');
   write('scripts/package-evidence.js',fs.readFileSync(path.join(__dirname,'../scripts/package-evidence.js')));
   write('.env','unit fixture excluded content');
+  for(const file of ['benchmarks/memory/calls.jsonl','benchmarks/memory/gold.json','benchmarks/memory/data/synthetic.json',
+    'benchmarks/memory/scripts/__pycache__/synthetic.pyc','benchmarks/memory/scripts/extra.js',
+    'benchmarks/memory/tests/memz_adapter.integration.js'])write(file,'synthetic benchmark exclusion canary');
   git('init','--quiet');git('add','.');git('-c','user.name=Evidence unit fixture','-c','user.email=fixture@example.invalid','commit','--quiet','-m','Synthetic unit fixture');
   const commit=git('rev-parse','HEAD');system.source.commit=commit;ui.source.commit=commit;retrieval.source.gitCommit=commit;
   for(const screenshot of screenshotNames)write(`artifacts/ui/unit/${screenshot}`,fs.readFileSync(path.join(root,'evidence/ui',screenshot)));
@@ -88,7 +109,12 @@ test('complete package build excludes ignored files, verifies offline, and rejec
     const index=fs.readFileSync(path.join(output,'index.md'),'utf8');
     assert.match(index,/阅读顺序/);for(const file of screenshotNames)assert.ok(index.includes(`unit caption ${file}`));
     assert.equal(manifest.commit,commit);assert.equal(fs.existsSync(path.join(output,'.env')),false);
+    assert.deepEqual(Object.keys(manifest.files).filter(file=>file.startsWith('benchmarks/')).sort(),[...benchmarkSources].sort(),
+      'only explicitly allowed benchmark sources enter the package, even when other benchmark files are tracked');
+    assert.equal(system.source.files[benchmarkSources[0]],hash(fs.readFileSync(path.join(output,benchmarkSources[0]))));
     const check=execFileSync(process.execPath,['scripts/package-evidence.js','verify','.'],{cwd:output,encoding:'utf8'});assert.match(check,/Package verified/);
+    const childEnv={...process.env};delete childEnv.NODE_TEST_CONTEXT;
+    const core=execFileSync(process.execPath,['--test','--test-reporter=tap','test/fixture.test.js'],{cwd:output,encoding:'utf8',env:childEnv});assert.match(core,/# pass 1/);
     write('server.js','uncommitted fixture change');assert.throws(()=>buildPackage(root),/Commit changes/);
     write('server.js','unit fixture server.js');ui.source.commit='f'.repeat(40);json('artifacts/ui/unit/report.json',ui);
     assert.throws(()=>buildPackage(root),/another commit/);
