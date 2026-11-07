@@ -50,7 +50,7 @@ async function runTransaction(pool,user,fn,{snapshot=false}={}){
   client.on('error',onError);
   try{
     await client.query(snapshot?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');
-    await client.query("SELECT set_config('app.user_id',$1,true)",[String(user)]);
+    await client.query("SELECT pg_catalog.set_config('app.user_id',$1,true)",[String(user)]);
     const result=await fn(client);
     const committed=await client.query('COMMIT');
     // An aborted transaction accepts COMMIT but reports ROLLBACK. This can

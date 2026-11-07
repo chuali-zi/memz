@@ -23,12 +23,14 @@ node scripts/check-setup.js && npm start
 ## 覆盖范围
 
 - 能否连接并查询数据库；连接/认证错误只输出固定提示。
-- 当前角色是否为超级用户、BYPASSRLS、CREATEROLE，或能继承所需表 owner 权限。
+- 会话身份与当前角色是否为超级用户、BYPASSRLS、CREATEROLE，或能继承所需表 owner 权限；管理员连接后SET ROLE降权不能绕过此项。
 - public schema 的八张基本表是否存在，其中包括迁移 002 的幂等回执表。
 - 表是否启用 RLS、应用角色是否具有读取权限，身份函数是否存在且可执行。
 - facts 的两个当前修订约束名称是否存在且已验证，用于提示遗漏迁移 001。
+- 所需列及基本类型是否匹配；每表是否存在适用于当前角色或PUBLIC的permissive读取策略。它与[本机readiness](health-probes.md)共享一条目录查询，但不读取业务行。
+- public schema的USAGE、会话row_security开启，以及业务表/身份函数按实际名称解析到已检查的public对象。目录关系、内建函数、运算符和相关类型使用pg_catalog限定，不通过自定义同名对象检查。
 
-这是一组基本前提检查，不逐条比对所有字段、策略表达式、约束定义或写入权限，不证明业务数据正确、备份可恢复、生产安全或整个演示可用。通过后仍需实际登录并走来源—待审—审批—读取流程，或运行推荐的隔离系统测试。不要把 BASIC_CHECKS_PASSED 当成完整验收。
+这是一组基本前提检查，不逐条比对所有列属性、策略表达式、约束定义或写入权限，不证明业务数据正确、备份可恢复、生产安全或整个演示可用。通过后仍需实际登录并走来源—待审—审批—读取流程，或运行推荐的隔离系统测试。不要把 BASIC_CHECKS_PASSED 当成完整验收。
 
 ## 失败时的保留数据路径
 
@@ -37,6 +39,7 @@ node scripts/check-setup.js && npm start
 | DATABASE_UNAVAILABLE | 确认本机 PostgreSQL 已启动、认证和端口配置正确；不要把原始连接串贴进公开日志 |
 | UNSAFE_DATABASE_ROLE | 应用和诊断使用 memz_app；管理员连接仅用于维护，不传给应用 |
 | SCHEMA_MISSING | 先核对连接的数据库；只有明确的新空库才初始化，不能为消除报错而删除旧卷 |
+| SCHEMA_PREREQUISITES | 列、类型、适用读取策略或运行时schema/RLS前提不符；请维护者核对schema、授权与连接设置，不自动修复 |
 | MIGRATION_REQUIRED | 暂停写入、备份并核验备份，按 README 顺序执行 001 和 002，再运行诊断 |
 | RLS_DISABLED / SCHEMA_PERMISSIONS | 请维护者核对 schema、权限及迁移；诊断不会自动改授权 |
 | LOCAL_DATABASE_REQUIRED | 核对实际解析目标；本工具不做外部数据库运维 |

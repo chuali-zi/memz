@@ -14,7 +14,7 @@ function fixture(query=async sql=>({rows:[],command:sql.split(' ',1)[0]})){
 test('successful transactions preserve identity, read snapshot and callback result',async()=>{
   const f=fixture();
   assert.deepEqual(await runTransaction(f.pool,3,async()=>({value:42}),{snapshot:true}),{value:42});
-  assert.deepEqual(f.queries,[['BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'],["SELECT set_config('app.user_id',$1,true)",['3']],['COMMIT']]);
+  assert.deepEqual(f.queries,[['BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'],["SELECT pg_catalog.set_config('app.user_id',$1,true)",['3']],['COMMIT']]);
   assert.deepEqual(f.releases,[undefined]);assert.equal(f.client.listenerCount('error'),0);
 });
 test('business failure rolls back and preserves the exact error and reusable client',async()=>{

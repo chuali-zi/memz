@@ -7,6 +7,7 @@ const {SessionStore,SESSION_TTL_MS}=require('./scripts/session-store');
 const {databasePoolOptions,databaseErrorKind,safeErrorCode,runTransaction}=require('./scripts/database');
 const {listenPort,createShutdownGate,installShutdown}=require('./scripts/server-lifecycle');
 const {assertLegacyScope,assertLegacyJSONBudget}=require('./scripts/legacy-view-budget');
+const {createHealthProbes}=require('./scripts/health-probes');
 const {MAX_CURRENT_LABELS,CURRENT_LABELS_MAX_BYTES,EXACT_CONTEXT_MAX_BYTES,currentLabelsReceipt,exactContextReceipt,validateCurrentLabels,validateExactContextRequest,validateExactSelector,validateExactContext}=require('./scripts/exact-context-protocol');
 const app=express();
 const shutdownGate=createShutdownGate();
@@ -24,7 +25,13 @@ app.use((req,res,next)=>{
   if(!match||(match[2]!==undefined&&(Number(match[2])<1||Number(match[2])>65535)))return res.status(403).json({error:'仅支持本机演示地址'});
   next();
 });
+app.use((req,res,next)=>{if(/^\/health\/(live|ready)\/?$/i.test(req.path))res.set('Cache-Control','no-store');next()});
 app.use(shutdownGate.middleware);
+// Health observations require no session. Reuse the same admitted transaction
+// path as business reads; the closure runs after tx has been initialized.
+const health=createHealthProbes((...args)=>tx(...args));
+app.get('/health/live',health.live);
+app.get('/health/ready',health.ready);
 app.use(express.json({limit:'16kb',verify:(req,res,buffer)=>{req.jsonBodyBytes=buffer.length}})); app.use(cookieParser());
 app.post('/api/login',requireJsonObject,(req,res)=>{
   if(req.get('origin')&&req.get('origin')!==`${req.protocol}://${req.get('host')}`)return res.status(403).json({error:'请求来源无效'});
