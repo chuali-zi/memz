@@ -135,6 +135,19 @@ df320d8完整远端[CI成功](https://github.com/chuali-zi/memz/actions/runs/423
 
 当前继续两项有依据的开发：把既有批准历史读取通过显式opt-in MCP暴露，并补native取消；为Node22/24准备固定loadgen、相同小profile与应用字节预算的成对工程smoke。原n80/page25测量合并HTTP与driver读取超过16MiB，因此不原样重跑；新样本不会用于稳定尾延迟、真实模型或换栈结论。尚未提交/运行部分按后续记录说明。LoCoMo下载未恢复，外部模型新增请求仍0，夜间窗口继续。
 
+## 2026-11-07 20:27 UTC 检查点
+
+- e76246c的完整CI成功，core405/405、迁移9/9及全部后续步骤通过；冷启动真实回归保持独立opt-in，不让原生PG核心测试依赖Docker。
+- 5169172：新增显式opt-in历史MCP工具及宿主生成开关，仅分页/输出预算，复用批准历史与完整固定版本来源；默认工具顺序与生成JSON逐字节兼容。历史模块复用既有native取消与独立尽力注销，不增加stdin/任意日期/自动分页或审批。非PG兼容70/70、真实SDK→HTTP→随机PG6/6，旧修订与业务指纹保留、撤权整次失败、并发批准不替换已固定版本，临时库清理确认。[完整CI](https://github.com/chuali-zi/memz/actions/runs/42408352011)core440/440、迁移9/9和后续步骤成功。
+- f0951c4：仅将CI PostgreSQL服务health同步为TCP。现有outage runner已有真实TCP connect+SELECT屏障而未修改；不把安装等待当就绪保证。该提交完整CI成功。
+- ae30483：独立预算的小profile和显式child runtime，保留原legacy及历史原始证据；同Node24负载生成器、相同page10/n32/fixture。计量包装兼容pg原生callback/Promise，保留错误与清理；总deadline、child/owner/admin/DROP异常的剩余句柄均独立清理。Node22/24各9项纯回归、额外8组账本与12类cleanup故障注入通过。[完整CI](https://github.com/chuali-zi/memz/actions/runs/42409923848)core449/449、迁移9/9及完整后续步骤成功。
+
+在ae30483同一干净固定验证工作树，root实际串行运行22.23.4→24.22.1两轮服务smoke，固定负载生成器24.22.1。各138次HTTP，126个reader成功、6个预期503、2个预期403、4个认证请求；意外0、恢复各12/12，两轮应用字节合计13924104/16777216、终末预约0、owned临时库及进程连接均清理。六份原始report/requests/resources和SHA已保存至[配对证据](../evaluation/evidence/reader-capacity-node-pair-2026-11-07/README.md)，独立审查逐字节、重算全部分母/分位数/byteledger通过。并发12的观测p95为36.18/25.79ms，但单对、每档32样本、固定顺序、非冷缓存与JSON计量开销使其不能作为runtime或换栈因果判断；完整六行表和RSS初始差异限制见该证据及reader-capacity说明。没有模型/token/费用测量。
+
+- febfa88：合成真实CLI注入证明headers之后的错误转交Express默认handler会在development/production打印原异常；现只关闭该部分响应，不追加JSON或转交原异常，保留headers前合同和固定错误码日志。Node22/24各2/2、既有错误合同联合19/19通过。未读取真实secret或增加生产故障接口；该变更完整CI待推送后核实。
+
+当前继续离线核查adapter的ingest/freeze是否也会在schema拒绝前读取未知getter，不以query已修替代所有阶段验证；不改已封存真实/合成原始结果。LoCoMo数据未取得、模型新增调用0，Space报告保持同一身份，后续再同步实测检查点；夜间窗口继续。
+
 ## 技术栈决定与主要缺口
 
 目前继续Node/Express/PostgreSQL。现有测量是特定fixture的HTTP传输和真实模型小样本，不是语言/框架横向基准，没有证据说明更换语言能消除主要瓶颈。保留RLS、不可变revision、审批和幂等语义比立即重写更重要。若后续测量显示明确瓶颈，再在固定数据/硬件/并发和冷热条件下比较p50/p95/p99、吞吐、错误率、内存、读写成本；候选栈必须先实现相同接口合同和影子对照，再提供保留数据迁移、备份恢复、回退和分阶段切流方案。

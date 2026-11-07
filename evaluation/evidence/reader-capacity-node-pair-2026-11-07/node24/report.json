@@ -1,0 +1,674 @@
+{
+  "schema": "memz-reader-capacity-v1",
+  "synthetic": true,
+  "status": "passed",
+  "startedAt": "2026-11-07T20:13:45.058Z",
+  "source": {
+    "commit": "ae30483466488893238332928c8ce25a5b10d3f9",
+    "workingTreeDirty": false,
+    "files": {
+      "server.js": "acd40064f198db0ae18c79cf81775a300479dd55def6279ead7123f4f9a21b0c",
+      "idempotency.js": "2e1f2d065a75e01ffc08d9ccc278a275bf9824655a582c51bf79b49dcc29b20c",
+      "db/schema.sql": "6dc7b3f3a10f868aa6b1d3f0ba2792c8b615224e6e56a75afa926b81eeb64d0f",
+      "scripts/database.js": "4f8ce0e610e5a43346ee172620d69be0458ce6e641a64107f286d66a4d0a6bf6",
+      "scripts/session-store.js": "4f2e37fc59849b190bac9123578524508fe835c8a99b7cd68ac7ee581a7e3eba",
+      "scripts/server-lifecycle.js": "5f12de9091ffe9a42ac5f8dcc62505214d465b75d9e5605cede359b04b39179d",
+      "scripts/context-snapshot.js": "af9cc7236e09b6a0809f40c141609435a70d78333e46ed5764e8247f69c6aa96",
+      "scripts/search-query.js": "3e2288c65d0e2c6ea65a3a83aa161956b38bf4fa2d2f0a8fa7db0902bba40c4e",
+      "evaluation/reader-capacity.js": "229ae4e26d3bf6f9f4dce4a144b9fd685828a605840deca3cd35475d132428f6",
+      "evaluation/fixtures/reader-capacity-child.js": "5580678d9da9fe54d5ac919db1ae05ed5589e7346535d23398e740048753a5ff",
+      "scripts/http-server.js": "e8f60bb1def87ab56e517a1cfb80e94ae4080266ea3a7d57658a892f57155614",
+      "scripts/context-evidence.js": "2ed821305fc41ee6ab522c63e78a1394df54999c0806b4787021be44f533e1b5",
+      "scripts/health-probes.js": "9bdfa930eb39b6fbebeab84531853ac7f42a220aee95f78d63fab5246ab0a3a6",
+      "scripts/setup-catalog.js": "6097fcd7587e2ff1cbc6e327b64858734f34303519e144ffaeffe40a29160bb8",
+      "scripts/legacy-view-budget.js": "890e8d6493dc054b3a40b7e13e58f0c5ae894a409ea33a96e1cf6364c2791643",
+      "scripts/exact-context-protocol.js": "045c814aaf2b5c2e00dacb31b202b7bae6cd797bff7d95018a37dda330015e94",
+      "evaluation/capacity-budget.js": "5bae74da88e7d8e41b9400d826d2f41eb19a50d0cd24a58c298e37ae2f3f7797",
+      "package-lock.json": "cbaad9f466df6926ff30193c26ef8e98dee34e60933e34292e12ebbd76b735b1"
+    },
+    "endCommit": "ae30483466488893238332928c8ce25a5b10d3f9",
+    "endWorkingTreeDirty": false
+  },
+  "method": {
+    "seed": 42,
+    "concurrencies": [
+      1,
+      4,
+      12
+    ],
+    "measuredPerLevel": 32,
+    "closedLoop": true,
+    "profile": "node-pair-smoke-v1",
+    "profileSha256": "9690db06bc78a864ed5b3f257c1cb2f41c92ed9fb6978c1470b5243eeb4d647f",
+    "pageSize": 10,
+    "pair": "Exactly two fresh runs, child Node22 then Node24; same Node24 load generator. No automatic retries.",
+    "byteScope": "HTTP request/response bodies plus PG query UTF8, parameter JSON and result rows JSON; not wire, heap, headers, auth packets, IPC or diagnostics.",
+    "budgetPerRun": {
+      "parent": 5242880,
+      "child": 3145728,
+      "total": 8388608
+    },
+    "pairBudgetBytes": 16777216,
+    "boundary": "Pre-operation reservations use fixed synthetic projection bounds. Unexpected HTTP chunks/PG materialization beyond a bound are detected, reported as overruns and fail the run; not a hard allocation bound for arbitrary data.",
+    "timing": "Direct HTTP, full body consumption, JSON parsing and snapshot validation; login/logout excluded from reader timings and counted separately.",
+    "workload": "Same seeded sequence of five first/deeper current-snapshot pages at every level, 10 facts and distinct 1KiB sources per page.",
+    "cache": "Fresh-process first read recorded separately. Fixture creation and ANALYZE have already touched PostgreSQL/OS caches; no cold-cache claim.",
+    "tail": "32 samples per level: nearest-rank p99 is the observed maximum; not a stable tail estimate or SLO.",
+    "load": "Closed-loop workers with no think time; coordinated omission limits tail/load interpretation. Not maximum sustainable capacity.",
+    "resources": "Child-only RSS/cumulative CPU and pool counts sampled at 100ms plus phase boundaries. Sampled maxima are not continuous peaks; PostgreSQL/load-generator memory excluded.",
+    "comparison": "Instrumented fixed profile: PG result JSON serialization, HTTP hashing/validation and synchronous raw writes add CPU/allocation/latency. Not uninstrumented production latency or RSS. No alternate stack or disabled-protection control; Node differences do not establish application or migration gains.",
+    "rawFiles": {
+      "requests": "requests.jsonl",
+      "resources": "resources.jsonl"
+    },
+    "limits": {
+      "executionMs": 90000,
+      "cleanupMs": 10000,
+      "httpMs": 8000,
+      "maxResponseBytes": 32768,
+      "authenticationAndExpectedErrorResponseBytes": 1024,
+      "maxHttpRequests": 138
+    },
+    "modelCalls": 0
+  },
+  "environment": {
+    "node": "v24.22.1",
+    "loadGeneratorNode": "v24.22.1",
+    "requestedApplicationNode": "v24.22.1",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logicalCpus": 5,
+    "loadAverageStart": [
+      0.01,
+      0,
+      0
+    ],
+    "noiseNote": "All four collaborating agents finished local tests before this pair; only dedicated test PostgreSQL observed. External host activity and caches not controlled. Fixed order Node22 then Node24; instrumented small smoke only.",
+    "postgres": "16.15 (Debian 16.15-1.pgdg13+2)",
+    "postgresMaxConnections": 100,
+    "otherDatabaseActivityBefore": {
+      "connections": 1,
+      "active": 0
+    },
+    "applicationLimits": {
+      "max": 10,
+      "connectionTimeoutMillis": 5000,
+      "statement_timeout": 10000,
+      "query_timeout": 15000
+    },
+    "applicationNode": "v24.22.1",
+    "httpReceivePolicy": {
+      "headersTimeout": 10000,
+      "requestTimeout": 15000,
+      "connectionsCheckingInterval": 1000,
+      "keepAliveTimeout": 5000,
+      "timeout": 0,
+      "maxConnections": 128
+    },
+    "otherDatabaseActivityAfter": {
+      "connections": 1,
+      "active": 0
+    },
+    "loadAverageEnd": [
+      0,
+      0,
+      0
+    ],
+    "childDiagnosticBytes": 132
+  },
+  "fixture": {
+    "approval": "Original synthetic records explicitly initialized as approved by schema owner, only in a random temporary database; not real data or automatic extraction.",
+    "generatedRows": 512,
+    "generationSha256": "564ce2e4d666ff078661606987e1e3870d80b05a2a08bf631691aacc6a69693c",
+    "sourceBodyBytes": 524288,
+    "builtinCounts": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 4,
+      "facts": 1,
+      "candidates": 1,
+      "revisions": 1,
+      "audit": 1,
+      "idempotency_requests": 0
+    },
+    "actualTotalCounts": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 516,
+      "facts": 513,
+      "candidates": 513,
+      "revisions": 513,
+      "audit": 513,
+      "idempotency_requests": 0
+    },
+    "actualGeneratedDataSha256": "564ce2e4d666ff078661606987e1e3870d80b05a2a08bf631691aacc6a69693c",
+    "workloadPages": [
+      {
+        "after": 0,
+        "factIds": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      {
+        "after": 51,
+        "factIds": [
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61
+        ]
+      },
+      {
+        "after": 101,
+        "factIds": [
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111
+        ]
+      },
+      {
+        "after": 151,
+        "factIds": [
+          152,
+          153,
+          154,
+          155,
+          156,
+          157,
+          158,
+          159,
+          160,
+          161
+        ]
+      },
+      {
+        "after": 201,
+        "factIds": [
+          202,
+          203,
+          204,
+          205,
+          206,
+          207,
+          208,
+          209,
+          210,
+          211
+        ]
+      }
+    ],
+    "snapshotProjectionBytes": 16004
+  },
+  "phases": [
+    {
+      "name": "fresh_process_first_read",
+      "concurrency": 1,
+      "planned": 1,
+      "startedAtMs": 538.295208,
+      "measurementFinishedAtMs": 566.548221,
+      "finishedAtMs": 566.936868,
+      "attempted": 1,
+      "valid": 1,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 75603968,
+        "sampledMaxPoolTotal": 1,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 17849,
+        "childCpuSystemUs": 0
+      },
+      "statusCounts": {
+        "200": 1
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 35.39445509758551,
+      "valid200PerSecond": 35.39445509758551,
+      "latencyAllMs": {
+        "n": 1,
+        "p50": 28.068684000000076,
+        "p95": 28.068684000000076,
+        "p99": 28.068684000000076,
+        "max": 28.068684000000076
+      },
+      "latencyValid200Ms": {
+        "n": 1,
+        "p50": 28.068684000000076,
+        "p95": 28.068684000000076,
+        "p99": 28.068684000000076
+      }
+    },
+    {
+      "name": "warmup_1",
+      "concurrency": 1,
+      "planned": 1,
+      "startedAtMs": 567.337393,
+      "measurementFinishedAtMs": 576.145129,
+      "finishedAtMs": 576.5366,
+      "attempted": 1,
+      "valid": 1,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 75866112,
+        "sampledMaxPoolTotal": 1,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 5742,
+        "childCpuSystemUs": 0
+      },
+      "statusCounts": {
+        "200": 1
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 113.53655468329234,
+      "valid200PerSecond": 113.53655468329234,
+      "latencyAllMs": {
+        "n": 1,
+        "p50": 8.70950700000003,
+        "p95": 8.70950700000003,
+        "p99": 8.70950700000003,
+        "max": 8.70950700000003
+      },
+      "latencyValid200Ms": {
+        "n": 1,
+        "p50": 8.70950700000003,
+        "p95": 8.70950700000003,
+        "p99": 8.70950700000003
+      }
+    },
+    {
+      "name": "measured_1",
+      "concurrency": 1,
+      "planned": 32,
+      "startedAtMs": 576.88712,
+      "measurementFinishedAtMs": 769.842937,
+      "finishedAtMs": 770.201579,
+      "attempted": 32,
+      "valid": 32,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 4,
+        "sampledMaxRssBytes": 81240064,
+        "sampledMaxPoolTotal": 1,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 65138,
+        "childCpuSystemUs": 17043
+      },
+      "statusCounts": {
+        "200": 32
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 165.84107438440165,
+      "valid200PerSecond": 165.84107438440165,
+      "latencyAllMs": {
+        "n": 32,
+        "p50": 5.868715999999949,
+        "p95": 7.0418580000000475,
+        "p99": 7.366079000000013,
+        "max": 7.366079000000013
+      },
+      "latencyValid200Ms": {
+        "n": 32,
+        "p50": 5.868715999999949,
+        "p95": 7.0418580000000475,
+        "p99": 7.366079000000013
+      }
+    },
+    {
+      "name": "warmup_4",
+      "concurrency": 4,
+      "planned": 4,
+      "startedAtMs": 770.875117,
+      "measurementFinishedAtMs": 792.93276,
+      "finishedAtMs": 793.290381,
+      "attempted": 4,
+      "valid": 4,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 3,
+        "sampledMaxRssBytes": 82550784,
+        "sampledMaxPoolTotal": 4,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 18172,
+        "childCpuSystemUs": 0
+      },
+      "statusCounts": {
+        "200": 4
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 181.3430383291634,
+      "valid200PerSecond": 181.3430383291634,
+      "latencyAllMs": {
+        "n": 4,
+        "p50": 19.45272799999998,
+        "p95": 21.18112899999994,
+        "p99": 21.18112899999994,
+        "max": 21.18112899999994
+      },
+      "latencyValid200Ms": {
+        "n": 4,
+        "p50": 19.45272799999998,
+        "p95": 21.18112899999994,
+        "p99": 21.18112899999994
+      }
+    },
+    {
+      "name": "measured_4",
+      "concurrency": 4,
+      "planned": 32,
+      "startedAtMs": 793.693089,
+      "measurementFinishedAtMs": 879.185516,
+      "finishedAtMs": 879.55875,
+      "attempted": 32,
+      "valid": 32,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 91463680,
+        "sampledMaxPoolTotal": 4,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 45929,
+        "childCpuSystemUs": 16113
+      },
+      "statusCounts": {
+        "200": 32
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 374.30215895028914,
+      "valid200PerSecond": 374.30215895028914,
+      "latencyAllMs": {
+        "n": 32,
+        "p50": 9.904548999999975,
+        "p95": 14.633763000000044,
+        "p99": 14.756813999999963,
+        "max": 14.756813999999963
+      },
+      "latencyValid200Ms": {
+        "n": 32,
+        "p50": 9.904548999999975,
+        "p95": 14.633763000000044,
+        "p99": 14.756813999999963
+      }
+    },
+    {
+      "name": "warmup_12",
+      "concurrency": 12,
+      "planned": 12,
+      "startedAtMs": 879.866114,
+      "measurementFinishedAtMs": 923.494145,
+      "finishedAtMs": 923.787038,
+      "attempted": 12,
+      "valid": 12,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 3,
+        "sampledMaxRssBytes": 95526912,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 2,
+        "childCpuUserUs": 42398,
+        "childCpuSystemUs": 788
+      },
+      "statusCounts": {
+        "200": 12
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 275.052522998345,
+      "valid200PerSecond": 275.052522998345,
+      "latencyAllMs": {
+        "n": 12,
+        "p50": 35.71064100000001,
+        "p95": 43.103477999999996,
+        "p99": 43.103477999999996,
+        "max": 43.103477999999996
+      },
+      "latencyValid200Ms": {
+        "n": 12,
+        "p50": 35.71064100000001,
+        "p95": 43.103477999999996,
+        "p99": 43.103477999999996
+      }
+    },
+    {
+      "name": "measured_12",
+      "concurrency": 12,
+      "planned": 32,
+      "startedAtMs": 924.049484,
+      "measurementFinishedAtMs": 977.620376,
+      "finishedAtMs": 977.929223,
+      "attempted": 32,
+      "valid": 32,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 2,
+        "sampledMaxRssBytes": 96313344,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 36425,
+        "childCpuSystemUs": 8448
+      },
+      "statusCounts": {
+        "200": 32
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 597.3393162839257,
+      "valid200PerSecond": 597.3393162839257,
+      "latencyAllMs": {
+        "n": 32,
+        "p50": 17.95389399999999,
+        "p95": 25.794067999999925,
+        "p99": 28.22467999999992,
+        "max": 28.22467999999992
+      },
+      "latencyValid200Ms": {
+        "n": 32,
+        "p50": 17.95389399999999,
+        "p95": 25.794067999999925,
+        "p99": 28.22467999999992
+      }
+    },
+    {
+      "name": "pool_saturation",
+      "concurrency": 6,
+      "planned": 6,
+      "startedAtMs": 978.689031,
+      "measurementFinishedAtMs": 5985.877044,
+      "finishedAtMs": 5986.360493,
+      "attempted": 6,
+      "valid": 6,
+      "httpErrors": 6,
+      "resources": {
+        "samples": 52,
+        "sampledMaxRssBytes": 96444416,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 6,
+        "childCpuUserUs": 19779,
+        "childCpuSystemUs": 1159
+      },
+      "statusCounts": {
+        "503": 6
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 1.1982773533612867,
+      "valid200PerSecond": 0,
+      "latencyAllMs": {
+        "n": 6,
+        "p50": 5005.539755,
+        "p95": 5006.41836,
+        "p99": 5006.41836,
+        "max": 5006.41836
+      },
+      "latencyValid200Ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null
+      }
+    },
+    {
+      "name": "same_session_recovery",
+      "concurrency": 6,
+      "planned": 12,
+      "startedAtMs": 5987.293511999999,
+      "measurementFinishedAtMs": 6013.819758,
+      "finishedAtMs": 6016.502868,
+      "attempted": 12,
+      "valid": 12,
+      "httpErrors": 0,
+      "resources": {
+        "samples": 3,
+        "sampledMaxRssBytes": 98148352,
+        "sampledMaxPoolTotal": 10,
+        "sampledMaxPoolWaiting": 0,
+        "childCpuUserUs": 16698,
+        "childCpuSystemUs": 2907
+      },
+      "statusCounts": {
+        "200": 12
+      },
+      "errorCounts": {},
+      "completionsPerSecond": 452.3821425768214,
+      "valid200PerSecond": 452.3821425768214,
+      "latencyAllMs": {
+        "n": 12,
+        "p50": 11.349119999999857,
+        "p95": 15.460865000000013,
+        "p99": 15.460865000000013,
+        "max": 15.460865000000013
+      },
+      "latencyValid200Ms": {
+        "n": 12,
+        "p50": 11.349119999999857,
+        "p95": 15.460865000000013,
+        "p99": 15.460865000000013
+      }
+    }
+  ],
+  "checks": {
+    "fixtureUnchanged": true,
+    "rawRequests": 138,
+    "httpRequests": 138,
+    "readerRequests": 134,
+    "unexpectedSamples": 0,
+    "expected503": 6,
+    "rls403": 2
+  },
+  "cleanup": {
+    "childExited": true,
+    "ownerClosed": true,
+    "temporaryDatabaseDropped": true,
+    "adminClosed": true,
+    "childResult": {
+      "code": 0,
+      "signal": null
+    },
+    "childForced": false,
+    "elapsedMs": 34.80741499999931
+  },
+  "executionMs": 6038.679397999999,
+  "actualHttpRequests": 138,
+  "rawSampleCount": 138,
+  "finishedAt": "2026-11-07T20:13:51.090Z",
+  "byteBudget": {
+    "terminalCaptured": true,
+    "parent": {
+      "limit": 5242880,
+      "used": 4695510,
+      "reserved": 0,
+      "work": {
+        "limit": 5226496,
+        "used": 4695449,
+        "reserved": 0,
+        "peakCommitted": 4798887,
+        "operations": 179,
+        "denied": 0,
+        "overruns": 0,
+        "overrunBytes": 0,
+        "unmeasured": 0
+      },
+      "cleanup": {
+        "limit": 16384,
+        "used": 61,
+        "reserved": 0,
+        "peakCommitted": 61,
+        "operations": 1,
+        "denied": 0,
+        "overruns": 0,
+        "overrunBytes": 0,
+        "unmeasured": 0
+      }
+    },
+    "child": {
+      "limit": 3145728,
+      "used": 2266542,
+      "reserved": 0,
+      "work": {
+        "limit": 3129344,
+        "used": 2266518,
+        "reserved": 0,
+        "peakCommitted": 2266644,
+        "operations": 888,
+        "denied": 0,
+        "overruns": 0,
+        "overrunBytes": 0,
+        "unmeasured": 0
+      },
+      "cleanup": {
+        "limit": 16384,
+        "used": 24,
+        "reserved": 0,
+        "peakCommitted": 24,
+        "operations": 2,
+        "denied": 0,
+        "overruns": 0,
+        "overrunBytes": 0,
+        "unmeasured": 0
+      },
+      "failureCode": null
+    },
+    "perRunLimit": 8388608,
+    "pairLimit": 16777216,
+    "combinedUsed": 6962052,
+    "combinedReserved": 0,
+    "failureCode": null,
+    "scope": "HTTP request/response bodies plus PG query UTF8, parameter JSON and result rows JSON; not wire, heap, headers, auth packets, IPC or diagnostics."
+  },
+  "resourceSummary": {
+    "samples": 77,
+    "sampledMaxRssBytes": 98148352,
+    "sampledMaxPoolTotal": 10,
+    "sampledMaxPoolWaiting": 6
+  },
+  "rawFiles": {
+    "requests.jsonl": {
+      "bytes": 65657,
+      "sha256": "06e926858d0850559682bb4df2b188c8cf83f92391235add20278c67868b4e27"
+    },
+    "resources.jsonl": {
+      "bytes": 45909,
+      "sha256": "c1b6a8991a021da5a633358304ffc8802a6de5fcef126d4610ab79dfcf6f2f09"
+    }
+  }
+}
