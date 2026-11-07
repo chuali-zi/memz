@@ -5,22 +5,24 @@ const crypto=require('node:crypto');
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 // Required by core contract tests; never recursively include benchmark data or runs.
 const benchmarkSources=Object.freeze(['benchmarks/memory/scripts/memz_adapter.js']);
+const contractSources=Object.freeze(['contracts/openapi-local-v1.json']);
 function sourceFiles(root){
   const walk=dir=>fs.readdirSync(path.join(root,dir),{withFileTypes:true}).flatMap(entry=>{
     const file=`${dir}/${entry.name}`;
     assert.ok(!entry.isSymbolicLink(),'Source evidence cannot follow symbolic links');
     return entry.isDirectory()?walk(file):[file];
   });
-  for(const file of benchmarkSources){
+  for(const file of [...benchmarkSources,...contractSources]){
+    const kind=benchmarkSources.includes(file)?'benchmark':'contract';
     let current=root;
     for(const part of file.split('/')){
       current=path.join(current,part);
-      assert.ok(fs.existsSync(current),'Missing required benchmark source');
+      assert.ok(fs.existsSync(current),`Missing required ${kind} source`);
       assert.ok(!fs.lstatSync(current).isSymbolicLink(),'Source evidence cannot follow symbolic links');
     }
-    assert.ok(fs.lstatSync(current).isFile(),'Benchmark source must be a regular file');
+    assert.ok(fs.lstatSync(current).isFile(),`${kind} source must be a regular file`);
   }
-  return ['server.js','idempotency.js','package.json','package-lock.json',...['db','public','test','scripts','evaluation'].flatMap(dir=>fs.existsSync(path.join(root,dir))?walk(dir):[])].filter(file=>fs.existsSync(path.join(root,file))).concat(benchmarkSources).sort();
+  return ['server.js','idempotency.js','package.json','package-lock.json',...['db','public','test','scripts','evaluation'].flatMap(dir=>fs.existsSync(path.join(root,dir))?walk(dir):[])].filter(file=>fs.existsSync(path.join(root,file))).concat(benchmarkSources,contractSources).sort();
 }
 function coreTestFiles(root){return fs.readdirSync(path.join(root,'test')).filter(file=>file.endsWith('.test.js')).map(file=>`test/${file}`).sort()}
 function parseTap(text){
@@ -56,4 +58,4 @@ function verifySystemEvidence({root,reportPath,commit,checkedFile}){
   }
   return report;
 }
-module.exports={hash,benchmarkSources,sourceFiles,coreTestFiles,parseTap,verifySystemEvidence};
+module.exports={hash,benchmarkSources,contractSources,sourceFiles,coreTestFiles,parseTap,verifySystemEvidence};

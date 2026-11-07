@@ -1,5 +1,5 @@
 const fs=require('node:fs');
-const {verifySystemEvidence,benchmarkSources}=require('./system-evidence');
+const {verifySystemEvidence,benchmarkSources,contractSources}=require('./system-evidence');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const assert=require('node:assert/strict');
@@ -116,7 +116,8 @@ function buildPackage(root=path.resolve(__dirname,'..')){
   const {ui,retrieval,system}=verifyEvidence({root,commit,uiReportPath,retrievalReportPath,systemReportPath});
   const tracked=git('ls-files','-z').split('\0').filter(Boolean);
   for(const file of benchmarkSources)assert.ok(tracked.includes(file),'Required benchmark source must be tracked');
-  const include=file=>benchmarkSources.includes(file)||/^(docs|db|public|test|evaluation|scripts)\//.test(file)||['README.md','server.js','idempotency.js','package.json','package-lock.json','compose.yml','.github/workflows/ci.yml','.gitignore','.gitattributes'].includes(file);
+  for(const file of contractSources)assert.ok(tracked.includes(file),'Required contract source must be tracked');
+  const include=file=>benchmarkSources.includes(file)||/^(docs|db|public|test|evaluation|scripts)\//.test(file)||['contracts/openapi-local-v1.json','README.md','server.js','idempotency.js','package.json','package-lock.json','compose.yml','.github/workflows/ci.yml','.gitignore','.gitattributes'].includes(file);
   const destination=path.join(root,'artifacts/submission',`${commit.slice(0,12)}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`);
   const staging=destination+'.tmp';fs.mkdirSync(staging,{recursive:true});
   const copy=(from,to)=>{fs.mkdirSync(path.dirname(path.join(staging,to)),{recursive:true});fs.copyFileSync(from,path.join(staging,to))};

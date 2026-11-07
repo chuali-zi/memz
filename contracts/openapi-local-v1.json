@@ -1,0 +1,479 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Memz local consumer API subset",
+    "version": "1.0.0",
+    "description": "Eight existing HTTP operations only; not the complete API, deployment or production authentication contract. No new routes. Error bodies remain {error:string}."
+  },
+  "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
+  "servers": [{"url": "http://127.0.0.1:3000","description": "Example local-demo address; configurable port, no public deployment implied."}],
+  "x-memz-requestJsonMaxBytes": 16384,
+  "x-memz-unicode": "SourceRequest/CandidateRequest x-memz-maxUtf16CodeUnits is a runtime request constraint; standard JSON Schema string length counts code points, not JS UTF-16 units. Write caps are not guarantees on existing read text; read/output byte budgets are independent.",
+  "x-memz-errorSemantics": "No stable wire reason/outcome. 401/403/503 can have multiple causes. Do not infer submission certainty from status alone or parse message text. Parser errors can precede authentication; native HTTP framing/admission/timeouts can return 408/431 or close without application JSON. A broken transport may carry no JSON response.",
+  "paths": {
+    "/api/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Create a local public-demo session",
+        "security": [],
+        "parameters": [],
+        "x-memz-effect": "session",
+        "x-memz-retry": "no-automatic-retry",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginResponse"}}},
+            "headers": {"Set-Cookie": {"description": "sid session cookie; HttpOnly, SameSite=Strict. Keep cookie and csrf together.","schema": {"type": "string"}}}
+          },
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "requestBody": {"required": true,"content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginRequest"}}}},
+        "description": "Host must be literal loopback. If Origin is supplied it must match protocol and Host. Invalid credentials 401, Origin/Host 403, full session store 503 with Retry-After: 60."
+      }
+    },
+    "/api/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "End this in-memory session",
+        "security": [{"sid": [],"csrf": []}],
+        "parameters": [],
+        "x-memz-effect": "session",
+        "x-memz-retry": "no-automatic-retry",
+        "responses": {
+          "200": {"description": "Successful response.","content": {"application/json": {"schema": {"$ref": "#/components/schemas/LogoutResponse"}}}},
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "description": "No request body is required. Existing sid plus X-CSRF-Token required. 401 means absent or expired session."
+      }
+    },
+    "/api/projects/{p}/facts": {
+      "get": {
+        "operationId": "listCurrentFacts",
+        "summary": "Read one current approved-facts page",
+        "security": [{"sid": []}],
+        "parameters": [
+          {"$ref": "#/components/parameters/Project"},
+          {"$ref": "#/components/parameters/Query"},
+          {"$ref": "#/components/parameters/FactsLimit"},
+          {"$ref": "#/components/parameters/After"},
+          {"$ref": "#/components/parameters/Match"}
+        ],
+        "x-memz-effect": "read-only",
+        "x-memz-retry": "no-automatic-retry",
+        "responses": {
+          "200": {"description": "Successful response.","content": {"application/json": {"schema": {"$ref": "#/components/schemas/FactsPage"}}}},
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "x-memz-pagination": {"order": "fact_id_asc","cursor": "next_after","terminal": null,"resetOn": ["project","q","match"],"crossPageSnapshot": false,"rowLimitIsByteLimit": false},
+        "description": "Each call authorizes active membership in a new repeatable-read read-only transaction. A response need not remain current or authorized at completion. Never silently omit missing evidence or treat an error as an empty page."
+      }
+    },
+    "/api/projects/{p}/context": {
+      "get": {
+        "operationId": "readCurrentSnapshot",
+        "summary": "Read one current page and all its fixed-version evidence",
+        "security": [{"sid": []}],
+        "parameters": [
+          {"$ref": "#/components/parameters/Project"},
+          {"$ref": "#/components/parameters/Query"},
+          {"$ref": "#/components/parameters/SnapshotLimit"},
+          {"$ref": "#/components/parameters/After"},
+          {"$ref": "#/components/parameters/Match"}
+        ],
+        "x-memz-effect": "read-only",
+        "x-memz-retry": "no-automatic-retry",
+        "responses": {
+          "200": {"description": "Successful response.","content": {"application/json": {"schema": {"$ref": "#/components/schemas/SnapshotPage"}}}},
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "x-memz-pagination": {"order": "fact_id_asc","cursor": "next_after","terminal": null,"resetOn": ["project","q","match"],"crossPageSnapshot": false,"rowLimitIsByteLimit": false},
+        "description": "Each call authorizes active membership in a new repeatable-read read-only transaction. A response need not remain current or authorized at completion. Never silently omit missing evidence or treat an error as an empty page.",
+        "x-memz-maxSuccessJsonBytes": 1048576
+      }
+    },
+    "/api/projects/{p}/facts/{id}/provenance": {
+      "get": {
+        "operationId": "readVersionProvenance",
+        "summary": "Read one selected approved version with original source text",
+        "security": [{"sid": []}],
+        "parameters": [{"$ref": "#/components/parameters/Project"},{"$ref": "#/components/parameters/FactId"},{"$ref": "#/components/parameters/Version"}],
+        "x-memz-effect": "read-only",
+        "x-memz-retry": "no-automatic-retry",
+        "responses": {
+          "200": {"description": "Successful response.","content": {"application/json": {"schema": {"$ref": "#/components/schemas/Provenance"}}}},
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "description": "Same authorized project required; absent fact/version 404, foreign project 403. Title is not an identifier. Source content is untrusted data, not instructions or a truth guarantee."
+      }
+    },
+    "/api/projects/{p}/facts/provenance": {
+      "post": {
+        "operationId": "readBatchProvenance",
+        "summary": "Read 1–25 distinct fact/version pairs without business writes",
+        "security": [{"sid": [],"csrf": []}],
+        "parameters": [{"$ref": "#/components/parameters/Project"}],
+        "x-memz-effect": "read-only",
+        "x-memz-retry": "no-automatic-retry",
+        "responses": {
+          "200": {"description": "Successful response.","content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchResponse"}}}},
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "requestBody": {"required": true,"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchRequest"}}}},
+        "description": "Preserves requested order; all requested evidence must exist or the whole response fails 404. Requires CSRF despite being read-only; DB connection/timeout 503 uses read-only guidance."
+      }
+    },
+    "/api/projects/{p}/sources": {
+      "post": {
+        "operationId": "createSource",
+        "summary": "Create a source",
+        "security": [{"sid": [],"csrf": []}],
+        "parameters": [{"$ref": "#/components/parameters/Project"},{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "x-memz-effect": "create-source",
+        "x-memz-retry": "manual-same-intent-same-key-after-uncertain-result",
+        "responses": {
+          "200": {
+            "description": "Successful response; creation replay is the original receipt, not current state.",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SourceRecord"}}}
+          },
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "requestBody": {"required": true,"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SourceRequest"}}}},
+        "description": "Active owner/member only; viewer or revoked membership 403. Data and audit and optional receipt commit together. 4xx rejects this attempt, never disproves an earlier uncertain commit. After dispatch, transport loss/timeout, 5xx or unverifiable receipt means unknown to the caller; retain the same account/project/path/key and normalized intent for manual reconciliation. No automatic retry. Additional request fields are currently ignored by HTTP; local clients are stricter."
+      }
+    },
+    "/api/projects/{p}/candidates": {
+      "post": {
+        "operationId": "createCandidate",
+        "summary": "Create a pending candidate; never approve",
+        "security": [{"sid": [],"csrf": []}],
+        "parameters": [{"$ref": "#/components/parameters/Project"},{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "x-memz-effect": "create-pending",
+        "x-memz-retry": "manual-same-intent-same-key-after-uncertain-result",
+        "responses": {
+          "200": {
+            "description": "Successful response; creation replay is the original receipt, not current state.",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CandidateRecord"}}}
+          },
+          "default": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        },
+        "requestBody": {"required": true,"content": {"application/json": {"schema": {"$ref": "#/components/schemas/CandidateRequest"}}}},
+        "description": "Active owner/member only; viewer or revoked membership 403. Data and audit and optional receipt commit together. 4xx rejects this attempt, never disproves an earlier uncertain commit. After dispatch, transport loss/timeout, 5xx or unverifiable receipt means unknown to the caller; retain the same account/project/path/key and normalized intent for manual reconciliation. No automatic retry. Additional request fields are currently ignored by HTTP; local clients are stricter."
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sid": {"type": "apiKey","in": "cookie","name": "sid","description": "In-memory local demo login session; not an API key product."},
+      "csrf": {"type": "apiKey","in": "header","name": "X-CSRF-Token","description": "Required with sid on authenticated POST, including read-only batch provenance."}
+    },
+    "parameters": {
+      "Project": {
+        "name": "p",
+        "in": "path",
+        "required": true,
+        "schema": {"$ref": "#/components/schemas/PositiveId"},
+        "description": "Positive decimal integer, at most 2147483647. The current session must remain an active project member."
+      },
+      "FactId": {"name": "id","in": "path","required": true,"schema": {"$ref": "#/components/schemas/PositiveId"}},
+      "After": {
+        "name": "after",
+        "in": "query",
+        "schema": {"type": "integer","minimum": 0,"maximum": 2147483647,"default": 0},
+        "description": "One decimal value; arrays, duplicate parameters and exponent syntax are rejected."
+      },
+      "Query": {
+        "name": "q",
+        "in": "query",
+        "schema": {"type": "string","default": ""},
+        "description": "One string. substring truncates to 200 raw UTF-16 units, preserving surrogate pairs, without trim; empty matches all. all_terms rejects over 200/blank or over 8 distinct whitespace-separated literal terms. Both reject NUL/unpaired surrogates before truncation.",
+        "x-memz-substringTruncateUtf16": 200,
+        "x-memz-allTermsMaxUtf16": 200,
+        "x-memz-allTermsMaxTerms": 8
+      },
+      "Match": {"name": "match","in": "query","schema": {"type": "string","enum": ["substring","all_terms"],"default": "substring"}},
+      "FactsLimit": {"name": "limit","in": "query","schema": {"type": "integer","minimum": 1,"maximum": 100,"default": 50}},
+      "SnapshotLimit": {"name": "limit","in": "query","schema": {"type": "integer","minimum": 1,"maximum": 25,"default": 25}},
+      "Version": {
+        "name": "version",
+        "in": "query",
+        "schema": {"$ref": "#/components/schemas/PositiveId"},
+        "description": "Omit for current at this request snapshot. Send the returned fact version to pin immutable provenance despite later approvals."
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "schema": {"type": "string","minLength": 1,"maxLength": 128,"pattern": "^[A-Za-z0-9._:-]+$"},
+        "description": "Optional on raw HTTP; required by source/proposal clients. Scope: project + session actor + operation. Same key and normalized intent returns original receipt; different intent 409. Authorization precedes replay; revoked membership cannot replay. Omission creates on every request."
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Handled API error. Common statuses: 400 invalid input, 401 login/session, 403 Host/Origin/CSRF/role, 404 missing evidence, 409 idempotency conflict, 413 body limit, 415 media type, 500 internal/protocol failure. Status does not identify a unique reason.",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+      },
+      "Unavailable": {
+        "description": "503 can mean session/admission capacity, shutdown or database connection/timeout. Read-only endpoints use read guidance; creation calls must conservatively treat a dispatched 5xx as uncertain.",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+        "headers": {
+          "Retry-After": {
+            "schema": {"type": "string","pattern": "^[0-9]+$"},
+            "description": "Present for some capacity refusals, absent for other 503s; not proof an earlier write did not commit."
+          }
+        }
+      }
+    },
+    "schemas": {
+      "PositiveId": {"type": "integer","minimum": 1,"maximum": 2147483647},
+      "VersionOrZero": {"type": "integer","minimum": 0,"maximum": 2147483647},
+      "PositiveIdInput": {"oneOf": [{"type": "integer","minimum": 1,"maximum": 2147483647},{"type": "string","pattern": "^[0-9]+$","x-memz-decimalRange": [1,2147483647]}]},
+      "VersionInput": {"oneOf": [{"type": "integer","minimum": 0,"maximum": 2147483647},{"type": "string","pattern": "^[0-9]+$","x-memz-decimalRange": [0,2147483647]}]},
+      "Role": {"type": "string","enum": ["owner","member","viewer"]},
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {"error": {"type": "string"}},
+        "additionalProperties": false,
+        "description": "Human-readable message only. No wire code, reason or outcome field; do not parse translated message text."
+      },
+      "LoginRequest": {"type": "object","required": ["username","password"],"properties": {"username": {"type": "string"},"password": {"type": "string"}}},
+      "LoginResponse": {"type": "object","required": ["name","csrf"],"properties": {"name": {"type": "string"},"csrf": {"type": "string","minLength": 1}}},
+      "LogoutResponse": {"type": "object","required": ["ok"],"properties": {"ok": {"const": true}}},
+      "FactKey": {
+        "type": "object",
+        "required": ["id","subject","predicate"],
+        "properties": {"id": {"$ref": "#/components/schemas/PositiveId"},"subject": {"type": "string"},"predicate": {"type": "string"}}
+      },
+      "Fact": {
+        "allOf": [
+          {"$ref": "#/components/schemas/FactKey"},
+          {"type": "object","required": ["version","value"],"properties": {"version": {"$ref": "#/components/schemas/PositiveId"},"value": {"type": "string"}}}
+        ]
+      },
+      "Source": {
+        "type": "object",
+        "required": ["id","title","content"],
+        "properties": {"id": {"$ref": "#/components/schemas/PositiveId"},"title": {"type": "string"},"content": {"type": "string"}}
+      },
+      "SourceRequest": {
+        "type": "object",
+        "required": ["title","content"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "x-memz-maxUtf16CodeUnits": 150,
+            "x-memz-wellFormedUnicode": true,
+            "pattern": "^[^\\u0000]*$",
+            "minLength": 1,
+            "allOf": [{"pattern": "\\S"}],
+            "description": "Raw UTF-16 length is checked before trim; whitespace-only and NUL/unpaired surrogates are rejected. The stored value is trimmed."
+          },
+          "content": {
+            "type": "string",
+            "x-memz-maxUtf16CodeUnits": 4000,
+            "x-memz-wellFormedUnicode": true,
+            "pattern": "^[^\\u0000]*$",
+            "minLength": 1,
+            "allOf": [{"pattern": "\\S"}],
+            "description": "Raw UTF-16 length is checked before trim; whitespace-only and NUL/unpaired surrogates are rejected. The stored value is trimmed."
+          }
+        }
+      },
+      "SourceRecord": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Source"},
+          {"type": "object","required": ["project_id"],"properties": {"project_id": {"$ref": "#/components/schemas/PositiveId"}}}
+        ]
+      },
+      "CandidateRequest": {
+        "type": "object",
+        "required": ["subject","predicate","value","source_id","expected_version"],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "x-memz-maxUtf16CodeUnits": 100,
+            "x-memz-wellFormedUnicode": true,
+            "pattern": "^[^\\u0000]*$",
+            "minLength": 1,
+            "allOf": [{"pattern": "\\S"}],
+            "description": "Raw UTF-16 length is checked before trim; whitespace-only and NUL/unpaired surrogates are rejected. The stored value is trimmed."
+          },
+          "predicate": {
+            "type": "string",
+            "x-memz-maxUtf16CodeUnits": 100,
+            "x-memz-wellFormedUnicode": true,
+            "pattern": "^[^\\u0000]*$",
+            "minLength": 1,
+            "allOf": [{"pattern": "\\S"}],
+            "description": "Raw UTF-16 length is checked before trim; whitespace-only and NUL/unpaired surrogates are rejected. The stored value is trimmed."
+          },
+          "value": {
+            "type": "string",
+            "x-memz-maxUtf16CodeUnits": 1000,
+            "x-memz-wellFormedUnicode": true,
+            "pattern": "^[^\\u0000]*$",
+            "minLength": 1,
+            "allOf": [{"pattern": "\\S"}],
+            "description": "Raw UTF-16 length is checked before trim; whitespace-only and NUL/unpaired surrogates are rejected. The stored value is trimmed."
+          },
+          "source_id": {"$ref": "#/components/schemas/PositiveIdInput"},
+          "expected_version": {"$ref": "#/components/schemas/VersionInput"}
+        }
+      },
+      "CandidateRecord": {
+        "allOf": [
+          {"$ref": "#/components/schemas/CandidateRequest"},
+          {
+            "type": "object",
+            "required": ["id","project_id","source_id","expected_version","proposed_by","status","created_at"],
+            "properties": {
+              "id": {"$ref": "#/components/schemas/PositiveId"},
+              "project_id": {"$ref": "#/components/schemas/PositiveId"},
+              "source_id": {"$ref": "#/components/schemas/PositiveId"},
+              "expected_version": {"$ref": "#/components/schemas/VersionOrZero"},
+              "proposed_by": {"$ref": "#/components/schemas/PositiveId"},
+              "status": {"const": "pending"},
+              "created_at": {"type": "string","format": "date-time"}
+            }
+          }
+        ]
+      },
+      "Search": {
+        "type": "object",
+        "required": ["mode","terms","order","matching","caseHandling","fields"],
+        "properties": {
+          "mode": {"const": "all_terms"},
+          "terms": {"type": "array","minItems": 1,"maxItems": 8,"uniqueItems": true,"items": {"type": "string","minLength": 1}},
+          "order": {"const": "fact_id_asc"},
+          "matching": {"const": "all_terms_any_field_substring"},
+          "caseHandling": {"const": "postgresql_lower"},
+          "fields": {"const": ["subject","predicate","value"]}
+        }
+      },
+      "NextAfter": {
+        "type": ["integer","null"],
+        "minimum": 1,
+        "maximum": 2147483647,
+        "description": "null ends this traversal; otherwise the last returned fact id. Reuse only with the same project/query/match."
+      },
+      "FactsListFact": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Fact"},
+          {
+            "type": "object",
+            "required": ["source"],
+            "properties": {"source": {"type": "string","description": "Display title only; not a source identifier or complete provenance."}}
+          }
+        ]
+      },
+      "FactsPage": {
+        "type": "object",
+        "required": ["role","facts","next_after"],
+        "properties": {
+          "role": {"$ref": "#/components/schemas/Role"},
+          "facts": {"type": "array","items": {"$ref": "#/components/schemas/FactsListFact"},"maxItems": 100},
+          "next_after": {"$ref": "#/components/schemas/NextAfter"},
+          "search": {"$ref": "#/components/schemas/Search"}
+        }
+      },
+      "Revision": {
+        "type": "object",
+        "required": ["id","version","value","created_at","approved_by"],
+        "properties": {
+          "id": {"$ref": "#/components/schemas/PositiveId"},
+          "version": {"$ref": "#/components/schemas/PositiveId"},
+          "value": {"type": "string"},
+          "created_at": {"type": "string","format": "date-time"},
+          "approved_by": {"$ref": "#/components/schemas/PositiveId"}
+        }
+      },
+      "ApprovedCandidate": {
+        "type": "object",
+        "required": ["id","expected_version","proposed_by"],
+        "properties": {
+          "id": {"$ref": "#/components/schemas/PositiveId"},
+          "expected_version": {"$ref": "#/components/schemas/VersionOrZero"},
+          "proposed_by": {"$ref": "#/components/schemas/PositiveId"}
+        }
+      },
+      "ProofBase": {
+        "type": "object",
+        "required": ["sourceTextIsUntrusted","role","fact","revision","candidate"],
+        "properties": {
+          "sourceTextIsUntrusted": {"const": true},
+          "role": {"$ref": "#/components/schemas/Role"},
+          "fact": {"$ref": "#/components/schemas/FactKey"},
+          "revision": {"$ref": "#/components/schemas/Revision"},
+          "candidate": {"$ref": "#/components/schemas/ApprovedCandidate"}
+        }
+      },
+      "Provenance": {
+        "allOf": [{"$ref": "#/components/schemas/ProofBase"},{"type": "object","required": ["source"],"properties": {"source": {"$ref": "#/components/schemas/Source"}}}]
+      },
+      "ReferencedProvenance": {
+        "allOf": [
+          {"$ref": "#/components/schemas/ProofBase"},
+          {"type": "object","required": ["sourceId"],"properties": {"sourceId": {"$ref": "#/components/schemas/PositiveId"}}}
+        ]
+      },
+      "VersionRef": {
+        "type": "object",
+        "required": ["id","version"],
+        "properties": {"id": {"$ref": "#/components/schemas/PositiveId"},"version": {"$ref": "#/components/schemas/PositiveId"}},
+        "additionalProperties": false
+      },
+      "BatchRequest": {
+        "type": "object",
+        "required": ["facts"],
+        "properties": {"facts": {"type": "array","minItems": 1,"maxItems": 25,"uniqueItems": true,"items": {"$ref": "#/components/schemas/VersionRef"}}},
+        "additionalProperties": false
+      },
+      "BatchResponse": {
+        "type": "object",
+        "required": ["sourceTextIsUntrusted","role","provenance"],
+        "properties": {
+          "sourceTextIsUntrusted": {"const": true},
+          "role": {"$ref": "#/components/schemas/Role"},
+          "provenance": {"type": "array","items": {"$ref": "#/components/schemas/Provenance"},"maxItems": 25}
+        }
+      },
+      "SnapshotFact": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Fact"},
+          {
+            "type": "object",
+            "required": ["revisionId","sourceId"],
+            "properties": {"revisionId": {"$ref": "#/components/schemas/PositiveId"},"sourceId": {"$ref": "#/components/schemas/PositiveId"}}
+          }
+        ]
+      },
+      "SnapshotPage": {
+        "type": "object",
+        "required": ["schema","consistency","projectId","query","limit","after","role","sourceTextIsUntrusted","facts","provenance","sources","next_after"],
+        "properties": {
+          "schema": {"const": "memz-context-snapshot-v1"},
+          "consistency": {"const": "single-page-repeatable-read"},
+          "projectId": {"$ref": "#/components/schemas/PositiveId"},
+          "query": {"type": "string"},
+          "limit": {"type": "integer","minimum": 1,"maximum": 25},
+          "after": {"type": "integer","minimum": 0,"maximum": 2147483647},
+          "role": {"$ref": "#/components/schemas/Role"},
+          "sourceTextIsUntrusted": {"const": true},
+          "facts": {"type": "array","items": {"$ref": "#/components/schemas/SnapshotFact"},"maxItems": 25},
+          "provenance": {"type": "array","items": {"$ref": "#/components/schemas/ReferencedProvenance"},"maxItems": 25},
+          "sources": {"type": "array","items": {"$ref": "#/components/schemas/Source"},"maxItems": 25},
+          "next_after": {"$ref": "#/components/schemas/NextAfter"},
+          "search": {"$ref": "#/components/schemas/Search"}
+        }
+      }
+    }
+  }
+}

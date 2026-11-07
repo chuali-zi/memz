@@ -6,7 +6,7 @@ const path=require('node:path');
 const {execFileSync}=require('node:child_process');
 const {hash,uiSources,screenshotNames,evaluationSources,expectedResults,verifyEvidence,verifyPackage,buildPackage}=require('../scripts/package-evidence');
 
-const {benchmarkSources,sourceFiles,coreTestFiles,parseTap}=require('../scripts/system-evidence');
+const {benchmarkSources,contractSources,sourceFiles,coreTestFiles,parseTap}=require('../scripts/system-evidence');
 
 // Deliberate unit fixtures, not browser or competition evidence.
 function fixture(fn){
@@ -17,9 +17,10 @@ function fixture(fn){
   try{
     for(const file of new Set([...uiSources,...Object.values(evaluationSources)]))write(file,`unit fixture ${file}`);
     json('evaluation/retrieval-cases.json',dataset);
-    write('test/fixture.test.js',"const assert=require('node:assert/strict');assert.equal(require('../benchmarks/memory/scripts/memz_adapter').synthetic,true);");
+    write('test/fixture.test.js',"const assert=require('node:assert/strict');assert.equal(require('../benchmarks/memory/scripts/memz_adapter').synthetic,true);assert.equal(require('../contracts/openapi-local-v1.json').openapi,'3.1.0');");
     write('test/migrations.js','// synthetic fixture');
     for(const file of benchmarkSources)write(file,'module.exports={synthetic:true};');
+    for(const file of contractSources)json(file,{openapi:'3.1.0',synthetic:true});
     for(const file of ['scripts/package-evidence.js','scripts/system-evidence.js'])write(file,fs.readFileSync(path.join(__dirname,'..',file)));
     const tap='TAP version 13\nok 1 - synthetic fixture\n# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
     const system={schemaVersion:1,synthetic:true,passed:true,source:{commit,workingTreeDirty:false,files:Object.fromEntries(sourceFiles(root).map(file=>[file,hash(fs.readFileSync(path.join(root,file)))]))},cleanup:{temporaryDatabaseDropped:true},suites:['core','migrations'].map(name=>({name,testFiles:name==='core'?coreTestFiles(root):['test/migrations.js'],exitCode:0,signal:null,passed:true,stdout:name+'.tap',stderr:name+'.stderr.txt',stdoutSha256:hash(tap),stderrSha256:hash(''),summary:parseTap(tap)}))};
@@ -79,6 +80,16 @@ test('required benchmark sources cannot be missing or replaced by symbolic links
   fs.symlinkSync(path.join(root,'scripts'),path.dirname(file));
   assert.throws(()=>sourceFiles(root),/cannot follow symbolic links/);
 }));
+test('contract hashes and mandatory regular files reject changes, omissions and symlinks',()=>fixture(({root,write,system,save,options})=>{
+  const name=contractSources[0],file=path.join(root,name),original=fs.readFileSync(file);
+  write(name,'{"openapi":"changed"}');assert.throws(()=>verifyEvidence(options),/System source changed/);
+  fs.writeFileSync(file,original);delete system.source.files[name];save();assert.throws(()=>verifyEvidence(options),/System source coverage changed/);
+  fs.unlinkSync(file);assert.throws(()=>sourceFiles(root),/Missing required contract source/);
+  fs.mkdirSync(file);assert.throws(()=>sourceFiles(root),/must be a regular file/);fs.rmdirSync(file);
+  fs.symlinkSync(path.join(root,'server.js'),file);assert.throws(()=>sourceFiles(root),/cannot follow symbolic links/);
+  fs.unlinkSync(file);fs.rmSync(path.dirname(file),{recursive:true});
+  fs.symlinkSync(path.join(root,'scripts'),path.dirname(file));assert.throws(()=>sourceFiles(root),/cannot follow symbolic links/);
+}));
 test('package verification detects changed documents and extra files',()=>fixture(({root,write,json,options})=>{
   for(const file of ['index.md','docs/submission-report.md','docs/demo-script.md'])write(file,'unit fixture document');
   const collect=(dir,prefix='')=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?collect(path.join(dir,e.name),prefix+e.name+'/'):[prefix+e.name]);
@@ -93,6 +104,7 @@ test('complete package build excludes ignored files, verifies offline, and rejec
   for(const file of ['docs/submission-report.md','docs/demo-script.md'])write(file,'unit fixture document');
   write('scripts/package-evidence.js',fs.readFileSync(path.join(__dirname,'../scripts/package-evidence.js')));
   write('.env','unit fixture excluded content');
+  write('contracts/unrelated-private.json','synthetic exclusion canary');
   for(const file of ['benchmarks/memory/calls.jsonl','benchmarks/memory/gold.json','benchmarks/memory/data/synthetic.json',
     'benchmarks/memory/scripts/__pycache__/synthetic.pyc','benchmarks/memory/scripts/extra.js',
     'benchmarks/memory/tests/memz_adapter.integration.js'])write(file,'synthetic benchmark exclusion canary');
@@ -112,6 +124,8 @@ test('complete package build excludes ignored files, verifies offline, and rejec
     assert.deepEqual(Object.keys(manifest.files).filter(file=>file.startsWith('benchmarks/')).sort(),[...benchmarkSources].sort(),
       'only explicitly allowed benchmark sources enter the package, even when other benchmark files are tracked');
     assert.equal(system.source.files[benchmarkSources[0]],hash(fs.readFileSync(path.join(output,benchmarkSources[0]))));
+    assert.deepEqual(Object.keys(manifest.files).filter(file=>file.startsWith('contracts/')),contractSources);
+    assert.equal(system.source.files[contractSources[0]],hash(fs.readFileSync(path.join(output,contractSources[0]))));
     const check=execFileSync(process.execPath,['scripts/package-evidence.js','verify','.'],{cwd:output,encoding:'utf8'});assert.match(check,/Package verified/);
     const childEnv={...process.env};delete childEnv.NODE_TEST_CONTEXT;
     const core=execFileSync(process.execPath,['--test','--test-reporter=tap','test/fixture.test.js'],{cwd:output,encoding:'utf8',env:childEnv});assert.match(core,/# pass 1/);
@@ -119,6 +133,11 @@ test('complete package build excludes ignored files, verifies offline, and rejec
     write('server.js','unit fixture server.js');ui.source.commit='f'.repeat(40);json('artifacts/ui/unit/report.json',ui);
     assert.throws(()=>buildPackage(root),/another commit/);
     assert.equal(fs.readdirSync(path.join(root,'artifacts/submission')).length,1,'failed build must not publish another package');
+    git('rm','--cached','--',contractSources[0]);write('.gitignore','artifacts/\nevidence/\n.env\n'+contractSources[0]+'\n');git('add','.gitignore');
+    git('-c','user.name=Evidence unit fixture','-c','user.email=fixture@example.invalid','commit','--quiet','-m','Synthetic ignored required contract');
+    const missingTrackedCommit=git('rev-parse','HEAD');system.source.commit=missingTrackedCommit;ui.source.commit=missingTrackedCommit;retrieval.source.gitCommit=missingTrackedCommit;
+    json('artifacts/ui/unit/report.json',ui);json('artifacts/retrieval-report.json',retrieval);json('artifacts/system/unit/report.json',system);
+    assert.throws(()=>buildPackage(root),/Required contract source must be tracked/);
   }finally{if(previousSystem===undefined)delete process.env.SYSTEM_REPORT_PATH;else process.env.SYSTEM_REPORT_PATH=previousSystem;if(previous===undefined)delete process.env.UI_REPORT_PATH;else process.env.UI_REPORT_PATH=previous}
 }));
 

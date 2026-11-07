@@ -2,6 +2,8 @@
 
 实现依据：`server.js`。本机默认地址 `http://127.0.0.1:3000`，JSON请求体上限16 KiB。除登录外，API 需要服务端随机 `sid` cookie；非 GET/HEAD 还需 `X-CSRF-Token`。身份取自会话，不接受请求中的 user_id/role 指定。成功响应均为200，未采用201状态。所有路径在JSON解析前校验Host：仅接受localhost、127.0.0.1、[::1]及1–65535可选端口，否则403固定JSON说明，不创建会话、不访问数据库；不信任X-Forwarded-Host覆盖。默认CLI仍只绑定127.0.0.1，允许Host字面量不等于额外监听IPv6接口。
 
+现有8条消费者入口的[OpenAPI 3.1本机子集](consumer-contract.md)提供可离线读取的参数、分页、依据与副作用合同；它不覆盖本页所有路由，也不为HTTP错误新增code/outcome。
+
 ## 接口清单
 
 | 方法与路径 | 输入 | 成功结果 | 权限与主要失败 |
