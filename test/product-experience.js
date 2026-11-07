@@ -616,3 +616,82 @@ test('browser cleanup failure still destroys an unfinished HTTP connection and r
     await bounded(disconnected,'destroying unfinished HTTP connection');assert.equal(isolated.listening,false);
   }finally{request?.destroy();isolated.closeAllConnections();isolated.close()}
 });
+
+test('keyboard login moves focus into the loaded workspace',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await page.locator('#loginForm [name=password]').focus();await page.keyboard.press('Enter');await settled(page,'#loginForm');
+    assert.equal(await page.locator('#project').evaluate(node=>document.activeElement===node),true);
+    assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+for(const failure of ['empty','503'])test(`initial project ${failure} leaves a keyboard reachable retry after login`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let attempts=0;
+    await page.route('**/api/projects',async route=>{
+      if(++attempts===1)await route.fulfill(failure==='empty'?{json:[]}:{status:503,json:{error:'合成初始项目故障'}});
+      else await route.fallback();
+    });
+    await page.locator('#loginForm [name=password]').focus();await page.keyboard.press('Enter');await settled(page,'#loginForm');
+    assert.equal(await page.locator('#refreshWorkspace').evaluate(node=>document.activeElement===node),true);
+    assert.equal(await page.locator('#proposal button').isDisabled(),true);
+    await page.keyboard.press('Enter');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(attempts,2);assert.equal(await page.locator('#project').inputValue(),'1');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('login completion does not steal focus from a draft edited during project loading',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const projects=await hold(page,'**/api/projects','GET');
+    await page.locator('#loginForm button').click();await projects.observed;
+    await page.locator('#proposal [name=value]').fill('用户主动编辑的候选草稿');
+    projects.release([{id:1,name:'合成项目一',role:'owner'}]);await settled(page,'#loginForm');
+    assert.equal(await page.locator('#proposal [name=value]').evaluate(node=>document.activeElement===node),true);
+    assert.equal(await page.locator('#proposal [name=value]').inputValue(),'用户主动编辑的候选草稿');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a successful workspace retry clears its resolved failure notice and remains keyboard reachable',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let attempts=0;
+    await page.route('**/api/projects/1/data?*',async route=>{
+      if(++attempts===1)await route.fulfill({status:503,json:{error:'合成工作台故障'}});else await route.fallback();
+    });
+    await page.locator('#loginForm [name=password]').focus();await page.keyboard.press('Enter');await settled(page,'#loginForm');
+    assert.match(await page.locator('#notice').textContent(),/工作台加载失败：503 合成工作台故障/);
+    const retryWasFocused=await page.locator('#refreshWorkspace').evaluate(node=>document.activeElement===node);
+    await page.locator('#refreshWorkspace').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator('#notice').textContent(),'');assert.equal(retryWasFocused,true);assert.equal(attempts,2);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('workspace recovery preserves a newer uncertain-operation notice',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await page.route('**/api/projects/1/data?*',route=>route.fulfill({status:503,json:{error:'合成工作台故障'}}));
+    await page.locator('#loginForm button').click();await settled(page,'#loginForm');
+    const recovery=await hold(page,'**/api/projects/1/data?*','GET');
+    await page.locator('#refreshWorkspace').click();await recovery.observed;
+    await page.route('**/api/logout',route=>route.fulfill({status:503,json:{error:'合成退出故障，写入结果可能不确定'}}));
+    await page.locator('#identity button').click();await page.locator('#notice').getByText(/503 合成退出故障/).waitFor();
+    const newer=await page.locator('#notice').textContent();
+    recovery.release({role:'owner'});await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    assert.equal(await page.locator('#notice').textContent(),newer);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('late login completion cannot move focus after the user changes workspace',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const initial=await hold(page,'**/api/projects/1/data?*','GET');
+    await page.locator('#loginForm button').click();await initial.observed;
+    await page.locator('#project').selectOption('2');await page.waitForFunction(()=>!document.querySelector('#proposal button').disabled);
+    await page.locator('.intro h1').click();assert.equal(await page.evaluate(()=>document.activeElement===document.body),true);
+    initial.release({role:'owner'});await settled(page,'#loginForm');
+    assert.equal(await page.evaluate(()=>document.activeElement===document.body),true);
+    assert.equal(await page.locator('#project').inputValue(),'2');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});

@@ -40,7 +40,8 @@ async function createRecord(path,body){
     throw error;
   }
 }
-function message(s,target='#notice'){$(target).textContent=s}
+let noticeGeneration=0,workspaceProblem=null;
+function message(s,target='#notice'){$(target).textContent=s;if(target==='#notice')return ++noticeGeneration}
 function rows(id,items,render){
   const fragment=document.createDocumentFragment();
   if(!items.length)fragment.append(el('p','暂无记录','hint'));
@@ -346,8 +347,11 @@ async function load(){
     const result=await api(`/api/projects/${p}/data?include_facts=false&include_history=false&include_candidates=false&include_sources=false&include_audit=false`);
     if(generation!==contextGeneration||p!==projectId)return;
     data=result;
+    // A resolved read failure cannot clear a newer message from another action.
+    if(workspaceProblem?.workspace===workspaceGeneration&&workspaceProblem.project===p&&workspaceProblem.notice===noticeGeneration)message('');
+    workspaceProblem=null;
     writeControls();
-  }catch(e){if(generation===contextGeneration&&p===projectId)message(`工作台加载失败：${e.message}。请刷新重试。`)}
+  }catch(e){if(generation===contextGeneration&&p===projectId)workspaceProblem={project:p,workspace:workspaceGeneration,notice:message(`工作台加载失败：${e.message}。请刷新重试。`)}}
   await Promise.all([facts,history,candidates,sources,audit]);
 }
 async function perform(fn,feedback=null){const p=projectId,workspace=workspaceGeneration;if(feedback){message('');message('',feedback)}try{await fn()}catch(e){if(p===projectId&&workspace===workspaceGeneration){message(e.message,feedback||'#notice');if(feedback)$(feedback).focus()}}}
@@ -366,7 +370,14 @@ async function submitOnce(target,fn,{feedback=null,progress='正在提交…'}={
   }
 }
 $('#loginForm').username.onchange=e=>$('#loginForm').password.value=`demo-${e.target.value}`;
-$('#loginForm').onsubmit=e=>{e.preventDefault();submitOnce('#loginForm',async()=>{const f=new FormData(e.target);const x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=x.csrf;message('');$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));const b=el('button','切换账号');b.onclick=()=>perform(switchAccount);$('#identity').append(b);await loadProjects()},{progress:'正在登录…'})};
+$('#loginForm').onsubmit=e=>{e.preventDefault();submitOnce('#loginForm',async()=>{
+  const f=new FormData(e.target),x=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});
+  csrf=x.csrf;message('');if($('#login').contains(document.activeElement))document.activeElement.blur();$('#login').hidden=true;$('#workspace').hidden=false;$('#identity').replaceChildren(document.createTextNode(x.name));
+  const b=el('button','切换账号');b.onclick=()=>perform(switchAccount);$('#identity').append(b);
+  const projects=loadProjects(),workspace=workspaceGeneration;await projects;
+  // Hiding the login form leaves keyboard focus on BODY; respect any later user focus.
+  if(workspace===workspaceGeneration&&document.activeElement===document.body)(projectId===null||!data?$('#refreshWorkspace'):$('#project')).focus();
+},{progress:'正在登录…'})};
 $('#project').onchange=e=>{workspaceGeneration++;for(const id of ['#notice','#sourceFeedback','#proposalFeedback','#candidateFeedback'])message('',id);projectId=Number(e.target.value);selectedSource=null;sourcePage=[];$('#sourceSearchForm').q.value='';perform(load)};$('#searchForm').onsubmit=e=>{e.preventDefault();perform(()=>loadFacts({reset:true}))};
 $('#factsPrevious').onclick=()=>perform(()=>loadFacts({index:factState.index-1,focus:true}));
 $('#factsNext').onclick=()=>perform(()=>loadFacts({index:factState.index+1,focus:true}));
