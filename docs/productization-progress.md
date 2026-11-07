@@ -30,6 +30,22 @@
 
 当前继续推进：CLI有界优雅退出；5列表合法JSON但不合法字段/游标回执的提交前验证；每轮完整CI与新源码依赖的材料包验证。尚未结束用户要求的夜间窗口，继续按实质改进推进，避免重复创建任务。
 
+## 后续交付与截至当前的验证
+
+- 60b674c：CLI SIGTERM/SIGINT有界排空，HTTP与pool共用20秒；卡住handler/pool、重复信号、pipeline与真实PG锁等待回归。仅接管CLI，import不绑定信号。
+- 156bf3f：整套发现COMMIT代理清理race，显式等待上下游socket关闭，保留严格清理断言；对应业务证据不改。bd4bd06 clean core159/migrations9及真实PG UI通过。
+- bd4bd06：5列表在替换DOM/state之前验证分页信封、游标和必要来源字段；合法JSON坏形状先红后绿，浏览器38项。
+- 6d30e10：浏览器harness取消gate时明确abort拦截请求、清理有界且失败仍报错；43项通过，CI独立步骤2分钟上限。旧项目DOM残留假设经3项控制测试未成立，未为此改产品。
+- 54cb263、f533a33：纯字段模板与真实只读CLI；默认scope最多25，唯一完整模板后再取真实snapshot、exact筛选、修剪sources，输出selection/spans与modelCalls0；联合59、独立PG5与注销401无结束正文独立复验通过。
+- e038e74、1cea35a：并发基线runner/方法与原始合成证据（282请求）；保留dirty源码hash与后续失败路径增强未重测的区别。`.gitattributes`保护原始证据字节，不改变历史SHA。
+- 77f7971：脱敏且限长的失败TAP用例名进入CI日志，减少产物传递不可用时的诊断盲区。
+
+最新完整远端成功检查点：[1cea35a CI](https://github.com/chuali-zi/memz/actions/runs/42387954090)。本地同提交干净Node24工作树core202/202、migrations9/9、完整真实数据库UI通过；system目录 `artifacts/system/run-1794066385049-61a50bb9`，UI `artifacts/ui/run-1794066386698-3994a7ac`（均在验证工作树）。没有以局部测试代替该提交的整套结果。
+
+保留一项未归因的历史风险：[e038e74 CI](https://github.com/chuali-zi/memz/actions/runs/42386605465)为core174/175、migrations9/9；GitHub工具可解析产物身份，但当前消费端下载和受支持物化均未取得可读字节，网络原因未确定。未换执行器或改网络规则，未盲重跑旧CI。按该CI日志匹配并校验官方SHA的Node22.23.4，在同一云环境对同一e038e74干净工作树独立复现175/175+9/9通过（`artifacts/system/run-1794066777587-41e64f4d`）；因此暂未复现，不能称旧失败已归因/修复。Node22仅位于workspace临时toolchain，未替换默认Node24。
+
+当前正在推进的v2协议阶段只提供纯validators/selector planner，74项回归通过；尚未上线新HTTP或CLI路径。它拟解除大于25条的项目限制，固定最多512个完整标签并精确键读取；需要后续真实API/权限/规模/预算回归。继续夜间窗口内的实质工作，遵守用户后续停止/变更指令。
+
 ## 技术栈决定与主要缺口
 
 目前继续Node/Express/PostgreSQL。现有测量是特定fixture的HTTP传输和真实模型小样本，不是语言/框架横向基准，没有证据说明更换语言能消除主要瓶颈。保留RLS、不可变revision、审批和幂等语义比立即重写更重要。若后续测量显示明确瓶颈，再在固定数据/硬件/并发和冷热条件下比较p50/p95/p99、吞吐、错误率、内存、读写成本；候选栈必须先实现相同接口合同和影子对照，再提供保留数据迁移、备份恢复、回退和分阶段切流方案。
