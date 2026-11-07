@@ -2,7 +2,7 @@
 const path=require('node:path');
 function configuration(host){
   if(!['claude-desktop','vscode'].includes(host))throw new Error('UNSUPPORTED_HOST');
-  const server={...(host==='vscode'?{type:'stdio'}:{}),command:process.execPath,args:[path.join(__dirname,'mcp-server.js')],env:{MEMZ_BASE_URL:'http://127.0.0.1:3000',MEMZ_PROJECT_ID:'1',MEMZ_USERNAME:'viewer',MEMZ_PASSWORD:'demo-viewer',MEMZ_MCP_ALLOW_PROPOSALS:'0'}};
+  const server={...(host==='vscode'?{type:'stdio'}:{}),command:process.execPath,args:[path.join(__dirname,'mcp-server.js')],env:{MEMZ_BASE_URL:'http://127.0.0.1:3000',MEMZ_PROJECT_ID:'1',MEMZ_USERNAME:'viewer',MEMZ_PASSWORD:'demo-viewer',MEMZ_MCP_ALLOW_PROPOSALS:'0',MEMZ_MCP_ENABLE_LABEL_CONTEXT:'0'}};
   return {[host==='vscode'?'servers':'mcpServers']:{memz:server}};
 }
 if(require.main===module){
