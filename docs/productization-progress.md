@@ -28,7 +28,7 @@
 
 本机另运行query plans（10 baseline+search comparison）和六组×三情形×20次上下文传输实验通过。共享来源25事实下，individual需28次请求/241603正文bytes，snapshot需3次/20055bytes；这是一项合成结构验证，运行时有其他套件并行，不用于跨栈速度、模型token或金额结论。报告见主工作区artifacts/query-plans.json和context-optimization.json。
 
-当前继续推进：CLI有界优雅退出；5列表合法JSON但不合法字段/游标回执的提交前验证；每轮完整CI与新源码依赖的材料包验证。尚未结束用户要求的夜间窗口，继续按实质改进推进，避免重复创建任务。
+后续已完成CLI有界优雅退出与5列表提交前回执验证，见下方各轮记录。每轮继续核实完整CI与源码依赖的材料包；尚未结束用户要求的夜间窗口。
 
 ## 后续交付与截至当前的验证
 
@@ -44,7 +44,15 @@
 
 保留一项未归因的历史风险：[e038e74 CI](https://github.com/chuali-zi/memz/actions/runs/42386605465)为core174/175、migrations9/9；GitHub工具可解析产物身份，但当前消费端下载和受支持物化均未取得可读字节，网络原因未确定。未换执行器或改网络规则，未盲重跑旧CI。按该CI日志匹配并校验官方SHA的Node22.23.4，在同一云环境对同一e038e74干净工作树独立复现175/175+9/9通过（`artifacts/system/run-1794066777587-41e64f4d`）；因此暂未复现，不能称旧失败已归因/修复。Node22仅位于workspace临时toolchain，未替换默认Node24。
 
-当前正在推进的v2协议阶段只提供纯validators/selector planner，74项回归通过；尚未上线新HTTP或CLI路径。它拟解除大于25条的项目限制，固定最多512个完整标签并精确键读取；需要后续真实API/权限/规模/预算回归。继续夜间窗口内的实质工作，遵守用户后续停止/变更指令。
+## 当前精确读取路径检查点
+
+- 3a99b67：v2纯协议、完整标签校验及精确selector模板planner，共享证据校验机械提取，74项回归通过；原v1模板与header行为保持兼容。[该提交完整CI成功](https://github.com/chuali-zi/memz/actions/runs/42389424095)。
+- 8a0e487：要求Node22+，与当前CI和官方仍受支持LTS保持一致；仅修改engines及锁文件根元数据，没有升级依赖或替换云默认运行时。
+- fc4b294：独立的授权current-labels与context/exact HTTP路径。标签只读取subject/predicate、不读取value/source，最多512个完整标签；513个返回complete:false与空标签。精确读取在单个事务快照内校验current revision、已批准candidate、source和scope，损坏数据报错，不降级为空结果。POST只读错误与写入不确定错误分开，原/context合同未改。
+
+fc4b294的新增HTTP5项、独立真实PostgreSQL8项通过，覆盖256/512/513、字面量特殊字符、权限/RLS、并发版本、坏指针及来源/正文超限；这是合成数据的真实服务验证，不是模型或LoCoMo评测。[完整远端CI成功](https://github.com/chuali-zi/memz/actions/runs/42390931415)。同一云环境的干净固定提交、Node22.23.4独立system core230/230与migrations9/9通过，目录 `artifacts/system/run-1794068716022-35be8691`（验证工作树）。
+
+当前继续实现显式opt-in的v2 CLI：默认v1继续最多25标签；新模式最多512完整标签且精确键读取，元数据与精确读取分别是current事务，不能声称两次请求共享冻结快照。该CLI尚未交付，不能把HTTP已验证当成CLI已验证。另并行检查界面可恢复操作、运维故障和MCP只读接入边界。继续夜间窗口内的实质工作，遵守用户后续停止/变更指令。
 
 ## 技术栈决定与主要缺口
 
