@@ -90,6 +90,31 @@ df320d8完整远端[CI成功](https://github.com/chuali-zi/memz/actions/runs/423
 
 下一轮正在落实DeepSeek实验入口与已有SpendGuard的一致性，包括严格执行标志、调用前累计预算、异常usage和响应凭据回显防护；真实价格/tokenizer未核实时继续fail closed。这些开发和模拟验证不改写2026-11-06已有351次真实请求的历史证据，也不新增外部模型调用。夜间窗口继续进行。
 
+## 2026-11-07 19:03 UTC 检查点
+
+- 60ace1d：延迟写入失败仍显示错误，但不抢走用户正在编辑的焦点/caret；BODY失焦回退、Tab/Enter手动重试和原幂等键保留。真实Chromium新增4项先红后绿，原82与响应式4合计90通过。
+- d9b3880：程序化基准query在序列化/取字段值之前验证完整自有字段和data descriptor，未知gold/evidence及accessor零读取；错误行id也不调用getter。纯回归9/9、独立16个合法/拒绝探针及真实服务合成集成12/12通过。没有模型调用，不能识别藏在合法文本里的gold，也不把Proxy视为沙箱。
+- 82ece9c：内部 `decide` 与HTTP入口一致，只接受明确的approve/reject；缺省或拼错动作在业务SQL前拒绝。真实PG先复现undefined实际产生approved/revision/audit，再验证修复后5项及相关单元16项通过；有效审批、并发/权限/来源/过期版本和异常回滚均保留。
+- a16188f：文档提交dfa7584的[CI](https://github.com/chuali-zi/memz/actions/runs/42402638748)发现产品UI81/82，完整日志确认为超限GET用例在初始facts尚未完成时拍下空baseline。受控HTTP gate先红后绿；fixture改等自己的实际row和busy状态提交，不用sleep或削弱旧页/游标/真实断连断言。新增1项后本云产品87+响应式4=91/91。
+
+[a16188f完整远端CI](https://github.com/chuali-zi/memz/actions/runs/42403211763)已成功：core393/393、migrations9/9、产品UI87/87、响应式4/4、真实服务合成adapter12/12、retrieval19/19、两类SQL计划、真实停启恢复、完整PG UI与材料包步骤均通过。远端归档内系统目录 `artifacts/system/run-1794077465777-5f3093b5`，UI目录 `artifacts/ui/run-1794077588268-8142d444`；这些不是已下载到本机的文件。
+
+- 379b517：备份改为唯一私有目录/文件，不截断旧备份；dump失败/空输出清理自身文件且变量清空，迁移显式短路，不依赖set -e，001失败不启动002。独立离线6/6、shell语法通过；文档仍要求验证这一次实际备份。修正npm wrapper PID信号说明，监督入口直接exec Node；Node22既有启动/排空11/11通过。
+- 68884e9：归档[新备份helper的真实恢复检查](../evaluation/evidence/backup-helper-2026-11-07/README.md)，保留两次失败核验和最后通过的原始报告。最终实际归档34922 bytes、文件0600/目录0700、PG16.15恢复到独立空库后8表指纹与RLS策略相同；owned备份/容器/卷全部清理。已定位的失败是临时harness误查不存在的users表，第一份旧报告自身未定位具体阶段，不替它补写结果。测试时helper尚未提交，报告保留其确切文件hash，不声称clean整仓库取证。这轮已正常推送，完整CI待核实。
+
+另完成一次只读浏览器可信边界检查：10/10合成真实Chromium探针通过，覆盖项目/身份/五列表/详情中的HTML、链接样式、Unicode文本及五列表旧分页切项目晚响应；没有动态标签执行、canary请求或非登录写入。未发现需改产品的缺陷，不重复制造回归。这不表示真实用户数据、屏幕阅读器或通用安全审计已完成。
+
+68884e9的[完整远端CI](https://github.com/chuali-zi/memz/actions/runs/42404174234)随后成功：core399/399、迁移9/9、产品UI87/87、响应式4/4、真实服务合成adapter12/12及两类SQL计划/真实停启/完整PG UI/材料包均通过；远端归档内system `artifacts/system/run-1794078177248-36160fad`、UI `artifacts/ui/run-1794078316692-162c9b25`。
+
+## 2026-11-07 19:10 UTC 检查点
+
+- 2dbe346：固定静态根为应用自身public目录。真实CLI先红复现从临时cwd启动会提供该目录的canary；修复后临时/仓库两个cwd均返回仓库资产的同一SHA256，canary不暴露、存活正常且零DB调用。新2项及既有启动4项通过；不把其他备份/迁移命令也称为cwd无关。
+- d2ef85d：GLM与DeepSeek共享调用前预算、strict usage及回显检查。独立先复现GLM同实例并发超过请求上限、Decimal低精度影响费用、入场失败释放锁后才halt，以及正常内层JSON转义回显漏检；改为同锁检查/预约/失败halt、独立512位金额上下文、有限的嵌套JSON扫描并保留duplicate键值，超限整份失败。DeepSeek runner全计划预检、同实例账本、失败不退款/不重试、保留not_run；明确simulation才用合成transport。两provider默认提示及历史351次实验材料未改。
+
+预算代码最终全部Python99/99、22文件内存编译、原提示AST对照通过；独立审查另验证20个回显/边界探针、并发与halt反例及1280组Fraction精确金额对照。整合烟测还先发现共享helper破坏包路径导入，已修复并增加空环境包导入/两条原脚本CLI回归。全部验证使用空合成环境/阻网或明确fake transport，新增真实模型调用0。实际计数器和价格仍需独立核实；CLI没有默认counter loader，缺依赖在读凭据/transport前停止。金额是按配置预约，不是账单；每实例各自账本，已admit在途请求不可撤销，不检测任意编码秘密。
+
+2dbe346与d2ef85d的完整CI待推送后核实。当前继续有测量依据的CLI入站资源保护：Node22/24默认header60s、完整请求300s、检查间隔30s且无连接上限；低值实验确认检查是周期性的，连接满直接断开而非503，server.close还会清除入站检查timer。因此计划保持现有独立20s排空，另设置明确的CLI入站边界，尚未完成的实现另行记录。LoCoMo下载状态未变，夜间窗口继续。
+
 ## 技术栈决定与主要缺口
 
 目前继续Node/Express/PostgreSQL。现有测量是特定fixture的HTTP传输和真实模型小样本，不是语言/框架横向基准，没有证据说明更换语言能消除主要瓶颈。保留RLS、不可变revision、审批和幂等语义比立即重写更重要。若后续测量显示明确瓶颈，再在固定数据/硬件/并发和冷热条件下比较p50/p95/p99、吞吐、错误率、内存、读写成本；候选栈必须先实现相同接口合同和影子对照，再提供保留数据迁移、备份恢复、回退和分阶段切流方案。
