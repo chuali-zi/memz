@@ -16,6 +16,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     services:
       postgres:
         image: postgres:16
@@ -30,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
       - uses: actions/setup-python@v5
         with:
@@ -53,13 +57,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: memory-adapter-synthetic-integration
+          name: memory-adapter-synthetic-integration${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/memory-adapter/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: system-test-evidence
+          name: system-test-evidence${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/system/
           if-no-files-found: ignore
       - run: npm run eval:retrieval
@@ -68,7 +72,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: retrieval-evaluation
+          name: retrieval-evaluation${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/retrieval-report.json
           if-no-files-found: ignore
       - run: npm run eval:context
@@ -77,7 +81,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: context-optimization
+          name: context-optimization${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/context-optimization.json
           if-no-files-found: error
       - run: npm run eval:plans
@@ -86,7 +90,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: query-plan-evidence
+          name: query-plan-evidence${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/query-plans.json
           if-no-files-found: ignore
       - run: npm run eval:exact-plans
@@ -95,7 +99,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: exact-reader-sql-plans
+          name: exact-reader-sql-plans${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/exact-reader-plans.json
           if-no-files-found: ignore
       - name: Verify Chinese font availability
@@ -106,7 +110,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: outage-evidence
+          name: outage-evidence${{ matrix.node == 24 && '-node24' || '' }}
           path: |
             artifacts/outage-report.json
             artifacts/outage-browser/
@@ -117,13 +121,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-evidence
+          name: ui-evidence${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/ui/
           if-no-files-found: ignore
       - name: Verify and package competition evidence
         run: npm run evidence:package
       - uses: actions/upload-artifact@v4
         with:
-          name: competition-evidence
+          name: competition-evidence${{ matrix.node == 24 && '-node24' || '' }}
           path: artifacts/submission/
           if-no-files-found: error

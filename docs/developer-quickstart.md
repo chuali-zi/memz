@@ -88,3 +88,7 @@ DATABASE_URL=postgres://memz_app:memz_demo_only@127.0.0.1:5433/memz PORT=3001 np
 基本接入不要求系统安装pg_dump或浏览器。完整系统验证另需PostgreSQL工具，UI证据另需Chromium与中文字体，见README验证章节；不要为初次读取上下文就混入全部取证依赖。
 
 首次安装或恢复旧库后，先运行 `node scripts/check-setup.js`。它使用应用连接做只读基本检查，能识别缺迁移和误用管理员连接；未通过时按 [诊断说明](setup-check.md)保留数据处理，不自动修复，也不代替完整业务流程验证。
+
+## CI 的 Node 版本与证据
+
+现有集成测试job分别在Node22和24执行，每个matrix job仍限15分钟；fail-fast=false使其中一个失败时另一个继续，离线Python准备检查仍只运行一次。两个Node版本执行相同测试与取证步骤，不能用其中一个通过代替另一个的结果。Node22保留全部原artifact名称；Node24统一追加 `-node24`，例如 `system-test-evidence-node24`、`ui-evidence-node24` 和 `competition-evidence-node24`。取证时按同一提交和对应job核对报告，不混用两个运行时的文件；配置存在不代表该次GitHub运行已通过。
