@@ -148,6 +148,25 @@ df320d8完整远端[CI成功](https://github.com/chuali-zi/memz/actions/runs/423
 
 当前继续离线核查adapter的ingest/freeze是否也会在schema拒绝前读取未知getter，不以query已修替代所有阶段验证；不改已封存真实/合成原始结果。LoCoMo数据未取得、模型新增调用0，Space报告保持同一身份，后续再同步实测检查点；夜间窗口继续。
 
+## 2026-11-07 21:08 UTC 检查点
+
+- a5b3398：prepare/ingest/freeze/query 的有限 artifact schema 在 canonical/hash 或网络前检查 own descriptor，拒绝 getter、隐藏/Symbol/toJSON 字段和非法数组索引；正常 JSON/共享来源的五个旧 hash 与42次HTTP轨迹不变。Node22/24纯21/21；完整CI core463/463、adapter12/12通过，不把普通对象保护称作Proxy沙箱。
+- a54d2df：详情请求保留最新意图，BODY失焦才恢复仍连接的当前按钮；刷新核对不抢用户正在编辑的草稿/caret。Chromium先红后绿，产品95+响应式4=99/99，完整CI通过。
+- 8cae134：批量版本依据POST正确标记为只读；数据库503提示与GET/exact一致，来源/候选写入不确定提示保留。真实loopback+合成pool失败联合13/13，无PG或模型；完整CI通过。
+- 8c8e316：membership.active默认true，停用保留原role、actor外键、不可变历史与创建回执；新迁移003重复/并发保留false，坏字段或DDL失败整体回滚。真实同session撤权、直接8表RLS、旧键重放、跨项目和已有RR快照边界新增9/9，原迁移9/9；27HTTP、199141应用字节、9随机库全部清理。没有增加成员管理API或应用更新membership的权限。
+
+readiness/doctor只查目录，检查active普通列及受支持的精确成员函数源码/配置/签名，同时确认函数owner实际具备读取及绕过membership RLS的前提。独立PG先复现canonical函数转给app后旧检查仍ready、真实调用却54001；修复后为SCHEMA_PREREQUISITES，super+FORCE RLS正对照仍ready。最终PG21/21、纯13/13、零会话/业务写入。003保留原owner/ACL，不把重跑迁移当作错误owner的修复。
+
+备份升级链现为001→002→003，任一步失败短路；恢复/回退说明要求保留过滤函数并核对备份后撤权。扩展真实恢复单项1/1：inactive actor/原role和拒绝旧键重放均保留，owner仍可继续v3；首次临时harness的PATH漏掉Docker目录导致pg_dump启动失败，修正PATH后通过，没有修改产品来解释该失败。实际归档36175字节及TAP见本云 `/tmp/ops-membership-restore-fixed-path.tap`，不是用户实际备份。
+
+[8c8e316完整远端CI](https://github.com/chuali-zi/memz/actions/runs/42413990896)成功：core483/483、迁移9/9、Python99/99、产品UI95/95、响应式4/4、真实服务合成adapter12/12、retrieval19/19，以及SQL计划/停机恢复/完整PG UI/材料包后续步骤均通过。远端归档内system `artifacts/system/run-1794085479167-2829fd2c`、UI `artifacts/ui/run-1794085626900-13e95e51`，未作为本机下载路径。相同干净提交在本云默认Node24也通过core483/483、迁移9/9，验证工作树system `artifacts/system/run-1794085224557-086723ec`。
+
+仍继续浏览器已知角色/403后的过时操作入口、在途写入遇到撤权的原子性，以及稳定本机API子集的机器可读合同。未把尚在开发的内容当成已验证或已推送。LoCoMo仍0字节，原Library helper失败阶段及未知网络原因不变；未盲试或绕过。用户已保存的Vault键及覆盖范围是已确认事实；本夜间新增模型调用0，历史351次请求保留原范围。
+
+追加测试阶段：`test/membership-write-revocation-postgres.test.js` 在原生callback确认INSERT成功、真实READ COMMITTED后暂缓交付结果，待限定成员UPDATE的COMMIT完成才继续。两种创建均在后续audit RLS处42501、实际ROLLBACK，8表业务/receipt/history无残留；inactive原键403，明确恢复后只创建一次并准确重放，candidate仍pending无revision。Node24正常2/2、12HTTP、44845字节；原撤权9/9也重跑通过、27HTTP、199141字节。
+
+独立纯故障审查发现并修复两个测试harness清理问题：work计量超限不能再次阻断DROP；CREATE已成功但结果计量失败前须登记owned归属。两个测试文件从原1MiB中预留4KiB给限定ROLLBACK/精确owned DROP，不放宽总量。纯4/4和真实两个小fixture故意预算失败均确认清理；真实故障TAP按预期exit1、2fail，但2created/2dropped，不能把它们计入normal通过。最终正常2+9通过且数据库前缀无残留；不声称验证未知网络CREATE结果的回收。这些是测试基础设施改进，不是新增生产权限或任意在途撤权取消保证。
+
 ## 技术栈决定与主要缺口
 
 目前继续Node/Express/PostgreSQL。现有测量是特定fixture的HTTP传输和真实模型小样本，不是语言/框架横向基准，没有证据说明更换语言能消除主要瓶颈。保留RLS、不可变revision、审批和幂等语义比立即重写更重要。若后续测量显示明确瓶颈，再在固定数据/硬件/并发和冷热条件下比较p50/p95/p99、吞吐、错误率、内存、读写成本；候选栈必须先实现相同接口合同和影子对照，再提供保留数据迁移、备份恢复、回退和分阶段切流方案。

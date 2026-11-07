@@ -6,24 +6,28 @@ const {runTransaction,databasePoolOptions}=require('../scripts/database');
 const ROOT=path.resolve(__dirname,'..'),migration=fs.readFileSync(path.join(ROOT,'db/migrations/003-membership-active.sql'),'utf8');
 const body="SELECT role FROM public.memberships WHERE project_id=p AND user_id=nullif(pg_catalog.current_setting('app.user_id',true),'')::pg_catalog.int4 AND active IS TRUE";
 const tables=['sources','facts','candidates','revisions','audit','idempotency_requests'];
-let applicationBytes=0,httpRequests=0,created=0,dropped=0;
-function account(value){applicationBytes+=Buffer.byteLength(JSON.stringify(value));assert.ok(applicationBytes<1024*1024,'small synthetic application data budget')}
-function connect(url){
+const CLEANUP_RESERVE=4096,nativeClients=new WeakMap();
+let applicationBytes=0,httpRequests=0,created=0,dropped=0,workBytes=0,cleanupBytes=0;
+function accountBytes(bytes,cleanup=false){applicationBytes+=bytes;if(cleanup)cleanupBytes+=bytes;else workBytes+=bytes;assert.ok(cleanup?cleanupBytes<=CLEANUP_RESERVE:workBytes<=1024*1024-CLEANUP_RESERVE,'small synthetic '+(cleanup?'reserved cleanup':'work')+' application data budget')}
+function account(value,cleanup=false){accountBytes(Buffer.byteLength(JSON.stringify(value)),cleanup)}
+function terminalQuery(c,sql){const native=nativeClients.get(c);assert.ok(native);assert.ok(sql==='ROLLBACK'||(native.database&&sql===`DROP DATABASE ${native.database} WITH (FORCE)`),'only the owned database or ROLLBACK may use cleanup reserve');account([],true);return native.query.call(c,sql).then(result=>{account(Array.isArray(result)?result.map(r=>r.rows):result.rows,true);return result})}
+function connect(url,{database,onCreate}={}){
   const c=new Client({connectionString:url,connectionTimeoutMillis:3000,statement_timeout:10000,query_timeout:15000});c.on('error',()=>{});
-  const query=c.query;c.query=function(sql,params){account(params||[]);return query.call(this,sql,params).then(result=>{account(Array.isArray(result)?result.map(r=>r.rows):result.rows);return result})};return c;
+  const query=c.query;nativeClients.set(c,{query,database});c.query=function(sql,params){if(sql==='ROLLBACK')return terminalQuery(this,sql);account(params||[]);return query.call(this,sql,params).then(result=>{if(database&&sql===`CREATE DATABASE ${database}`)onCreate();account(Array.isArray(result)?result.map(r=>r.rows):result.rows);return result})};return c;
 }
 async function migrate(c,sql=migration){try{await c.query(sql)}catch(error){await c.query('ROLLBACK');throw error}}
 async function fixture(schema,fn){
   assert.ok(process.env.MIGRATION_TEST_DATABASE_URL,'explicit isolated test administrator connection required');
-  const admin=connect(process.env.MIGRATION_TEST_DATABASE_URL),name='memz_membership_'+randomBytes(8).toString('hex');let owner,made=false;
+  const name='memz_membership_'+randomBytes(8).toString('hex');let owner,made=false;
+  const admin=connect(process.env.MIGRATION_TEST_DATABASE_URL,{database:name,onCreate:()=>{made=true;created++}});
   try{
-    await admin.connect();await admin.query(`CREATE DATABASE ${name}`);made=true;created++;
+    await admin.connect();await admin.query(`CREATE DATABASE ${name}`);
     const url=new URL(process.env.MIGRATION_TEST_DATABASE_URL);url.pathname='/'+name;owner=connect(url.href);await owner.connect();
     await owner.query(fs.readFileSync(path.join(ROOT,schema),'utf8').replace(/^CREATE ROLE memz_app .*;\r?\n/m,''));
     if(schema!=='db/schema.sql')for(const file of ['001-current-revision-integrity.sql','002-create-idempotency.sql'])await migrate(owner,fs.readFileSync(path.join(ROOT,'db/migrations',file),'utf8'));
     await fn(owner,url.href);
   }finally{
-    try{if(owner)await owner.end()}finally{try{if(made){await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);dropped++}}finally{await admin.end()}}
+    try{if(owner)await owner.end()}finally{try{if(made){await terminalQuery(admin,`DROP DATABASE ${name} WITH (FORCE)`);dropped++}}finally{await admin.end()}}
   }
 }
 async function snapshot(c){
@@ -36,21 +40,21 @@ async function snapshot(c){
 async function signature(c){return (await c.query("SELECT oid,proowner,proacl::text AS acl,prosrc,prosecdef,provolatile,proconfig,obj_description(oid,'pg_proc') AS marker FROM pg_proc WHERE oid='public.member_role(integer)'::regprocedure")).rows[0]}
 async function field(c){return (await c.query("SELECT a.atttypid::regtype::text AS type,a.attnotnull,pg_get_expr(d.adbin,d.adrelid) AS default_value FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum WHERE a.attrelid='public.memberships'::regclass AND a.attname='active' AND NOT a.attisdropped")).rows}
 async function withPool(url,fn){const u=new URL(url);u.username='memz_app';u.password='memz_demo_only';const pool=new Pool(databasePoolOptions(u.href));pool.on('error',()=>{});
-  pool.on('connect',c=>{const query=c.query;c.query=function(sql,params){account(params||[]);return query.call(this,sql,params).then(result=>{account(result.rows);return result})}});
+  pool.on('connect',c=>{const query=c.query;c.query=function(sql,params){account(params||[],sql==='ROLLBACK');return query.call(this,sql,params).then(result=>{account(result.rows,sql==='ROLLBACK');return result})}});
   try{await fn(pool)}finally{await pool.end()}
 }
 async function withHTTP(url,fn){
   const u=new URL(url);u.username='memz_app';u.password='memz_demo_only';process.env.DATABASE_URL=u.href;
   // The only HTTP fixture in this isolated test worker imports the app once;
   // meter every application query result as well as the direct owner queries.
-  const service=require('../server');service.pool.on('connect',c=>{const query=c.query;c.query=function(sql,params){account(params||[]);return query.call(this,sql,params).then(result=>{account(result.rows);return result})}});
+  const service=require('../server');service.pool.on('connect',c=>{const query=c.query;c.query=function(sql,params){account(params||[],sql==='ROLLBACK');return query.call(this,sql,params).then(result=>{account(result.rows,sql==='ROLLBACK');return result})}});
   const server=service.app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
   try{
     const base='http://127.0.0.1:'+server.address().port;
     async function call(route,{session,body,method=body===undefined?'GET':'POST',key,status=200}={}){
-      const data=body===undefined?undefined:JSON.stringify(body);if(data)applicationBytes+=Buffer.byteLength(data);httpRequests++;
+      const data=body===undefined?undefined:JSON.stringify(body);if(data)accountBytes(Buffer.byteLength(data));httpRequests++;
       const response=await fetch(base+route,{method,headers:{...(session?{cookie:session.cookie,'x-csrf-token':session.csrf}:{}),...(data?{'content-type':'application/json'}:{}),...(key?{'idempotency-key':key}:{})},body:data,signal:AbortSignal.timeout(10000)});
-      const text=await response.text();applicationBytes+=Buffer.byteLength(text);assert.ok(applicationBytes<1024*1024);assert.equal(response.status,status);
+      const text=await response.text();accountBytes(Buffer.byteLength(text));assert.equal(response.status,status);
       return {data:JSON.parse(text),cookie:response.headers.get('set-cookie')?.split(';')[0]};
     }
     const login=async name=>{const r=await call('/api/login',{body:{username:name,password:'demo-'+name}});return {cookie:r.cookie,csrf:r.data.csrf}};
@@ -149,4 +153,4 @@ test('an established repeatable-read snapshot retains its authorized view; the n
   });
 });
 
-after(()=>{assert.equal(created,dropped);assert.ok(applicationBytes<1024*1024);console.log('Synthetic membership resources:',JSON.stringify({applicationBytes,httpRequests,temporaryDatabasesCreated:created,temporaryDatabasesDropped:dropped,modelCalls:0}))});
+after(()=>{assert.equal(created,dropped);assert.ok(applicationBytes<1024*1024);console.log('Synthetic membership resources:',JSON.stringify({applicationBytes,workBytes,cleanupBytes,cleanupReserve:CLEANUP_RESERVE,httpRequests,temporaryDatabasesCreated:created,temporaryDatabasesDropped:dropped,modelCalls:0}))});
