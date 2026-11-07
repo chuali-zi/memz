@@ -58,7 +58,7 @@ stdin只接受 `projectId`、`question`、`protocol`、`timeoutMs`、`totalTimeo
 | 选项 | 对应环境 | 默认与边界 |
 | --- | --- | --- |
 | projectId | MEMZ_PROJECT_ID | 必须显式提供，1—2147483647整数 |
-| question | MEMZ_QUESTION | 必须提供，沿用上文200 UTF-16单位规则 |
+| question | MEMZ_QUESTION | 必须提供；默认snapshot_filter_v1最多200个UTF-16单位，显式metadata_exact_v2最多210；先限制原始长度再去外围空白 |
 | protocol | MEMZ_LABEL_PROTOCOL | 默认snapshot_filter_v1；只可显式选择metadata_exact_v2或snapshot_filter_v1，其他值在HTTP之前拒绝 |
 | timeoutMs | MEMZ_TIMEOUT_MS | 每次请求默认5000ms，1—60000ms；还受总期限约束 |
 | totalTimeoutMs | MEMZ_TOTAL_TIMEOUT_MS | 全流程默认30000ms，1—60000ms |
@@ -157,7 +157,7 @@ POST同样拒绝所有URL query参数，body必须通过原16KiB JSON对象限�
 
 metadata的complete只描述该次事务视图，不冻结之后的项目大小、权限或批准状态。随后单独发起的exact读取建立新事务，两次请求没有共同快照。
 
-`scripts/label-query-plan-v2.js` 的 `planExactLabelQuery({question,labels})` 使用同一固定问句模板，独立限制最多512行。唯一匹配返回 `mode:label_template_exact_v2`、`status:planned`、`selector` 与template，不生成all_terms查询，所以不施加旧八词限制。它不认识别名、代词、历史或多属性问题，仍保留明确拒绝；不接受gold、evidence、value或调用者提供的容量策略。调用者仍负责从单个已授权、完整current-labels响应提供词表，不拼分页快照。v1的 `planLabelQuery` 继续固定25行与八词限制。
+`scripts/label-query-plan-v2.js` 的 `planExactLabelQuery({question,labels})` 使用同一固定问句模板，独立限制最多512行。v2原始问句上限为210个UTF-16单位：两个100单位合法标签＋最长5单位连接词＋最长4单位问尾＋一个可选问号；先限长再trim，外围空白也占预算，因此最长带问号模板没有额外空白空间。合法代理对按两个单位计，不截断Unicode。唯一匹配返回 `mode:label_template_exact_v2`、`status:planned`、`selector` 与template，不生成all_terms查询，所以不施加旧八词限制。它不认识别名、代词、历史或多属性问题，仍保留明确拒绝；不接受gold、evidence、value或调用者提供的容量策略。调用者仍负责从单个已授权、完整current-labels响应提供词表，不拼分页快照。v1的 `planLabelQuery` 继续固定原始问句200单位、25行、八词与查询200单位限制；stdin16KiB、metadata512和正文/输出预算不变。本次是显式v2长标签覆盖增强，不改变默认协议。
 
 ```sh
 node --test test/exact-context-protocol.test.js test/label-query-plan-v2.test.js \

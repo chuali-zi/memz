@@ -24,9 +24,9 @@ async function readLabelContext(options={}){
   let base;try{base=new URL(baseURL)}catch{throw failure('INVALID_BASE_URL')}
   check(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&!base.search&&!base.hash&&base.pathname==='/','INVALID_BASE_URL');
   check(positive(projectId),'INVALID_PROJECT');
-  // Validate question before login, without supplying evidence or selecting a label.
-  planLabelQuery({question,labels:[]});
   check(['snapshot_filter_v1','metadata_exact_v2'].includes(protocol),'INVALID_LABEL_PROTOCOL');
+  // Validate against the explicitly selected fixed policy before login.
+  (protocol==='metadata_exact_v2'?planExactLabelQuery:planLabelQuery)({question,labels:[]});
   check(text(username,100)&&text(password,8192),'INVALID_CREDENTIALS');
   check(within(timeoutMs,60000),'INVALID_TIMEOUT');check(within(totalTimeoutMs,60000),'INVALID_TOTAL_TIMEOUT');
   check(within(maxResponseBytes,1048576),'INVALID_RESPONSE_LIMIT');check(within(maxOutputBytes,4194304),'INVALID_OUTPUT_BUDGET');

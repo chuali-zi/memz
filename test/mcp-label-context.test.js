@@ -30,7 +30,7 @@ test('the four flag combinations preserve old discovery order and disabled tools
 test('new question arguments cannot replace scope, identity, transport, policy, evidence or cancellation',{timeout:15000},async()=>{
   await withHttp(()=>assert.fail('Rejected arguments must not call HTTP'),async({baseURL,requests})=>withMcp(baseURL,async client=>{
     for(const key of ['projectId','baseURL','username','password','protocol','labels','selector','value','gold','evidence','query','limit','after','fetchImpl','signal','timeoutMs','totalTimeoutMs'])error(await call(client,{question,[key]:'synthetic-private-input'}),'INVALID_ARGUMENTS');
-    for(const invalid of [undefined,'','   ',true,[],{},'x'.repeat(201),'前\ud800后','前\0后'])error(await call(client,{question:invalid}),'INVALID_ARGUMENTS');
+    for(const invalid of [undefined,'','   ',true,[],{},'x'.repeat(211),'前\ud800后','前\0后'])error(await call(client,{question:invalid}),'INVALID_ARGUMENTS');
     for(const maxOutputBytes of [2047,32769,1.5,null,'4096'])error(await call(client,{question,maxOutputBytes}),'INVALID_ARGUMENTS');
     assert.equal(requests.length,0);
   }));

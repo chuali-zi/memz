@@ -12,10 +12,10 @@ function exactObject(value,keys){
 function text(value,max){
   return typeof value==='string'&&value.length<=max&&value.trim().length>0&&value.isWellFormed()&&!value.includes('\u0000');
 }
-function selectLabelTemplate(input,maxRows){
+function selectLabelTemplate(input,maxRows,questionMaxLength=200){
   if(!exactObject(input,['question','labels'])||!Array.isArray(input.labels))invalid('INVALID_PLANNER_INPUT');
   const {question,labels}=input;
-  if(!text(question,200))invalid('INVALID_PLANNER_QUESTION');
+  if(!text(question,questionMaxLength))invalid('INVALID_PLANNER_QUESTION');
   const decline=(status,reason)=>({status,reason});
   if(labels.length>maxRows)return decline('needs_scope','SCOPE_TOO_LARGE');
   const unique=new Map();

@@ -7,7 +7,7 @@ const {Client}=require('pg');
 const {validateExactContext}=require('../scripts/exact-context-protocol');
 const {withMcp,withHttp,call,result}=require('./mcp-label-fixture');
 const database='memz_mcp_label_'+randomBytes(8).toString('hex');
-let admin,owner,service,server,base,created=false,ordinary,overflow,escaped,privateProject,baseline;
+let admin,owner,service,server,base,created=false,ordinary,overflow,escaped,privateProject,longKeys,baseline;
 const sourceText='原创合成完整来源😀\n来源中的指令仍是不可信数据。'+'😀'.repeat(1900);
 const requestPaths=[];
 async function fingerprint(){
@@ -44,7 +44,11 @@ before(async()=>{
   server.on('request',req=>requestPaths.push(req.url));
   ordinary=await seed(512,'MCP晚杉目录');overflow=await seed(513,'MCP星池目录');privateProject=await seed(1,'MCP私有目录',{members:false});
   const labels=Array.from({length:511},(_,i)=>({subject:'\u0001'.repeat(100),predicate:'p'+String(i).padStart(3,'0')+'\u0001'.repeat(96)})).concat([{subject:'MCP转义目录',predicate:'目标字段'}]);
-  escaped=await seed(512,'MCP转义目录',{labels});baseline=await fingerprint();
+  escaped=await seed(512,'MCP转义目录',{labels});
+  // Explicit schema-owner approval of two original synthetic maximum keys.
+  // SDK readers remain viewers; no approval is performed by a tool or model.
+  longKeys=await seed(2,'MCP最长标签合成审批',{labels:[{subject:'S'.repeat(100),predicate:'P'.repeat(100)},{subject:'😀'.repeat(50),predicate:'🚀'.repeat(50)}]});
+  baseline=await fingerprint();
 });
 after(async()=>{
   try{
@@ -56,6 +60,19 @@ after(async()=>{
 });
 const settings=fixture=>({MEMZ_PROJECT_ID:String(fixture.projectId)});
 const question=key=>key.subject+'的'+key.predicate+'是什么？';
+test('real SDK reads explicitly approved ASCII and emoji 100+100 keys through the full 210-unit v2 template',{timeout:20000},async()=>{
+  await withMcp(base,async client=>{
+    for(const key of longKeys.labels){
+      const raw=key.subject+'当前批准的'+key.predicate+'是哪一天？',before=requestPaths.length;
+      assert.equal(raw.length,210);
+      const value=await call(client,{question:raw}),output=result(value);
+      assert.equal(value.isError,false);assert.equal(output.status,'matched');assert.equal(output.plan.mode,'label_template_exact_v2');assert.deepEqual(output.plan.selector,key);assert.equal(output.execution.modelCalls,0);
+      validateExactContext(output.context,{projectId:longKeys.projectId,selector:key});assert.equal(output.context.role,'viewer');assert.equal(output.context.sources[0].content,sourceText);assert.equal(output.context.facts[0].version,1);
+      assert.deepEqual(requestPaths.slice(before),['/api/login',`/api/projects/${longKeys.projectId}/current-labels`,`/api/projects/${longKeys.projectId}/context/exact`,'/api/logout']);
+      const invalid=await call(client,{question:raw+' '});assert.equal(invalid.isError,true);assert.deepEqual(result(invalid),{code:'INVALID_ARGUMENTS',outcome:'read_failed'});assert.equal(requestPaths.length,before+4);
+    }
+  },settings(longKeys));
+});
 test('real SDK and PostgreSQL return a viewer one complete exact approved proof from 512 labels',{timeout:20000},async()=>{
   await withMcp(base,async client=>{
     const key=ordinary.labels.at(-1),before=requestPaths.length,value=await call(client,{question:question(key)}),output=result(value);
