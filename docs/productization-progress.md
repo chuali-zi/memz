@@ -178,6 +178,14 @@ readiness/doctor只查目录，检查active普通列及受支持的精确成员�
 
 原Space报告已在同一身份更新第5版（21:29UTC检查点），保留11月6日11760字节历史及真实Node配对证据。该版的已确认HEAD为30619f7，后续创建/审批回执阶段另按此处记录，不把旧报告当实时main。LoCoMo仍未取得，外部模型本夜间新增0次，历史351次请求的范围不变；不以工程/检索检查代替回答正确率或token/费用结论。
 
+## 2026-11-07 22:14 UTC 独立材料包首次运行
+
+[947b416材料包烟测](../evaluation/evidence/package-first-run-2026-11-07/README.md)使用293清单文件加manifest，在新scratch内从已知公共缓存独立npm ci（offline/ignore-scripts/empty配置、锁110项且无安装脚本）；4个生产入口realpath均在副本node_modules，未借用上级依赖。正式CLI从foreign cwd启动，三资产hash匹配、canary404，setup/live/ready和22次实际HTTP检查通过：成员来源/候选同键重放、owner显式批准、viewer固定v1完整原文、另一账号403及退出。八表14→23行，source/candidate/fact/revision各+1、audit+3、receipt+2，项目/成员/角色属性不变；SIGTERM正常exit0，无KILL，自建库、客户端/socket/应用副本均清理。
+
+声明范围内work73768+cleanup207=73975字节，不含包/cache文件IO、服务内部PG、wire/heap；1887ms是这个有温缓存的小流程用时，不是安装/启动性能或生产SLO。使用既有PG角色、仅在新随机库去掉一条已存在CREATE ROLE，未验证空集群建角色；HTTP-only，无MCP握手、浏览器或完整542重跑。包无自身.git且设置ceiling，但原gitRepository=false为scope声明而非Git-discovery探针；不从loose包生成Git来源证据。原report schema字段对象碰撞、部分回执仅ID/选定字段而非全字段/字节等价、raw runner只能在专属空scratch布局运行等限制均原样注明。独立复审与原包/manifested字节核验通过；6份原始payload加SHA清单保存，未改原包或原始报告。
+
+CI已另提交91f4735扩为Node22/24相同集成链，每job原15min且fail-fast=false，Python准备仍一次；Node22九个artifact旧名保留，Node24追加-node24，18名预检无冲突。[91f4735真实双版本CI](https://github.com/chuali-zi/memz/actions/runs/42418928725)已成功：test(22)、test(24)及单份Python准备三job均成功；两Node版本各core542/542、迁移9/9、产品113/113、响应式4/4、adapter12/12及所有后续步骤，18个不同名称的artifact上传均确认。CI Node24实际为24.22.2，不能混称本云24.22.1。
+
 ## 技术栈决定与主要缺口
 
 目前继续Node/Express/PostgreSQL。现有测量是特定fixture的HTTP传输和真实模型小样本，不是语言/框架横向基准，没有证据说明更换语言能消除主要瓶颈。保留RLS、不可变revision、审批和幂等语义比立即重写更重要。若后续测量显示明确瓶颈，再在固定数据/硬件/并发和冷热条件下比较p50/p95/p99、吞吐、错误率、内存、读写成本；候选栈必须先实现相同接口合同和影子对照，再提供保留数据迁移、备份恢复、回退和分阶段切流方案。

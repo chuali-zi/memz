@@ -1,0 +1,370 @@
+{
+  "schema": {
+    "originalSha256": "7f3ed182965f0a523c48f1465e0fe176283adcb0c863469b55cab36df48b39df",
+    "executedSha256": "dac6e497ebc7c1a310cf1d64c412fedbdd704fd8cda2b742d3461eb07052d5ba",
+    "removedExistingRoleDeclarations": 1
+  },
+  "synthetic": true,
+  "passed": true,
+  "startedAt": "2026-11-07T22:04:55.417Z",
+  "node": "v22.23.4",
+  "gitRepository": false,
+  "sourceEvidenceGenerated": false,
+  "scope": "HTTP only; module closure includes MCP SDK, no SDK handshake or desktop host",
+  "limits": {
+    "httpAttempts": 30,
+    "responseBytes": 65536,
+    "requestBytes": 2048,
+    "applicationBytes": 8388608,
+    "cleanupReserveBytes": 65536,
+    "workMs": 540000,
+    "cleanupMs": 60000
+  },
+  "commands": [
+    {
+      "name": "verify-original",
+      "command": "/workspace/.memz-toolchains/node22/bin/node",
+      "args": [
+        "/workspace/memz-verify/artifacts/submission/947b416de6ac-1794087831987-ae6fc3/scripts/package-evidence.js",
+        "verify",
+        "/workspace/memz-verify/artifacts/submission/947b416de6ac-1794087831987-ae6fc3"
+      ],
+      "cwd": "/workspace/memz-package-smoke-Lf1eJnmA",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "outputBytes": 59,
+      "outputSha256": "2c3fe7b00518efa87bc18751629a6475517b026fb7897aa684b03599abb7b264",
+      "diagnosticCodes": []
+    },
+    {
+      "name": "verify-copy",
+      "command": "/workspace/.memz-toolchains/node22/bin/node",
+      "args": [
+        "/workspace/memz-package-smoke-Lf1eJnmA/app/scripts/package-evidence.js",
+        "verify",
+        "/workspace/memz-package-smoke-Lf1eJnmA/app"
+      ],
+      "cwd": "/workspace/memz-package-smoke-Lf1eJnmA/app",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "outputBytes": 59,
+      "outputSha256": "2c3fe7b00518efa87bc18751629a6475517b026fb7897aa684b03599abb7b264",
+      "diagnosticCodes": []
+    },
+    {
+      "name": "npm-ci",
+      "command": "/workspace/.memz-toolchains/node22/bin/node",
+      "args": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/lib/node_modules/npm/bin/npm-cli.js",
+        "ci",
+        "--offline",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund",
+        "--cache",
+        "/workspace/.npm-memz-benchmark",
+        "--userconfig",
+        "/workspace/memz-package-smoke-Lf1eJnmA/empty-user.npmrc",
+        "--globalconfig",
+        "/workspace/memz-package-smoke-Lf1eJnmA/empty-global.npmrc",
+        "--logs-dir",
+        "/workspace/memz-package-smoke-Lf1eJnmA/evidence/npm"
+      ],
+      "cwd": "/workspace/memz-package-smoke-Lf1eJnmA/app",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "outputBytes": 26,
+      "outputSha256": "518fa191e378ff4232900e35b16f3ee98b29f5463df1f10a6fb6c80aab656397",
+      "diagnosticCodes": []
+    },
+    {
+      "name": "setup-check",
+      "command": "/workspace/.memz-toolchains/node22/bin/node",
+      "args": [
+        "/workspace/memz-package-smoke-Lf1eJnmA/app/scripts/check-setup.js"
+      ],
+      "cwd": "/workspace/memz-package-smoke-Lf1eJnmA/app",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "outputBytes": 215,
+      "outputSha256": "b02436aa5d9c7ee9e32baf718d109ab267c4e3d1df1a8ccbe7f36de2d1006009",
+      "diagnosticCodes": []
+    }
+  ],
+  "http": [
+    {
+      "step": "static_index.html",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 7831,
+      "authentication": false,
+      "sha256": "e3631f7c31749ecf7401d637c7f8c94ba2364a5e42d20c1d4ec21507186e039e"
+    },
+    {
+      "step": "static_app.js",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 49015,
+      "authentication": false,
+      "sha256": "b938207eb292f0738ad74da78853914208c0291c3cdbb433172bb486219d3175"
+    },
+    {
+      "step": "static_style.css",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 3851,
+      "authentication": false,
+      "sha256": "3e633d5cd741a10e58624a8c10fde20aa354f7de5ee1176919df9d4fde8bed8c"
+    },
+    {
+      "step": "foreign_canary",
+      "status": 404,
+      "requestBytes": 0,
+      "responseBytes": 163,
+      "authentication": false,
+      "sha256": "f0921b6841c6a828e33f839fac70ba5b9e673095d4ac5ad7f6147960145e9f57"
+    },
+    {
+      "step": "live",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 18,
+      "authentication": false,
+      "sha256": "bc24b0b5a305d5afc198c725890c8fb91053be2dbd8672779de73cac19a008fa"
+    },
+    {
+      "step": "ready",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 18,
+      "authentication": false,
+      "sha256": "31bf75f4c0a97cc1f7b60df824fa390b3be9ba014f29b63c87c698ba63d9a9fd"
+    },
+    {
+      "step": "login_member",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 75,
+      "authentication": true
+    },
+    {
+      "step": "source_create",
+      "status": 200,
+      "requestBytes": 109,
+      "responseBytes": 131,
+      "authentication": false,
+      "sha256": "7ea7a82d424cdb7e6821368dce52eab7e8eb9a376edc87d560c5c8c126685078"
+    },
+    {
+      "step": "source_replay",
+      "status": 200,
+      "requestBytes": 109,
+      "responseBytes": 131,
+      "authentication": false,
+      "sha256": "555fba9c899eb2e5cd7c9df47b33f2ef6d2803c9b48b2c63c7658ba3057d5694"
+    },
+    {
+      "step": "candidate_create",
+      "status": 200,
+      "requestBytes": 120,
+      "responseBytes": 217,
+      "authentication": false,
+      "sha256": "ed6365e1555dcfebbd8af5d5e6eac474cce1b562d106347dc3b54e6fff511dc8"
+    },
+    {
+      "step": "candidate_replay",
+      "status": 200,
+      "requestBytes": 120,
+      "responseBytes": 217,
+      "authentication": false,
+      "sha256": "655ee1d958c24e0318074649c8337ac9bbe5e80aaab255dc2570dc18840e41d6"
+    },
+    {
+      "step": "login_owner",
+      "status": 200,
+      "requestBytes": 44,
+      "responseBytes": 78,
+      "authentication": true
+    },
+    {
+      "step": "explicit_approval",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 33,
+      "authentication": false,
+      "sha256": "ec8abf343a2577013942502fcb949c34af304715ec295b059df767e61606b6f5"
+    },
+    {
+      "step": "login_viewer",
+      "status": 200,
+      "requestBytes": 46,
+      "responseBytes": 78,
+      "authentication": true
+    },
+    {
+      "step": "viewer_facts",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 192,
+      "authentication": false,
+      "sha256": "8083652fdacecb3b4bd72d42063552d9cf94d72adbf4b7b2aea25cd29b6111ab"
+    },
+    {
+      "step": "viewer_fixed_proof",
+      "status": 200,
+      "requestBytes": 0,
+      "responseBytes": 418,
+      "authentication": false,
+      "sha256": "8417439be1eef81e278b5582d6837db9b373bfa8933fe9375c5b45ba94707bc9"
+    },
+    {
+      "step": "login_other",
+      "status": 200,
+      "requestBytes": 44,
+      "responseBytes": 87,
+      "authentication": true
+    },
+    {
+      "step": "cross_project_denied",
+      "status": 403,
+      "requestBytes": 0,
+      "responseBytes": 51,
+      "authentication": false,
+      "sha256": "65025708a6076db2cbff12227dcae3b5adba4152b9b07a4a68629e16096ad882"
+    },
+    {
+      "step": "logout_other",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11,
+      "authentication": true
+    },
+    {
+      "step": "logout_viewer",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11,
+      "authentication": true
+    },
+    {
+      "step": "logout_owner",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11,
+      "authentication": true
+    },
+    {
+      "step": "logout_member",
+      "status": 200,
+      "requestBytes": 2,
+      "responseBytes": 11,
+      "authentication": true
+    }
+  ],
+  "cleanup": {
+    "serviceClosed": true,
+    "httpSocketsClosed": true,
+    "ownerClosed": true,
+    "adminClosed": true,
+    "databaseDropped": true,
+    "manifestedBytesUnchanged": true,
+    "ownedWorkFilesRemoved": true,
+    "failedStages": [],
+    "databaseKnownRemaining": false,
+    "ownedProcessesRemaining": 0
+  },
+  "checks": {
+    "roleUnchanged": true,
+    "staticAssets": true,
+    "foreignCanary404": true,
+    "live": true,
+    "ready": true,
+    "sourceKeyReplay": true,
+    "candidateKeyReplay": true,
+    "explicitApproval": true,
+    "viewerFixedVersion": true,
+    "crossProject403": true
+  },
+  "package": {
+    "commit": "947b416de6ac2327fafc6f54d1c28b61646100bc",
+    "manifestSha256": "6d0d238923f7ba9e73b7a62bae17a3124832a5bcf24cf8dd554b332300687ad9",
+    "manifestEntries": 293
+  },
+  "install": {
+    "offline": true,
+    "ignoreScripts": true,
+    "noInheritedConfiguration": true,
+    "lockPackages": 110,
+    "hasInstallScript": 0,
+    "cache": "/workspace/.npm-memz-benchmark",
+    "lockSha256": "cbaad9f466df6926ff30193c26ef8e98dee34e60933e34292e12ebbd76b735b1",
+    "resolved": {
+      "express": "/workspace/memz-package-smoke-Lf1eJnmA/app/node_modules/express/index.js",
+      "cookie-parser": "/workspace/memz-package-smoke-Lf1eJnmA/app/node_modules/cookie-parser/index.js",
+      "pg": "/workspace/memz-package-smoke-Lf1eJnmA/app/node_modules/pg/lib/index.js",
+      "@modelcontextprotocol/sdk/client/index.js": "/workspace/memz-package-smoke-Lf1eJnmA/app/node_modules/@modelcontextprotocol/sdk/dist/cjs/client/index.js"
+    }
+  },
+  "ownedDatabase": "memz_pkg_smoke_3e457b03ace2a378",
+  "database": {
+    "before": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 4,
+      "facts": 1,
+      "candidates": 1,
+      "revisions": 1,
+      "audit": 1,
+      "idempotency_requests": 0
+    },
+    "after": {
+      "projects": 2,
+      "memberships": 4,
+      "sources": 5,
+      "facts": 2,
+      "candidates": 2,
+      "revisions": 2,
+      "audit": 4,
+      "idempotency_requests": 2
+    },
+    "delta": {
+      "projects": 0,
+      "memberships": 0,
+      "sources": 1,
+      "facts": 1,
+      "candidates": 1,
+      "revisions": 1,
+      "audit": 3,
+      "idempotency_requests": 2
+    }
+  },
+  "port": 43569,
+  "receipts": {
+    "sourceId": 5,
+    "candidateId": 2,
+    "factId": 2,
+    "version": 1
+  },
+  "fixture": {
+    "sha256": "b11af753a5d9d14692378c2a748dc4687e24b540d3313ab61e7df17b24048c53",
+    "sourceBodyBytes": 109,
+    "candidateBodyBytes": 120
+  },
+  "signal": {
+    "exitCode": 0,
+    "signal": null,
+    "forced": false
+  },
+  "accounting": {
+    "workBytes": 73768,
+    "cleanupBytes": 207,
+    "totalBytes": 73975,
+    "scope": "Parent subprocess output, fixture/admin SQL+params+rows JSON, HTTP request/response bodies; post-materialization, not heap/wire/package/cache/server-internal PG traffic"
+  },
+  "finishedAt": "2026-11-07T22:04:57.304Z",
+  "durationMs": 1887
+}

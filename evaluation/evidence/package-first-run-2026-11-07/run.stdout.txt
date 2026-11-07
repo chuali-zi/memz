@@ -1,0 +1,3 @@
+CHECKPOINT independent offline install succeeded; production dependencies resolve inside owned copy
+CHECKPOINT packaged CLI started from foreign cwd; setup check succeeded
+{"passed":true,"httpAttempts":22,"totalBytes":73975,"cleanupFailedStages":[],"remainingOwnedDatabase":false,"durationMs":1887}
