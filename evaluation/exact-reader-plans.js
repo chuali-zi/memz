@@ -5,10 +5,11 @@ const fs=require('node:fs');
 const crypto=require('node:crypto');
 const {execFileSync}=require('node:child_process');
 const {Client}=require('pg');
+const {captureQueries}=require('./capture-queries');
 const {databasePoolOptions}=require('../scripts/database');
 const {validateCurrentLabels,validateExactContext}=require('../scripts/exact-context-protocol');
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
-const files=['server.js','db/schema.sql','scripts/database.js','scripts/exact-context-protocol.js','scripts/context-evidence.js','evaluation/exact-reader-plans.js'];
+const files=['server.js','db/schema.sql','scripts/database.js','scripts/exact-context-protocol.js','scripts/context-evidence.js','evaluation/exact-reader-plans.js','evaluation/capture-queries.js'];
 
 async function main(){
   const adminURL=process.env.PLAN_DATABASE_URL;
@@ -36,17 +37,7 @@ async function main(){
     report.settings=(await owner.query("SELECT name,setting,unit FROM pg_settings WHERE name IN ('random_page_cost','seq_page_cost','work_mem','effective_cache_size','enable_seqscan','enable_indexscan','enable_bitmapscan','row_security','plan_cache_mode') ORDER BY name")).rows;
     report.indexes=(await owner.query("SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' AND tablename=ANY($1) ORDER BY tablename,indexname",[['facts','revisions','candidates','sources']])).rows;
     async function capture(read){
-      const queries=[],connect=service.pool.connect;
-      service.pool.connect=async function(...args){
-        const client=await connect.apply(this,args),query=client.query,release=client.release;
-        client.query=function(sql,params){
-          if(typeof sql==='string'&&/^SELECT\b/i.test(sql)&&/\b(?:FROM|JOIN)\s+(?:facts|revisions|candidates|sources)\b/i.test(sql))queries.push({sql,params});
-          return query.apply(this,arguments);
-        };
-        client.release=function(){client.query=query;client.release=release;return release.apply(this,arguments)};
-        return client;
-      };
-      try{return {result:await read(),queries}}finally{service.pool.connect=connect}
+      return captureQueries(service.pool,read,sql=>typeof sql==='string'&&/^SELECT\b/i.test(sql)&&/\b(?:FROM|JOIN)\s+(?:facts|revisions|candidates|sources)\b/i.test(sql));
     }
     for(const size of report.method.scales){
       report.stage='fixture:'+size;

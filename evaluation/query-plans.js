@@ -2,11 +2,12 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),crypto=require('node:crypto');
 const {execFileSync}=require('node:child_process');
 const {Client}=require('pg');
+const {captureQueries}=require('./capture-queries');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 async function main(){
   const adminURL=process.env.PLAN_DATABASE_URL;
   assert.ok(adminURL,'Set PLAN_DATABASE_URL to an initialized test PostgreSQL administrator connection');
-  const report={schemaVersion:1,synthetic:true,passed:false,startedAt:new Date().toISOString(),source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),files:Object.fromEntries(['server.js','db/schema.sql','evaluation/query-plans.js','evaluation/search-options.js'].map(f=>[f,hash(fs.readFileSync(f))]))},method:{scales:[200,2000],pageSize:25,plansPerCase:2,queryOrigin:'Captured from actual readProject/readSourcesPage calls',baseline:'Existing compatibility full-source read, not an equivalent single-page workload',planner:'Default planner settings, ANALYZE after fixture changes, no forced index',cache:'Queries and correctness traversal precede EXPLAIN; not a cold-cache experiment',timing:'EXPLAIN ANALYZE instrumentation, not HTTP latency or throughput'},scales:[],cleanup:{temporaryDatabaseDropped:false}};
+  const report={schemaVersion:1,synthetic:true,passed:false,startedAt:new Date().toISOString(),source:{commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workingTreeDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),files:Object.fromEntries(['server.js','db/schema.sql','evaluation/query-plans.js','evaluation/search-options.js','evaluation/capture-queries.js'].map(f=>[f,hash(fs.readFileSync(f))]))},method:{scales:[200,2000],pageSize:25,plansPerCase:2,queryOrigin:'Captured from actual readProject/readSourcesPage calls',baseline:'Existing compatibility full-source read, not an equivalent single-page workload',planner:'Default planner settings, ANALYZE after fixture changes, no forced index',cache:'Queries and correctness traversal precede EXPLAIN; not a cold-cache experiment',timing:'EXPLAIN ANALYZE instrumentation, not HTTP latency or throughput'},scales:[],cleanup:{temporaryDatabaseDropped:false}};
   const admin=new Client({connectionString:adminURL}),db=`memz_plans_${crypto.randomBytes(8).toString('hex')}`;
   let created=false,owner,service,failure;
   try{
@@ -22,15 +23,8 @@ async function main(){
     const seed=(await owner.query('SELECT id,title,content FROM sources WHERE project_id=1 ORDER BY id')).rows;
     let expected=[...seed],previous=0;
     async function capture(fn){
-      const queries=[],original=service.pool.connect;
-      service.pool.connect=async function(...args){
-        const client=await original.apply(this,args),query=client.query,release=client.release;
-        client.query=function(sql,params){if(typeof sql==='string'&&/^SELECT .*FROM sources(?:\s|$)/s.test(sql))queries.push({sql,params});return query.apply(this,arguments)};
-        client.release=function(){client.query=query;client.release=release;return release.apply(this,arguments)};
-        return client;
-      };
-      try{const result=await fn();assert.equal(queries.length,1,'Expected exactly one actual source query');return {result,...queries[0]}}
-      finally{service.pool.connect=original}
+      const {result,queries}=await captureQueries(service.pool,fn,sql=>typeof sql==='string'&&/^SELECT .*FROM sources(?:\s|$)/s.test(sql));
+      assert.equal(queries.length,1,'Expected exactly one actual source query');return {result,...queries[0]};
     }
     for(const size of report.method.scales){
       const inserted=(await owner.query("INSERT INTO sources(project_id,title,content) SELECT CASE WHEN n%2=0 THEN 1 ELSE 2 END,'计划来源'||lpad(n::text,5,'0'),repeat('合成正文',100) FROM generate_series($1::int,$2::int) n RETURNING id,project_id,title,content",[previous,size-1])).rows;
