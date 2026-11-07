@@ -13,3 +13,5 @@ PLAN_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:5432/memz npm
 metadata在512条时必须完整，4096条时必须返回 `complete:false` 与空标签；后者不会被称为客户端已支持4096标签。这里另以已知字面量键直接检查 exact SQL 的执行计划，模板客户端仍拒绝不完整词表。没有分页、共同冻结快照或自然语言质量结论。
 
 结果在 `artifacts/exact-reader-plans.json`。计时是数据库执行计划仪器的样本，预先已经执行正确性查询并 ANALYZE，因此属于热状态；不是 HTTP 延迟、吞吐或冷缓存测试，也不是新旧技术栈对照。其他隔离测试可能同时运行，不能从两次计划计时推出生产 SLO、加速比例、token 或费用节省。来源表只有少量完整来源行，选择 seqscan 可以合理，不应仅因看到 seqscan就增加索引。
+
+固定c3d7587的干净Node22.23.4实际报告及SHA256见 [原始计划记录](../evaluation/evidence/exact-reader-plans-2026-11-07/README.md)。报告原字节保留，后续源码不回写本次记录；其中的并行、热状态限制同样适用。

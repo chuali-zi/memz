@@ -40,7 +40,7 @@
 - e038e74、1cea35a：并发基线runner/方法与原始合成证据（282请求）；保留dirty源码hash与后续失败路径增强未重测的区别。`.gitattributes`保护原始证据字节，不改变历史SHA。
 - 77f7971：脱敏且限长的失败TAP用例名进入CI日志，减少产物传递不可用时的诊断盲区。
 
-最新完整远端成功检查点：[1cea35a CI](https://github.com/chuali-zi/memz/actions/runs/42387954090)。本地同提交干净Node24工作树core202/202、migrations9/9、完整真实数据库UI通过；system目录 `artifacts/system/run-1794066385049-61a50bb9`，UI `artifacts/ui/run-1794066386698-3994a7ac`（均在验证工作树）。没有以局部测试代替该提交的整套结果。
+此前完整远端成功检查点：[1cea35a CI](https://github.com/chuali-zi/memz/actions/runs/42387954090)。本地同提交干净Node24工作树core202/202、migrations9/9、完整真实数据库UI通过；system目录 `artifacts/system/run-1794066385049-61a50bb9`，UI `artifacts/ui/run-1794066386698-3994a7ac`（均在验证工作树）。没有以局部测试代替该提交的整套结果。
 
 保留一项未归因的历史风险：[e038e74 CI](https://github.com/chuali-zi/memz/actions/runs/42386605465)为core174/175、migrations9/9；GitHub工具可解析产物身份，但当前消费端下载和受支持物化均未取得可读字节，网络原因未确定。未换执行器或改网络规则，未盲重跑旧CI。按该CI日志匹配并校验官方SHA的Node22.23.4，在同一云环境对同一e038e74干净工作树独立复现175/175+9/9通过（`artifacts/system/run-1794066777587-41e64f4d`）；因此暂未复现，不能称旧失败已归因/修复。Node22仅位于workspace临时toolchain，未替换默认Node24。
 
@@ -52,7 +52,26 @@
 
 fc4b294的新增HTTP5项、独立真实PostgreSQL8项通过，覆盖256/512/513、字面量特殊字符、权限/RLS、并发版本、坏指针及来源/正文超限；这是合成数据的真实服务验证，不是模型或LoCoMo评测。[完整远端CI成功](https://github.com/chuali-zi/memz/actions/runs/42390931415)。同一云环境的干净固定提交、Node22.23.4独立system core230/230与migrations9/9通过，目录 `artifacts/system/run-1794068716022-35be8691`（验证工作树）。
 
-当前继续实现显式opt-in的v2 CLI：默认v1继续最多25标签；新模式最多512完整标签且精确键读取，元数据与精确读取分别是current事务，不能声称两次请求共享冻结快照。该CLI尚未交付，不能把HTTP已验证当成CLI已验证。另并行检查界面可恢复操作、运维故障和MCP只读接入边界。继续夜间窗口内的实质工作，遵守用户后续停止/变更指令。
+- df320d8：v2 CLI显式启用，默认v1保留；共享认证传输、完整输出预算和清理主错误优先。联合96/96、真实随机PG组合19/19；锁等待case由150ms调整为2000ms并确认目标请求实际进入PG Lock等待，受影响PG文件14/14重跑通过。metadata与exact仍是独立current事务，不声称共同冻结。
+- 0a8da13：键盘登录后进入项目或重试按钮，成功恢复只清对应错误、不清较新的并发提示；浏览器50项通过。
+- e5b6124：诊断命令删除重复URL期限覆盖，真实本机协议黑洞与既有隔离PG诊断5/5；期限按连接/单query计，不冒充全命令总期限。
+- 18fda69：SDK写取消传到实际HTTP，发送前not_attempted、发送后unknown、独立有界注销；23项相关合同通过，不自动重试、不声称取消回滚。
+- a6d7552：PORT严格十进制TCP解析，固定启动失败诊断；运行时listener错误进入同一个幂等排空流程而非只结束池。Node22生命周期11/11及独立runtime2/2通过，真实20秒到期、重复error/signal不二次end。
+- 5ffca28：恢复测试工具TERM→250ms→KILL，等close才报错，固定60s/8MiB边界；Node22独立4/4与真实PG16 custom恢复1/1通过。Docker CLI关闭不等于容器进程已止，文档保留边界。
+
+df320d8完整远端[CI成功](https://github.com/chuali-zi/memz/actions/runs/42392997911)，前一[a6d7552 CI](https://github.com/chuali-zi/memz/actions/runs/42392578980)也成功。同一df320d8干净验证工作树Node22 core282/282、migrations9/9通过，`artifacts/system/run-1794070109517-e2fc60f7`。
+
+## 字段读取接入与当前完整检查点
+
+- 7e93b2b、7cff7af：项目/bootstrap及事实/候选详情回执完整校验，拒绝错ID/版本/来源/比较状态，保护草稿、晚响应和固定历史版本；浏览器56、66项及原幂等4项分别通过。页面仍是各列表独立请求，不声称整页共同快照。
+- fd80eab：实际产品SQL捕获与viewer/RLS下512/4096合成计划检查，16份EXPLAIN计划，无forced index、无HTTP或模型。4096词表仍拒绝，不把已知selector直接SQL检查当作模板支持4096。
+- 079d293：模块级native AbortSignal，停止正在进行的实际读取/响应body及后续阶段，保留有界注销；联合69、隔离PG6通过。CLI/stdin不收signal，不保证HTTP取消会中止已开始的SQL或未知登录会话。
+- 9954da4：MCP显式 `MEMZ_MCP_ENABLE_LABEL_CONTEXT=1` 增加question-only工具，固定项目/身份/protocol，默认清单及顺序兼容；大标签metadata仅内部使用，输出最多32768，超预算不截断/不断stdio。SDK合同35、隔离PG6通过，业务digest未变。
+- c3d7587：真实PG提交后才触发SDK取消，7次有界HTTP确认注销、BUSY释放、同进程同键重放同pending ID，无重复记录或自动审批；Node22单项1/1，随机库与进程/socket清理确认。
+
+最新完整远端成功检查点：[c3d7587 CI](https://github.com/chuali-zi/memz/actions/runs/42394780746)。同一干净提交在Node22.23.4本云验证core314/314、migrations9/9与完整真实PG UI通过，分别在验证工作树 `artifacts/system/run-1794071294367-8c5225f2`、`artifacts/ui/run-1794071294846-4b1fc9f2`。同提交实际SQL计划报告已按原字节保存在 `evaluation/evidence/exact-reader-plans-2026-11-07/`，115889字节报告及README的SHA256均核对通过；报告保留source clean状态、原始计划、数据hash、并行/热状态限制与随机库删除确认。这些是真实服务/数据库上的合成工程回归，不是新增模型或LoCoMo实验。
+
+当前继续推进未完成数据库checkout申请的固定容量保护、浏览器完整响应的1MiB资源与严格UTF-8边界；只读审查与合成/真实服务回归继续进行。未提交/未推送阶段以git状态和各文件测试记录为准，不把工作树改动称为远端交付。继续夜间窗口内的实质工作，遵守用户后续停止/变更指令。
 
 ## 技术栈决定与主要缺口
 
