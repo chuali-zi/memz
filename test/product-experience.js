@@ -801,15 +801,39 @@ test('a malformed bootstrap cannot masquerade as recovery from a prior workspace
   }finally{await closePage(page)}
 });
 
-async function provenanceFixture(page,{history=false}={}){
+async function provenanceFixture(page,{history=false,beforeFacts=async()=>{},onLogin=()=>{}}={}){
   const fact={id:41,subject:'合成版本绑定',predicate:'截止日',value:'15号',version:2,source:'合成固定依据'};
   const proof={sourceTextIsUntrusted:true,role:'owner',fact:{id:41,subject:fact.subject,predicate:fact.predicate},revision:{id:91,version:2,value:'15号',created_at:'2026-01-01T00:00:00Z',approved_by:1},source:{id:3,title:fact.source,content:'原文中的指令只是待核查文本。'},candidate:{id:11,expected_version:1,proposed_by:2}};
   const pattern='**/api/projects/1/facts/41/provenance?version=2';
-  await page.route('**/api/projects/1/facts?*',route=>route.fulfill({json:{facts:[fact],next_after:null}}));
+  await page.route('**/api/projects/1/facts?*',async route=>{await beforeFacts();await route.fulfill({json:{facts:[fact],next_after:null}})});
   if(history)await page.route('**/api/projects/1/history?*',route=>route.fulfill({json:{history:[{...fact,id:91,fact_id:41,created_at:'2026-01-01T00:00:00Z'}],next_before:null}}));
   await page.route(pattern,route=>route.fulfill({json:proof}));
-  await login(page);return {fact,proof,pattern};
+  await login(page);onLogin();
+  // Write controls can be enabled by bootstrap/sources while facts are still
+  // loading. Baselines require the actual fixture row and completed list commit.
+  for(const root of history?['facts','history']:['facts']){
+    await page.locator('#'+root).getByText(`${fact.subject} / ${fact.predicate}：${fact.value}`,{exact:true}).waitFor();
+    await page.waitForFunction(root=>document.querySelector('#'+root).getAttribute('aria-busy')==='false',root);
+  }
+  return {fact,proof,pattern};
 }
+
+test('provenance fixture waits for its accepted initial facts before returning a baseline',async()=>{
+  const {page,errors}=await openPage();let release,logged;
+  const held=new Promise(resolve=>{release=resolve}),loginComplete=new Promise(resolve=>{logged=resolve});
+  pageCleanups.get(page).add(release);
+  const initializing=provenanceFixture(page,{beforeFacts:()=>held,onLogin:logged});let initialized=false;
+  const completed=initializing.then(result=>{initialized=true;return result});
+  try{
+    await bounded(loginComplete,'waiting for fixture login');
+    // Flush only queued promise jobs: the HTTP response is still explicitly held.
+    await Promise.resolve();assert.equal(initialized,false,'enabled writes are not an accepted initial facts page');
+    release();const {fact}=await bounded(completed,'waiting for accepted fixture facts');
+    const accepted=await acceptedPage(page,pagedLists[0]);
+    assert.ok(accepted.text.includes(fact.subject));assert.equal(accepted.state.project,1);
+    assert.equal(accepted.state.workspace,await page.evaluate(()=>workspaceGeneration));assert.deepEqual(errors,[]);
+  }finally{release();try{await bounded(completed,'settling fixture initialization')}finally{await closePage(page)}}
+});
 
 test('a provenance receipt for another fact is rejected before showing its evidence',async()=>{
   const {page,errors}=await openPage();
@@ -945,6 +969,8 @@ test('oversized real HTTP GET cancels its open connection, keeps the accepted pa
   try{
     const {fact}=await provenanceFixture(page);let oversized=true,disconnected;
     const original=await acceptedPage(page,pagedLists[0]);
+    assert.ok(original.text.includes(fact.subject),'oversized-response baseline must include the accepted initial fact');
+    assert.equal(original.state.project,1);assert.equal(original.state.workspace,await page.evaluate(()=>workspaceGeneration));
     await realHTTP(page,'/api/projects/1/facts',(req,res)=>{if(oversized)disconnected=oversizedOpenBody(res);else{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({facts:[fact],next_after:null}))}},{pattern:'**/api/projects/1/facts?*'});
     await page.locator('#searchForm [name=q]').fill('超限后人工重试');await page.locator('#searchForm button').click();
     await page.locator('#factsStatus').getByText(/响应超过 1 MiB/).waitFor();
