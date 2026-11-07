@@ -1,4 +1,5 @@
 const express=require('express'), cookieParser=require('cookie-parser'), crypto=require('crypto');
+const path=require('node:path');
 const {Pool}=require('pg');
 const {requestKey,createOnce}=require('./idempotency');
 const {parseSearchQuery}=require('./scripts/search-query');
@@ -365,7 +366,7 @@ async function decide(c,user,p,id,decision,inject){if(!['approve','reject'].incl
 await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify([p,ca.subject,ca.predicate])]);let f=(await c.query('SELECT * FROM facts WHERE project_id=$1 AND subject=$2 AND predicate=$3 FOR UPDATE',[p,ca.subject,ca.predicate])).rows[0];let v=f?.version||0;if(v!==ca.expected_version)throw fail(409,`版本冲突：候选基于 v${ca.expected_version}，当前为 v${v}，请重新提议`);if(!f)f=(await c.query('INSERT INTO facts(project_id,subject,predicate) VALUES($1,$2,$3) RETURNING *',[p,ca.subject,ca.predicate])).rows[0];const rev=(await c.query('INSERT INTO revisions(project_id,fact_id,version,value,source_id,candidate_id,approved_by) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',[p,f.id,v+1,ca.value,ca.source_id,id,user])).rows[0];if(inject)throw new Error('injected failure');await c.query('UPDATE facts SET version=$1,current_revision_id=$2 WHERE id=$3',[v+1,rev.id,f.id]);await c.query("UPDATE candidates SET status='approved' WHERE id=$1",[id]);await c.query('INSERT INTO audit(project_id,actor_id,action,detail) VALUES($1,$2,$3,$4)',[p,user,'approve',`候选 ${id} → v${v+1}`]);return {status:'approved',version:v+1}}
 app.post('/api/projects/:p/candidates/:id/:decision',route(async(req,res)=>{const p=num(req.params.p),id=num(req.params.id),d=req.params.decision;if(!['approve','reject'].includes(d))throw fail(400,'操作无效');res.json(await tx(req.user.id,c=>decide(c,req.user.id,p,id,d)))}));
 app.use('/api',(req,res)=>res.status(404).json({error:'接口不存在'}));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname,'public')));
 app.use((err,req,res,next)=>{
   const parseErrors={
     'entity.parse.failed':[400,'JSON 格式无效'],
