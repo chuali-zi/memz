@@ -45,7 +45,46 @@ COMPOSE_DISABLE_ENV_FILE=1 docker compose --env-file /dev/null -f compose.yml \
 ## 离线回归
 
 ```sh
-node --test test/compose-safety.test.js
+node --test test/compose-safety.test.js test/compose-readiness.test.js
 ```
 
 测试只使用合成配置，覆盖规范化配置成功、公开端口/host 网络、权限和挂载漂移、运行覆盖、非法输入、UTF-8 字节限制、输入超时、流错误及 CLI 退出码。故障配置带合成口令哨兵，用以确认输出不回显输入。这些测试无需 Docker 或数据库；现有系统测试按 `.test.js` 自动发现此文件。
+
+`compose-readiness.test.js` 另检查真实 `compose.yml` 中显式 argv 的 TCP 命令及原2s/3s/30参数，防止生产配置回退为默认 Unix socket。它针对仓库当前的 JSON 兼容 YAML flow sequence，不是通用 YAML 解析器；真实 Compose 规范化条件由下面的独立测试验证。通用配置校验器继续兼容启用的 CMD/CMD-SHELL，不改变其检查范围。
+
+## 首次初始化的 TCP 就绪
+
+默认配置现在使用 `CMD pg_isready -h 127.0.0.1 -U postgres -d memz`。
+本机缓存的 `postgres:16` 在原创4秒初始化 gate 中曾出现：旧 Unix socket
+检查让 `compose --wait` 返回 healthy，但同容器的 TCP 检查仍 exit 2，且
+gate 表尚未创建。显式 TCP 检查避开这个临时 Unix-only 初始化窗口。
+原检查间隔2秒、单次超时3秒、重试30次保持不变。
+
+healthy 只确认容器内 TCP 接受连接，不证明应用账号、RLS、schema完整性或
+宿主端口可达。启动后仍需执行 `check-setup.js` 与隔离系统测试；测试中的
+gate 是合成标记表，也不代替真实 schema 验收。
+
+有 Docker 且已缓存 `postgres:16` 时，可显式运行：
+
+```sh
+node test/compose-first-start.js --execute
+```
+
+该文件故意不以 `.test.js` 结尾，不进入默认核心或 CI 单元测试；原生
+PostgreSQL 用户无需 Docker。没有 `--execute` 时固定拒绝，不创建资源。
+脚本使用唯一随机 Compose 项目、两个全新数据卷、无发布端口且
+`network_mode:none`，只挂载原创4秒 gate，不挂载默认数据库或已有卷。
+镜像必须本机缓存，禁止 pull；只使用本机 Docker socket和临时空客户端配置，
+不读取继承环境值、dotenv、服务环境文件或注册表凭据。
+
+它先读取禁插值、禁环境文件解析的生产规范化 healthcheck，再对同一项目的
+旧命令验证“提前healthy而TCP/gate未就绪”，对现行命令验证
+“healthy时TCP/gate已就绪”。总期限39秒，预留清理时间；成功或失败都尝试
+清理自身项目并检查容器、卷和网络标签全部消失，保留第一失败及每步固定状态。
+超限不能被报告为清理成功；若报告保留 `fixtureDirectory`，它仅属于本轮
+随机项目，须核对该项目处理，不能对默认项目执行删除数据卷操作。
+
+报告保存在 `artifacts/compose-first-start/<随机项目>.json`，含runner与compose
+源码SHA256、缓存镜像ID、工具版本、观察时间、固定阶段/退出码和清理计数，
+不保存配置环境值、原始错误正文或认证信息。这是有界初始化竞态回归，
+不代表生产启动耗时保证，也不会启动应用或调用模型。
