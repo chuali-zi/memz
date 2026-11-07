@@ -27,7 +27,13 @@ async function readContext({baseURL='http://127.0.0.1:3000',username='viewer',pa
     let response;
     try{response=await fetchImpl(new URL(path,base),{method:body===undefined?'GET':'POST',redirect:'error',signal:AbortSignal.timeout(remaining),headers:{...(cookie?{cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':csrf})},...(body===undefined?{}:{body:JSON.stringify(body)})})}
     catch(error){throw failure(['AbortError','TimeoutError'].includes(error.name)?'REQUEST_TIMEOUT':'REQUEST_FAILED')}
-    if(logout&&response.status===401)return null;
+    if(logout&&response.status===401){
+      // Already logged out is acceptable, but its unused body may never end.
+      // Cancel it explicitly rather than retain an open response until timeout.
+      try{await response.body?.cancel()}
+      catch(error){throw failure(['AbortError','TimeoutError'].includes(error.name)?'REQUEST_TIMEOUT':'REQUEST_FAILED')}
+      return null;
+    }
     if(!response.ok)throw failure(`HTTP_${response.status}`,response.status);
     let value;
     try{

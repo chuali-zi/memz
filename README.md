@@ -135,3 +135,5 @@ MIGRATION_TEST_DATABASE_URL=postgres://postgres:postgres_demo_only@127.0.0.1:543
 无需真实智能体账号即可演示只读 MCP：启动本机服务后运行 `node scripts/mcp-read-example.js "项目"`，通过官方 SDK 返回已批准版本及来源原文，详见 [MCP 说明](docs/mcp-local.md)。
 
 来源与记忆文字始终是不可信数据，批准不使其中的指令可信。接口标记及宿主责任见 [记忆信任边界](docs/untrusted-memory.md)；未声称完整防提示注入或真实模型对抗验证。
+
+显式的[字段模板上下文入口](docs/label-query-plan.md)可处理文档列明的当前字段问句，例如 `MEMZ_PROJECT_ID=1 MEMZ_QUESTION="项目的截止日是什么？" npm run --silent demo:label-context`。它只读取授权批准事实并返回依据，范围超过25条或模板不覆盖时明确拒绝，不调用模型、不自动审批。当前栈的[小规模并发与连接池恢复基线](docs/reader-capacity.md)可用 `CAPACITY_DATABASE_URL=测试管理员连接 npm run eval:capacity` 在独立随机测试库重现；不要指向生产。
