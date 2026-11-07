@@ -21,6 +21,31 @@ function createShutdownGate(){
 // signals and pool. The deadline includes both HTTP drain and pool shutdown.
 function installShutdown({server,pool,onDrain=()=>{}}){
   let stopping=false,finished=false,failed=false,deadline;
+  const sockets=new Map();
+  function trackSocket(socket){
+    let state=sockets.get(socket);
+    if(state)return state;
+    state={active:0};sockets.set(socket,state);
+    socket.once('close',()=>sockets.delete(socket));
+    // The connection event can already be queued when server.close() runs.
+    if(stopping)socket.destroy();
+    return state;
+  }
+  server.on('connection',trackSocket);
+  // Count before the application's request listener can finish synchronously.
+  // Complete headers admit a request, including one whose body is still arriving.
+  server.prependListener('request',(request,response)=>{
+    const socket=request.socket,state=trackSocket(socket);state.active++;
+    let settled=false;
+    const settle=()=>{
+      if(settled)return;
+      settled=true;state.active--;
+      // end() flushes queued response bytes; destroy() here could truncate them.
+      // Pipelined responses share a socket and must all finish first.
+      if(stopping&&state.active===0&&!socket.destroyed)socket.end();
+    };
+    response.once('finish',settle);response.once('close',settle);
+  });
   function finish(code,message){
     if(finished)return;
     if(failed&&code===0)code=1;
@@ -44,6 +69,9 @@ function installShutdown({server,pool,onDrain=()=>{}}){
         if(error)return finish(1,'Shutdown failed; exiting.');
         Promise.resolve().then(()=>pool.end()).then(()=>finish(0),()=>finish(1,'Shutdown failed; exiting.'));
       });
+      // Native closeIdleConnections does not close a speculative TCP connection
+      // that has never submitted HTTP headers. It has no admitted work to drain.
+      for(const [socket,state] of sockets)if(state.active===0)socket.destroy();
       server.closeIdleConnections?.();
     }catch{finish(1,'Shutdown failed; exiting.')}
   }

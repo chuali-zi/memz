@@ -65,7 +65,9 @@ HTTP静态资源固定取自应用自身的 `public/`，不随启动工作目录
 
 `npm start` 保留为交互开发入口。前台终端的Ctrl+C通常向整个前台进程组发送SIGINT，与只向npm PID发送信号不同：npm包装进程的PID不等于应用PID，也不保证转发信号。本机合成验证中，只向npm PID发送SIGTERM后npm退出、应用仍能响应存活探针；只发送SIGINT时也未观察到应用排空。该验证使用本机临时端口及存活探针，不连接数据库，最终清理自己创建的进程组。
 
-需要supervisor或精确PID信号停止时，启动项直接执行 `node server.js`，使用exec形式让监督器管理应用进程；若必须经shell启动，最后使用 `exec node server.js`。这是服务进程入口说明，不是部署配置。`node server.js` 应用进程收到SIGTERM或SIGINT后停止接收新工作，等待已进入的HTTP请求完成再关闭连接池，成功退出0；已接收连接上的后续请求返回503和Connection: close。重复信号不重复关闭或延长期限。HTTP排空与pool.end共用20秒期限，失败或到期退出1，只打印固定诊断，不强制release仍被事务占用的客户端。直接require(server.js)的测试或宿主自行拥有server和pool，不自动接管进程信号。
+需要supervisor或精确PID信号停止时，启动项直接执行 `node server.js`，使用exec形式让监督器管理应用进程；若必须经shell启动，最后使用 `exec node server.js`。这是服务进程入口说明，不是部署配置。`node server.js` 应用进程收到SIGTERM或SIGINT后停止接收新工作，等待已进入的HTTP请求完成再关闭连接池，成功退出0；到达应用排空门禁的后续请求返回503和Connection: close。重复信号不重复关闭或延长期限。HTTP排空与pool.end共用20秒期限，失败或到期退出1，只打印固定诊断，不强制release仍被事务占用的客户端。直接require(server.js)的测试或宿主自行拥有server和pool，不自动接管进程信号。
+
+排空时还会关闭尚未提交完整HTTP请求头的自有TCP连接，包括空闲预连接和部分headers；这些连接没有HTTP回执保证，不能把关闭描述为503。已触发HTTP request事件的连接按未完成响应数量跟踪，即使请求正文仍在接收也不会当作空连接关闭；同一连接上的多个流水线请求分别计数，finish/close只结算一次，全部响应完成后用正常半关闭发送已排队字节。20秒期限及连接池关闭顺序保留，不以销毁活动socket或提前release来伪造正常退出。对应真实CLI及受控本机HTTP回归见 `test/shutdown-unadmitted.test.js`，测试不连接数据库；实际PG锁等待的旧排空回归仍独立运行。
 
 成功监听后的HTTP server error进入同一个有界排空流程并退出1，固定诊断不含原始异常。重复error或信号只触发一次pool关闭；不会把运行时错误误当启动失败而留下已结束连接池的活监听器。
 

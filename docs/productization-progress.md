@@ -222,3 +222,17 @@ CI已另提交91f4735扩为Node22/24相同集成链，每job原15min且fail-fast
 新opt-in `test:http-cache` 以实际Express/session/login/me/projects/facts、明确fake pool与真正loopback/Chromium原生缓存验证，不用Playwright route（它会禁HTTP cache）。正式先红18HTTP/5067正文bytes，4个目标断言失败、其余10个对照通过；修复后Node22/24各14/14、23HTTP/5321正文bytes、25次fake SQL/真实PG和模型0，所有浏览器/服务/socket/pool清理成功。报告只计数/身份匹配布尔值，不保存cookie/CSRF/正文原值；四个明确源码hash前后相等。原始red与两green在 `/tmp/memz-http-cache-regression-{red-6fc013d,green-node22-09df1f8,green-node24-09df1f8}/report.json`，不把scope hash称整仓库attestation。
 
 既有request-body/actual-health用例顺带检查API 400/413/415/401/403/404、Host优先和大小写GET/HEAD的drain503均no-store；健康探针无ETag语义保留。Node22/24各17/17；consumer合同/DB错误/headers后日志相关各24/24也通过。没有增加镜像helper或新的生产故障接口。独立脚本24HTTP/512KiB、4min work+1min cleanup；字节非wire/heap硬界。两个CI job显式运行并上传http-cache[-node24]，旧20个名保留、共22名唯一；配置不等于远端已过。本轮正式提交/CI在后续核实，所有模型和LoCoMo限制不变。详见[缓存边界](http-cache.md)。
+
+## 2026-11-07 23:12 UTC 观测回归与未开始HTTP的连接排空
+
+b0afaa0的[双版本CI](https://github.com/chuali-zi/memz/actions/runs/42422401845)整体失败，不能写成全绿。两个Node的API原生缓存对照均通过（CI各22HTTP/5171正文bytes，favicon调度与本机23次不同），core558/558、迁移9/9和Python99/99通过；重启测试在初始11HTTP读取时旁路body观测失败，后续依赖步骤未运行，部分always上传因无产物另报错。root在干净b0af本地复现相同失败，原始report保留；同提交本地system/UI/retrieval/材料包验证虽通过，也不能替代失败的完整CI。
+
+限定诊断将错误准确分类为CDP_DATA_UNAVAILABLE（调试协议报告无资源数据），发生在不同初始API；页面实际接受owner和五列表。独立13HTTP小探针未复现，故不推断no-store普遍导致正文不可读。测试改用原有Playwright拦截路径逐请求执行一次真实route.fetch，禁止自动重试/重定向，计量实际完整上游正文后原状态/头/正文交付页面；丢回复仍只在真实200后abort，缺正文和3xx继续失败，不忽略错误/补发业务请求。它是测试代理转发，不冒充原生浏览器缓存行为；原生缓存另有独立回归。安全固定failure/stage进入stdout，首错保留，清理分阶段继续而不因观测错跳过context/browser关闭。常驻actual-helper由6扩为11项，Node22/24各11/11，真实PG/HTTP/模型0。
+
+新转发路径又暴露实际CLI停机缺口：独立actualNode24 CLI、lazy DB端口1、一个空TCP加live200屏障（至多2连接）在SIGTERM后等20008ms而exit1，非强制kill。该无PG红证据在 `/tmp/memz-bare-tcp-drain-report.json`，不是测试代理必然故障。生命周期现在在app处理前按socket跟踪未完成HTTP响应，finish/close只结算一次；开始排空时关闭无完整HTTP头的连接，保留已开始HTTP的慢body/活动响应和流水线，响应全部完成后end发送队列，不破坏pool顺序/重复信号/原20秒总期限。导入app不安装跟踪或信号。
+
+新增原生回归在Node22/24各2/2：actualCLI空TCP+部分头+live屏障最多3socket、无session/checkout，约4ms正常退出；受控原生HTTP fixture在关闭空连接时，524321字节长200与排队503均完整、pool在两响应finish后仅end一次。新用例落地时产品已修，先红依据是上述独立旧版20.008s探针；不伪造新test的baseline。旧生命周期/启动/运行时错误13/13 Node24通过，两个真实20秒hang分支保留；原慢body测试和真实PG锁等待将在完整core继续检查。
+
+最终本地Node24真实HTTP/PG重启回归通过：30HTTP、89117声明应用字节、1678ms；两PID同端口、SIGTERM各exit0、无KILL/stderr，source/audit/receipt仍各1，八表指纹/原键/草稿/选择/同页/新cookie与CSRF/人工重新核权及另一账号403全部保持，0观测错误，独立清理全成功。报告 `artifacts/session-recovery/run-1794093044713-2b686026/report.json` 如实记录HEAD b0af+dirtytrue及明确源码hash；不是clean提交或性能承诺。原失败报告未改，完整CI待本轮提交后核实。
+
+首次新集群扩展仍只是未提交草稿，没有启动Docker或PG；独立审查先指出精确资源名归属及命令总期限问题，未修好不执行，不计入当前成果。本轮优先把实证停机缺口及CI回归闭环。新增模型仍0，LoCoMo字节仍0。
