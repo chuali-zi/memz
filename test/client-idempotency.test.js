@@ -5,9 +5,9 @@ const vm=require('node:vm');
 
 function client(){
   const requests=[];let serial=0,reloads=0;
-  const context=vm.createContext({AbortController,setTimeout,clearTimeout,location:{reload:()=>{reloads++}},document:{querySelector:()=>({username:{}})},crypto:{randomUUID:()=>`test-key-${++serial}`},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,key:options.headers['Idempotency-Key'],resolve,reject}))});
+  const context=vm.createContext({TextDecoder,AbortController,setTimeout,clearTimeout,location:{reload:()=>{reloads++}},document:{querySelector:()=>({username:{}})},crypto:{randomUUID:()=>`test-key-${++serial}`},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,key:options.headers['Idempotency-Key'],resolve,reject}))});
   vm.runInContext(fs.readFileSync('public/app.js','utf8')+'\nglobalThis.clientTest={createRecord,pendingCreations,switchAccount};',context);
-  const respond=(index,status=200)=>requests[index].resolve({ok:status<400,status,json:async()=>status<400?{id:index+1}:{error:'controlled rejection'}});
+  const respond=(index,status=200)=>requests[index].resolve(Response.json(status<400?{id:index+1}:{error:'controlled rejection'},{status}));
   return {...context.clientTest,requests,respond,reloads:()=>reloads};
 }
 for(const oldStatus of [200,400])test(`late ${oldStatus} from old key cannot erase newer uncertain creation key`,async()=>{

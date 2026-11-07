@@ -1,27 +1,46 @@
 let csrf='',projectId=null,data=null;const $=s=>document.querySelector(s);const el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 // Fixed browser request budget: headers and the complete JSON body share 15 seconds.
-const REQUEST_TIMEOUT_MS=15000;
+const REQUEST_TIMEOUT_MS=15000,MAX_RESPONSE_BYTES=1048576;
 async function api(path,opts={}){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),REQUEST_TIMEOUT_MS);
+  let timedOut=false,reader;
+  const controller=new AbortController(),timer=setTimeout(()=>{timedOut=true;controller.abort()},REQUEST_TIMEOUT_MS);
   const timeout=()=>new Error('请求超时（15秒），请稍后重试');
   try{
     let response;
     try{response=await fetch(path,{...opts,signal:controller.signal,headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...opts.headers}})}
-    catch(error){if(controller.signal.aborted)throw timeout();throw new Error('网络连接失败，请检查连接后重试')}
-    let value;
-    try{value=await response.json()}
-    catch(error){
-      if(controller.signal.aborted)throw timeout();
-      if(error.name==='SyntaxError')throw new Error('服务器响应不是有效 JSON，请稍后重试');
-      throw new Error('网络连接中断，未能完整读取响应，请稍后重试');
+    catch(error){if(timedOut)throw timeout();throw new Error('网络连接失败，请检查连接后重试')}
+    try{reader=response.body?.getReader()}catch{throw new Error('网络连接中断，未能完整读取响应，请稍后重试')}
+    if(!reader)throw new Error('服务器响应不是有效 JSON，请稍后重试');
+    const chunks=[];let bytes=0;
+    while(true){
+      let part;
+      try{part=await reader.read()}catch{if(timedOut)throw timeout();throw new Error('网络连接中断，未能完整读取响应，请稍后重试')}
+      if(part.done)break;
+      bytes+=part.value.byteLength;
+      if(bytes>MAX_RESPONSE_BYTES)throw new Error('服务器响应超过 1 MiB，未接纳本次响应');
+      chunks.push(part.value);
     }
-    if(controller.signal.aborted)throw timeout();
+    const encoded=new Uint8Array(bytes);let offset=0;
+    for(const chunk of chunks){encoded.set(chunk,offset);offset+=chunk.byteLength}
+    let text,value;
+    try{text=new TextDecoder('utf-8',{fatal:true}).decode(encoded)}catch{throw new Error('服务器响应不是有效 UTF-8，请稍后重试')}
+    try{value=JSON.parse(text)}catch{throw new Error('服务器响应不是有效 JSON，请稍后重试')}
+    if(timedOut)throw timeout();
     if(!response.ok){
       if(!value||typeof value.error!=='string')throw new Error('服务器响应格式异常，请稍后重试');
       const error=new Error(`${response.status} ${value.error}`);error.status=response.status;throw error;
     }
     return value;
-  }finally{clearTimeout(timer)}
+  }catch(error){
+    // Abort the real fetch first; cancellation/lock cleanup cannot replace the
+    // primary failure or turn a fully validated HTTP rejection into uncertainty.
+    controller.abort();
+    if(reader){try{await reader.cancel()}catch{}}
+    throw error;
+  }finally{
+    clearTimeout(timer);
+    if(reader){try{reader.releaseLock()}catch{}}
+  }
 }
 const pendingCreations=new Map(),busyActions=new Set();
 async function createRecord(path,body){

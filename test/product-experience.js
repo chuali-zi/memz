@@ -8,7 +8,7 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const {chromium}=require('playwright');
 let server,browser,browserServer,baseURL;
-const pageCleanups=new Map();
+const pageCleanups=new Map(),httpResponses=new Map();
 async function bounded(promise,label,milliseconds=5000){
   let timer;
   try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} exceeded ${milliseconds}ms`)),milliseconds)})])}
@@ -24,6 +24,8 @@ async function closePage(page){
 }
 before(async()=>{
   server=http.createServer(async(req,res)=>{
+    const controlled=httpResponses.get(`${req.method} ${new URL(req.url,'http://localhost').pathname}`);
+    if(controlled){req.resume();await controlled(req,res);return}
     // Deliberately unfinished responses exist only in this local test server.
     if(req.url==='/__test__/pending-headers')return;
     if(req.url==='/__test__/pending-body'){res.writeHead(200,{'Content-Type':'application/json'});res.write('{"unfinished":');return}
@@ -905,4 +907,122 @@ test('late fact and comparison details cannot populate a later A to B to A visit
       assert.equal(await panel.isHidden(),true);assert.equal(await panel.textContent(),'');assert.deepEqual(errors,[]);
     }finally{await closePage(page)}
   });
+});
+
+async function realHTTP(page,pathname,handler,{method='GET',pattern='**'+pathname}={}){
+  const key=method+' '+pathname;assert.equal(httpResponses.has(key),false);
+  httpResponses.set(key,handler);pageCleanups.get(page).add(()=>httpResponses.delete(key));
+  await page.route(pattern,async route=>{if(route.request().method()===method)await route.continue();else await route.fallback()});
+}
+
+test('real HTTP JSON larger than one MiB is rejected rather than accepted in full',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await realHTTP(page,'/__test__/large-json',(req,res)=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({padding:'x'.repeat(1048576)}))});
+    const result=await page.evaluate(async()=>{try{await api('/__test__/large-json');return {accepted:true}}catch(error){return {accepted:false,message:error.message}}});
+    assert.equal(result.accepted,false);assert.match(result.message,/响应超过 1 MiB/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('real HTTP malformed UTF-8 inside an otherwise valid JSON string is rejected',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await realHTTP(page,'/__test__/invalid-utf8',(req,res)=>{res.setHeader('Content-Type','application/json');res.end(Buffer.concat([Buffer.from('{"text":"'),Buffer.from([0xff]),Buffer.from('"}')]))});
+    const result=await page.evaluate(async()=>{try{await api('/__test__/invalid-utf8');return {accepted:true}}catch(error){return {accepted:false,message:error.message}}});
+    assert.equal(result.accepted,false);assert.match(result.message,/不是有效 UTF-8/);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+function oversizedOpenBody(res,status=200){
+  const disconnected=new Promise(resolve=>res.once('close',()=>resolve(!res.writableEnded)));
+  res.writeHead(status,{'Content-Type':'application/json'});res.write('{"padding":"');res.write('x'.repeat(1048576));
+  // Deliberately do not finish: only actual client cancellation can close this response.
+  return disconnected;
+}
+
+test('oversized real HTTP GET cancels its open connection, keeps the accepted page and can recover',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const {fact}=await provenanceFixture(page);let oversized=true,disconnected;
+    const original=await acceptedPage(page,pagedLists[0]);
+    await realHTTP(page,'/api/projects/1/facts',(req,res)=>{if(oversized)disconnected=oversizedOpenBody(res);else{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({facts:[fact],next_after:null}))}},{pattern:'**/api/projects/1/facts?*'});
+    await page.locator('#searchForm [name=q]').fill('超限后人工重试');await page.locator('#searchForm button').click();
+    await page.locator('#factsStatus').getByText(/响应超过 1 MiB/).waitFor();
+    assert.equal(await bounded(disconnected,'cancelling oversized real GET'),true);assert.deepEqual(await acceptedPage(page,pagedLists[0]),original);
+    oversized=false;await page.locator('#searchForm button').click();await page.locator('#factsStatus').getByText(/第 1 页/).waitFor();
+    assert.equal(await page.evaluate(()=>factState.query),'超限后人工重试');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+for(const mode of ['large-200','large-403','utf8-403'])test(`real HTTP ${mode} creation receipt stays uncertain and reuses its key on manual retry`,async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await login(page);await page.locator('#addSourceShortcut').click();
+    await page.locator('#sourceForm [name=title]').fill('真实HTTP合成重试来源');await page.locator('#sourceForm [name=content]').fill('失败时保留的原文');
+    const keys=[];let recover=false,disconnected;
+    await realHTTP(page,'/api/projects/1/sources',(req,res)=>{
+      keys.push(req.headers['idempotency-key']);
+      if(recover){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({id:81,title:'真实HTTP合成重试来源'}));return}
+      if(mode==='utf8-403'){res.writeHead(403,{'Content-Type':'application/json'});res.end(Buffer.concat([Buffer.from('{"error":"'),Buffer.from([0xff]),Buffer.from('"}')]))}
+      else disconnected=oversizedOpenBody(res,mode==='large-403'?403:200);
+    },{method:'POST'});
+    await page.locator('#sourceForm button').click();await settled(page,'#sourceForm');
+    assert.match(await page.locator('#sourceFeedback').textContent(),mode==='utf8-403'?/不是有效 UTF-8.*写入结果可能不确定/:/响应超过 1 MiB.*写入结果可能不确定/);
+    assert.ok(!(await page.locator('#sourceFeedback').textContent()).includes('缩小范围'),'uncertain creation must not suggest changing the request intent');
+    if(disconnected)assert.equal(await bounded(disconnected,'cancelling oversized creation response'),true);
+    assert.equal(await page.locator('#sourceForm [name=content]').inputValue(),'失败时保留的原文');assert.equal(keys.length,1,'no automatic replay');
+    recover=true;await page.locator('#sourceForm button').click();await settled(page,'#sourceForm');
+    assert.equal(keys.length,2);assert.equal(keys[1],keys[0]);assert.equal(await page.locator('#sourceSelect').inputValue(),'81');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('exactly one MiB of real UTF-8 JSON is accepted without clipping legitimate Unicode',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const marker='😀�',padding=1048576-Buffer.byteLength(JSON.stringify({marker,padding:''})),body=JSON.stringify({marker,padding:'x'.repeat(padding)});
+    assert.equal(Buffer.byteLength(body),1048576);
+    await realHTTP(page,'/__test__/exact-limit',(req,res)=>{res.setHeader('Content-Type','application/json');res.end(body)});
+    assert.deepEqual(await page.evaluate(async()=>{const result=await api('/__test__/exact-limit');return {marker:result.marker,padding:result.padding.length}}),{marker,padding});assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+async function apiWithBrokenReaderCleanup(page,pathname,{create=false}={}){
+  return page.evaluate(async({pathname,create})=>{
+    const cancel=ReadableStreamDefaultReader.prototype.cancel,release=ReadableStreamDefaultReader.prototype.releaseLock;
+    ReadableStreamDefaultReader.prototype.cancel=()=>{throw new Error('synthetic-private-cleanup-canary')};
+    ReadableStreamDefaultReader.prototype.releaseLock=()=>{throw new Error('synthetic-private-cleanup-canary')};
+    try{if(create)await createRecord(pathname,{title:'synthetic'});else await api(pathname);return {unexpectedSuccess:true}}
+    catch(error){return {message:error.message,status:error.status??null}}
+    finally{ReadableStreamDefaultReader.prototype.cancel=cancel;ReadableStreamDefaultReader.prototype.releaseLock=release}
+  },{pathname,create});
+}
+
+test('reader cleanup exceptions do not hide the size error or leave the real HTTP body open',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    let disconnected;await realHTTP(page,'/__test__/cleanup-size',(req,res)=>{disconnected=oversizedOpenBody(res)});
+    const result=await apiWithBrokenReaderCleanup(page,'/__test__/cleanup-size');
+    assert.match(result.message,/响应超过 1 MiB/);assert.equal(result.status,null);assert.ok(!result.message.includes('canary'));
+    assert.equal(await bounded(disconnected,'aborting HTTP despite synthetic reader cleanup failure'),true);assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('a fully read real HTTP 403 remains definitive despite reader cleanup exceptions',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    const keys=[];await realHTTP(page,'/__test__/cleanup-403',(req,res)=>{keys.push(req.headers['idempotency-key']);res.writeHead(403,{'Content-Type':'application/json'});res.end('{"error":"合成权限拒绝"}')},{method:'POST'});
+    for(let i=0;i<2;i++)assert.deepEqual(await apiWithBrokenReaderCleanup(page,'/__test__/cleanup-403',{create:true}),{message:'403 合成权限拒绝',status:403});
+    assert.equal(keys.length,2);assert.notEqual(keys[0],keys[1],'complete validated rejection clears the creation intent');assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
+});
+
+test('strict decoding accepts a valid multi-byte character split across real HTTP writes',async()=>{
+  const {page,errors}=await openPage();
+  try{
+    await realHTTP(page,'/__test__/split-utf8',(req,res)=>{
+      const emoji=Buffer.from('😀');res.writeHead(200,{'Content-Type':'application/json'});res.write(Buffer.concat([Buffer.from('{"text":"'),emoji.subarray(0,2)]));
+      const timer=setTimeout(()=>res.end(Buffer.concat([emoji.subarray(2),Buffer.from('"}')])),15);res.once('close',()=>clearTimeout(timer));
+    });
+    assert.deepEqual(await page.evaluate(()=>api('/__test__/split-utf8')),{text:'😀'});assert.deepEqual(errors,[]);
+  }finally{await closePage(page)}
 });

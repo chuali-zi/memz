@@ -32,7 +32,7 @@ async function main(){
     const request=(path,opts={})=>fetch(base+path,{...opts,headers:{cookie,...opts.headers},signal:AbortSignal.timeout(5000)});
     const before=await request('/api/projects');assert.equal(before.status,200);const projects=await before.json();
     const sent=[];let loseNext=false,committedId;
-    const context=vm.createContext({AbortController,setTimeout,clearTimeout,document:{querySelector:()=>({username:{}})},crypto:{randomUUID},fetch:async(path,opts)=>{
+    const context=vm.createContext({TextDecoder,AbortController,setTimeout,clearTimeout,document:{querySelector:()=>({username:{}})},crypto:{randomUUID},fetch:async(path,opts)=>{
       sent.push({key:opts.headers['Idempotency-Key'],body:opts.body});
       const response=await request(path,{...opts,headers:{...opts.headers,'X-CSRF-Token':csrf}});
       if(loseNext){loseNext=false;assert.equal(response.status,200);committedId=(await response.json()).id;throw new Error('synthetic response lost after commit')}
