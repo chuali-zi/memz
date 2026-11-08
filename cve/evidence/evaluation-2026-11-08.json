@@ -1,0 +1,256 @@
+{
+  "kind": "synthetic_contract_evaluation",
+  "generated_at": "2026-11-08T15:31:34.916Z",
+  "node": "v25.6.1",
+  "postgres": "16.15 (Debian 16.15-1.pgdg13+2)",
+  "corpus": {
+    "cves": 3,
+    "source_records": 6,
+    "synthetic": true
+  },
+  "passed": 16,
+  "total": 16,
+  "cases": [
+    {
+      "name": "exact ID",
+      "query": {
+        "id": "CVE-2099-10001"
+      },
+      "expected": [
+        "CVE-2099-10001"
+      ],
+      "actual": [
+        "CVE-2099-10001"
+      ],
+      "passed": true,
+      "elapsed_ms": 7.897,
+      "output_bytes": 6273,
+      "citations": 4
+    },
+    {
+      "name": "unknown ID",
+      "query": {
+        "id": "CVE-2099-99999"
+      },
+      "expected": [],
+      "actual": [],
+      "passed": true,
+      "elapsed_ms": 4.38,
+      "output_bytes": 557,
+      "citations": 0
+    },
+    {
+      "name": "case insensitive vendor/product",
+      "query": {
+        "vendor": "examplevendor",
+        "product": "examplewidget"
+      },
+      "expected": [
+        "CVE-2099-10001"
+      ],
+      "actual": [
+        "CVE-2099-10001"
+      ],
+      "passed": true,
+      "elapsed_ms": 5.508,
+      "output_bytes": 6302,
+      "citations": 4
+    },
+    {
+      "name": "package ecosystem",
+      "query": {
+        "vendor": "npm",
+        "product": "examplewidget"
+      },
+      "expected": [
+        "CVE-2099-10001"
+      ],
+      "actual": [
+        "CVE-2099-10001"
+      ],
+      "passed": true,
+      "elapsed_ms": 5.069,
+      "output_bytes": 6292,
+      "citations": 4
+    },
+    {
+      "name": "CWE-89",
+      "query": {
+        "cwe": "CWE-89"
+      },
+      "expected": [
+        "CVE-2099-10001"
+      ],
+      "actual": [
+        "CVE-2099-10001"
+      ],
+      "passed": true,
+      "elapsed_ms": 5.948,
+      "output_bytes": 6266,
+      "citations": 4
+    },
+    {
+      "name": "CWE-79",
+      "query": {
+        "cwe": "CWE-79"
+      },
+      "expected": [
+        "CVE-2099-10002"
+      ],
+      "actual": [
+        "CVE-2099-10002"
+      ],
+      "passed": true,
+      "elapsed_ms": 6.063,
+      "output_bytes": 1949,
+      "citations": 1
+    },
+    {
+      "name": "symptom keywords",
+      "query": {
+        "q": "SQL injection"
+      },
+      "expected": [
+        "CVE-2099-10001"
+      ],
+      "actual": [
+        "CVE-2099-10001"
+      ],
+      "passed": true,
+      "elapsed_ms": 4.795,
+      "output_bytes": 6271,
+      "citations": 4
+    },
+    {
+      "name": "second product",
+      "query": {
+        "vendor": "OtherVendor",
+        "product": "ExamplePortal"
+      },
+      "expected": [
+        "CVE-2099-10002"
+      ],
+      "actual": [
+        "CVE-2099-10002"
+      ],
+      "passed": true,
+      "elapsed_ms": 4.52,
+      "output_bytes": 1983,
+      "citations": 1
+    },
+    {
+      "name": "environment CPE is not vulnerable product",
+      "query": {
+        "vendor": "examplevendor",
+        "product": "exampleos"
+      },
+      "expected": [],
+      "actual": [],
+      "passed": true,
+      "elapsed_ms": 4.649,
+      "output_bytes": 582,
+      "citations": 0
+    },
+    {
+      "name": "KEV membership",
+      "query": {
+        "kev": "true"
+      },
+      "expected": [
+        "CVE-2099-10001"
+      ],
+      "actual": [
+        "CVE-2099-10001"
+      ],
+      "passed": true,
+      "elapsed_ms": 3.785,
+      "output_bytes": 6264,
+      "citations": 4
+    },
+    {
+      "name": "rejected excluded",
+      "query": {
+        "id": "CVE-2099-10003"
+      },
+      "expected": [],
+      "actual": [],
+      "passed": true,
+      "elapsed_ms": 4.09,
+      "output_bytes": 557,
+      "citations": 0
+    },
+    {
+      "name": "rejected explicit inspection",
+      "query": {
+        "id": "CVE-2099-10003",
+        "include_rejected": "true"
+      },
+      "expected": [
+        "CVE-2099-10003"
+      ],
+      "actual": [
+        "CVE-2099-10003"
+      ],
+      "passed": true,
+      "elapsed_ms": 3.556,
+      "output_bytes": 1941,
+      "citations": 1
+    },
+    {
+      "name": "no symptom match",
+      "query": {
+        "q": "unrelated_marker_987654"
+      },
+      "expected": [],
+      "actual": [],
+      "passed": true,
+      "elapsed_ms": 3.198,
+      "output_bytes": 565,
+      "citations": 0
+    },
+    {
+      "name": "cross product mismatch",
+      "query": {
+        "vendor": "OtherVendor",
+        "product": "ExampleWidget"
+      },
+      "expected": [],
+      "actual": [],
+      "passed": true,
+      "elapsed_ms": 3.599,
+      "output_bytes": 584,
+      "citations": 0
+    },
+    {
+      "name": "SQL input remains literal",
+      "query": {
+        "q": "x'); DROP SCHEMA cve CASCADE;--"
+      },
+      "expected": [],
+      "actual": [],
+      "passed": true,
+      "elapsed_ms": 3.086,
+      "output_bytes": 573,
+      "citations": 0
+    },
+    {
+      "name": "version is an explicit unevaluated candidate",
+      "query": {
+        "product": "ExampleWidget",
+        "version": "999.0.0"
+      },
+      "expected": [
+        "CVE-2099-10001"
+      ],
+      "version_assessment": "requires_ecosystem_specific_evaluation",
+      "actual": [
+        "CVE-2099-10001"
+      ],
+      "passed": true,
+      "elapsed_ms": 4.978,
+      "output_bytes": 6322,
+      "citations": 4
+    }
+  ],
+  "limitations": "Hand-authored fixtures and golden cases only. No semantic quality, real-model, target-vulnerability or production-scale performance claim."
+}

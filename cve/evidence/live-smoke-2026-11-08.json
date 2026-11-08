@@ -1,0 +1,79 @@
+{
+  "kind": "live_public_source_smoke",
+  "generated_at": "2026-11-08T15:23:11.577Z",
+  "sources": [
+    {
+      "source": "cvelist",
+      "url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/eb6ee303699384fcf39a3ba036045f3af7ed8f92/cves/2021/44xxx/CVE-2021-44228.json",
+      "download_sha256": "ed3cc6d61929bc2abb4b5343f617e18ce973f60abeb82d48495700ed8531cad4",
+      "status": "passed",
+      "counts": {
+        "inserted": 1,
+        "updated": 0,
+        "unchanged": 0,
+        "stale": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "source": "ghsa",
+      "url": "https://raw.githubusercontent.com/github/advisory-database/01ec58531afd348d4b06ae0c9c8487d539e27693/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json",
+      "download_sha256": "7361be33a495d4ed735cc65ca5af4102c8ce5bf1b1ea901e40d0ad1b612e4d24",
+      "status": "passed",
+      "counts": {
+        "inserted": 1,
+        "updated": 0,
+        "unchanged": 0,
+        "stale": 0,
+        "skipped": 0,
+        "unlinked": 0
+      }
+    },
+    {
+      "source": "nvd",
+      "url": "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2021-44228",
+      "download_sha256": "8f1fedd4e5661ae98a3623e2bb7eac8a010ba3e46d89549cf49f7bd03dd95116",
+      "status": "passed",
+      "counts": {
+        "inserted": 1,
+        "updated": 0,
+        "unchanged": 0,
+        "stale": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "source": "kev",
+      "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+      "download_sha256": "3e74e0322312bf196565d56b0b6084b86d7dae59fd77fd815f3b186e6e0035e7",
+      "status": "passed",
+      "counts": {
+        "inserted": 1,
+        "updated": 0,
+        "unchanged": 0,
+        "stale": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "source": "circl",
+      "url": "https://vulnerability.circl.lu/api/vulnerability/CVE-2021-44228",
+      "download_sha256": "4a36b331be6cce74cc6f77ef03f22a94a7b48f105f5b8b072303afaed566ff7e",
+      "status": "passed",
+      "counts": {
+        "inserted": 1,
+        "updated": 0,
+        "unchanged": 0,
+        "stale": 0,
+        "skipped": 0
+      }
+    }
+  ],
+  "cve_ids": [
+    "CVE-2021-44228"
+  ],
+  "context_bytes": 15575,
+  "citations": 5,
+  "context_within_64k": true,
+  "limitations": "Single known CVE only. No bulk ingestion, live incremental-history completeness, model/embedding quality or pentest-tools integration claim."
+}

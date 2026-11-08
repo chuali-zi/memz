@@ -1,0 +1,131 @@
+﻿TAP version 13
+# Subtest: isolated PostgreSQL CVE migration, lifecycle, sync, retrieval, HTTP and MCP
+    # Subtest: additive repeatable migration preserves preexisting memory data and PUBLIC has no access
+    ok 1 - additive repeatable migration preserves preexisting memory data and PUBLIC has no access
+      ---
+      duration_ms: 71.1542
+      type: 'test'
+      ...
+    # Subtest: idempotency, stale updates, complete independent sources, immutable old evidence
+    ok 2 - idempotency, stale updates, complete independent sources, immutable old evidence
+      ---
+      duration_ms: 99.7456
+      type: 'test'
+      ...
+    # Subtest: rejection hides all source matches; exact lookup and observations retain evidence
+    ok 3 - rejection hides all source matches; exact lookup and observations retain evidence
+      ---
+      duration_ms: 29.4053
+      type: 'test'
+      ...
+    # Subtest: GHSA alias removal detaches current links and stale snapshots cannot restore them
+    ok 4 - GHSA alias removal detaches current links and stale snapshots cannot restore them
+      ---
+      duration_ms: 75.5657
+      type: 'test'
+      ...
+    # Subtest: NVD page failure preserves committed cursor and resumes; invalid page rolls back
+    ok 5 - NVD page failure preserves committed cursor and resumes; invalid page rolls back
+      ---
+      duration_ms: 87.2925
+      type: 'test'
+      ...
+    # Subtest: KEV snapshot removal updates membership, retaining original observations
+    ok 6 - KEV snapshot removal updates membership, retaining original observations
+      ---
+      duration_ms: 42.187
+      type: 'test'
+      ...
+    # Subtest: read role cannot import; transactions used by reads reject writes; sync lock excludes overlap
+    ok 7 - read role cannot import; transactions used by reads reject writes; sync lock excludes overlap
+      ---
+      duration_ms: 21.9483
+      type: 'test'
+      ...
+    # Subtest: concurrent updates serialize per source/CVE and the latest source version wins
+    ok 8 - concurrent updates serialize per source/CVE and the latest source version wins
+      ---
+      duration_ms: 20.9284
+      type: 'test'
+      ...
+    # Subtest: pinned Git import ignores dirty worktree; rerun and incremental sync; broken JSON does not advance checkpoint
+    ok 9 - pinned Git import ignores dirty worktree; rerun and incremental sync; broken JSON does not advance checkpoint
+      ---
+      duration_ms: 1888.2707
+      type: 'test'
+      ...
+    # Subtest: HTTP exact lookup, unknowns, provenance, strict validation, methods and agent context
+    ok 10 - HTTP exact lookup, unknowns, provenance, strict validation, methods and agent context
+      ---
+      duration_ms: 792.8775
+      type: 'test'
+      ...
+    1..10
+ok 1 - isolated PostgreSQL CVE migration, lifecycle, sync, retrieval, HTTP and MCP
+  ---
+  duration_ms: 3350.8975
+  type: 'test'
+  ...
+# Subtest: CVE5 CNA + ADP references deduplicate while ranges, scores and languages survive
+ok 2 - CVE5 CNA + ADP references deduplicate while ranges, scores and languages survive
+  ---
+  duration_ms: 2.9026
+  type: 'test'
+  ...
+# Subtest: NVD configurations preserve AND/environment and CVSS discrepancies without verdicts
+ok 3 - NVD configurations preserve AND/environment and CVSS discrepancies without verdicts
+  ---
+  duration_ms: 0.7361
+  type: 'test'
+  ...
+# Subtest: GHSA aliases/ranges and KEV fields retain independent source identity
+ok 4 - GHSA aliases/ranges and KEV fields retain independent source identity
+  ---
+  duration_ms: 0.6369
+  type: 'test'
+  ...
+# Subtest: unknown formats, IDs, states and dates fail explicitly; hashes ignore key order
+ok 5 - unknown formats, IDs, states and dates fail explicitly; hashes ignore key order
+  ---
+  duration_ms: 0.9241
+  type: 'test'
+  ...
+# Subtest: query rejects unknown/duplicate-shaped inputs and binds hostile strings as parameters
+ok 6 - query rejects unknown/duplicate-shaped inputs and binds hostile strings as parameters
+  ---
+  duration_ms: 0.9232
+  type: 'test'
+  ...
+# Subtest: NVD uses bounded windows; CLI flags and client destinations are strict
+ok 7 - NVD uses bounded windows; CLI flags and client destinations are strict
+  ---
+  duration_ms: 0.92
+  type: 'test'
+  ...
+# Subtest: download rate limits NVD; retries transient errors without forwarding credentials to KEV
+ok 8 - download rate limits NVD; retries transient errors without forwarding credentials to KEV
+  ---
+  duration_ms: 21.151
+  type: 'test'
+  ...
+# Subtest: download bounds retries and fails closed on HTTP errors and malformed JSON
+ok 9 - download bounds retries and fails closed on HTTP errors and malformed JSON
+  ---
+  duration_ms: 1.2071
+  type: 'test'
+  ...
+# Subtest: agent client returns explicit no-match and distinguishes output-budget failures
+ok 10 - agent client returns explicit no-match and distinguishes output-budget failures
+  ---
+  duration_ms: 1.5166
+  type: 'test'
+  ...
+1..10
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3585.6201

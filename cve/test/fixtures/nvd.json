@@ -1,0 +1,11 @@
+{
+  "resultsPerPage": 1, "startIndex": 0, "totalResults": 1,
+  "vulnerabilities": [{"cve": {
+    "id": "CVE-2099-10001", "published": "2099-01-01T00:00:00.000", "lastModified": "2099-01-03T00:00:00.000", "vulnStatus": "Analyzed",
+    "descriptions": [{"lang": "en", "value": "Synthetic ExampleWidget SQL injection fixture."}],
+    "weaknesses": [{"source": "fixture", "type": "Primary", "description": [{"lang": "en", "value": "CWE-89"}]}],
+    "metrics": {"cvssMetricV31": [{"source": "fixture", "type": "Primary", "cvssData": {"version": "3.1", "baseScore": 8.1, "baseSeverity": "HIGH", "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"}}]},
+    "configurations": [{"operator": "AND", "nodes": [{"operator": "OR", "cpeMatch": [{"vulnerable": true, "criteria": "cpe:2.3:a:examplevendor:examplewidget:*:*:*:*:*:*:*:*", "versionStartIncluding": "1.0.0", "versionEndExcluding": "1.2.0"}]}, {"operator": "OR", "cpeMatch": [{"vulnerable": false, "criteria": "cpe:2.3:o:examplevendor:exampleos:*:*:*:*:*:*:*:*"}]}]}],
+    "references": [{"url": "https://example.invalid/nvd-reference"}]
+  }}]
+}

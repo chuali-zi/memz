@@ -1,0 +1,16 @@
+{
+  "dataType": "CVE_RECORD", "dataVersion": "5.2.0",
+  "cveMetadata": {"cveId": "CVE-2099-10001", "state": "PUBLISHED", "datePublished": "2099-01-01T00:00:00Z", "dateUpdated": "2099-01-02T00:00:00Z"},
+  "containers": {
+    "cna": {
+      "title": "SYNTHETIC ExampleWidget SQL injection",
+      "providerMetadata": {"shortName": "fixture"},
+      "descriptions": [{"lang": "en", "value": "Synthetic SQL injection in the ExampleWidget query endpoint. Fixture only; not a real vulnerability."}, {"lang": "zh", "value": "合成测试：查询接口的 SQL 注入"}],
+      "affected": [{"vendor": "ExampleVendor", "product": "ExampleWidget", "defaultStatus": "unaffected", "versions": [{"version": "1.0.0", "lessThan": "1.2.0", "status": "affected", "versionType": "semver"}]}],
+      "problemTypes": [{"descriptions": [{"lang": "en", "cweId": "CWE-89", "description": "SQL Injection"}]}],
+      "metrics": [{"cvssV3_1": {"version": "3.1", "baseScore": 7.5, "baseSeverity": "HIGH", "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}}],
+      "references": [{"url": "https://example.invalid/advisory/10001", "tags": ["vendor-advisory"]}]
+    },
+    "adp": [{"providerMetadata": {"shortName": "fixture-adp"}, "references": [{"url": "https://example.invalid/advisory/10001", "tags": ["patch"]}, {"url": "https://example.invalid/fix/10001"}]}]
+  }
+}

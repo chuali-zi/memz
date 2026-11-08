@@ -1,0 +1,9 @@
+{
+  "id": "GHSA-2345-6789-cfgh", "aliases": ["CVE-2099-10001"],
+  "summary": "SYNTHETIC ExampleWidget query injection", "details": "Synthetic package advisory; do not treat as a real CVE.",
+  "published": "2099-01-01T00:00:00Z", "modified": "2099-01-04T00:00:00Z",
+  "affected": [{"package": {"ecosystem": "npm", "name": "examplewidget", "purl": "pkg:npm/examplewidget"}, "ranges": [{"type": "SEMVER", "events": [{"introduced": "1.0.0"}, {"fixed": "1.2.0"}]}]}],
+  "database_specific": {"cwe_ids": ["CWE-89"], "severity": "HIGH", "github_reviewed": true},
+  "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}],
+  "references": [{"type": "FIX", "url": "https://example.invalid/fix/10001"}]
+}
