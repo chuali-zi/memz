@@ -23,7 +23,7 @@
 | 真实公开来源联网 smoke | **5/5 来源成功**；CVE Program、NVD、GHSA、KEV、CIRCL 各导入同一已知 CVE 的一条记录 | `artifacts/cve/live-smoke.json`，`node scripts/cve_live_smoke.js --allow-network` |
 | 真实记录上下文大小 | `CVE-2021-44228`，**5个来源引用，15,575 bytes**，小于64KiB预算 | 联网 smoke 报告，不含第三方原文 |
 | 原 Memz 全量测试 | **未运行**；本模块独立，原仓库有既存未提交变更，且其完整套件需要额外隔离/种子前提 | 本轮仅运行与新增 CVE 模块相称的检查 |
-| GitHub CI | 已添加配置；远端实际状态另行核实，不预先宣称通过 | `.github/workflows/cve.yml` |
+| GitHub CVE CI | **success**，实现提交 `87a381b` 的 Node22/24 两组检查均通过 | [实际运行42495382499](https://github.com/chuali-zi/memz/actions/runs/42495382499)，`.github/workflows/cve.yml` |
 
 复跑生成TAP时曾出现一次临时库清理阶段的异步连接错误，退出码1；没有将该次报告作为通过证据。原因是 `pg-pool.end()` 与 idle socket 实际关闭存在时序差异。已让测试清理等待各连接的 `end` 事件，并去掉强制删库；表中的通过结果对应修复后重新运行的报告。
 
@@ -47,4 +47,6 @@
 
 起始分支 `main`，起始 HEAD `ee1f1f21ad29fa9a93011b31fd50759dd88f52b7`，已有远端 `origin=https://github.com/chuali-zi/memz.git`，起始远端 `main` 与本地 HEAD 一致。已有大量 Memz 改动未提交；本任务只暂存新增 `cve/`、`db/cve_schema.sql`、`scripts/cve_*` 和 `.github/workflows/cve.yml`，不撤销或混入原改动。
 
-本文件随 CVE 实现提交；提交号和实际推送结果以最终交付及 Git 日志为准，避免在提交前写入尚不存在的提交号或同步成功声明。推送仅面向已有 `origin/main`；若远端已前进、身份/权限或授权有歧义，保留本地提交并停止同步，不改身份、不 force push、不夹带额外已有提交。
+实现提交：`87a381b6affe336f4f807ae697cb1ea5ee9074e5`（`Add isolated CVE knowledge ingestion and read-only retrieval`）。已成功推送到已有 `origin/main`，并通过 `git ls-remote` 确认远端 SHA 与该实现提交一致；该提交的 CVE CI 已核实为 success。原有工作区改动与起始状态一致，暂存区为空，临时测试库/角色已清理，原 Memz 库中未创建 `cve` schema。
+
+本文件随后仅补记上述已发生的提交、推送与 CI 结果；补记提交自身的 SHA 见最终交付与 Git 日志。推送仅面向已有 `origin/main`，不改身份、不 force push、不夹带额外已有提交。
