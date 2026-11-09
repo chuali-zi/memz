@@ -1,5 +1,7 @@
 # 按层选择测试入口
 
+> 本文主要覆盖旧项目记忆原型。2026-11-09 起的漏洞知识库使用 `node --test cve/test/*.test.js`、`node scripts/cve_evaluate.js` 和 `node scripts/cve_tree_evaluate.js`；权限与数据边界见 [CVE 验证说明](../cve/README.md#验证与证据)，实际结果见 [CVE STATUS](../cve/STATUS.md)。
+
 以下命令在完整仓库根目录执行，先按[上手指南](developer-quickstart.md)安装锁定依赖。Node需22+；浏览器、PostgreSQL和Docker只在相应层需要。这里说明入口与权限，不是固定通过数或某次CI成功声明。
 
 ## 先选数据边界

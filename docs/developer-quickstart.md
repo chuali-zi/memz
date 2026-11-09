@@ -1,5 +1,7 @@
 # 开发者首次接入：从空库到可读取上下文
 
+> 历史项目记忆原型上手指南。2026-11-09 起 Memz 的主产品是智能体漏洞知识库，新接入请使用 [CVE 启动说明](../cve/README.md#启动与权限) 和 [智能体调用指南](cve-agent-guide.md)。下文的账号、审批与旧服务不属于新产品的接入流程。
+
 以下命令在仓库根目录执行，使用POSIX shell（Linux/macOS/Git Bash语法）；本轮实际验证的是Linux。只需Node/npm、Docker Compose和公开演示账号，不需要模型、API key或外部账号。Windows PowerShell需改写环境变量语法，本轮未验证。
 
 ## 1. 安装与启动

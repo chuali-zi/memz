@@ -1,12 +1,14 @@
 # Memz CVE 知识库
 
-这是 Memz 仓库中的独立、只读消费的公开漏洞知识模块。项目事实仍由原 Memz 的来源、候选、审批和修订机制管理；CVE 数据使用独立 `cve` schema、独立连接变量和端口。无需修改原 `server.js`、`package.json`、`db/schema.sql` 或现有数据库迁移。
+这是 Memz 的核心产品：为 AI 智能体提供漏洞知识与 CVE 详情的外部数据库。2026-11-09 起，旧项目记忆与审批原型仅作历史参考；当前需求见 [产品方向](../docs/cve-product-direction.md) 和 [检索树设计](../docs/cve-retrieval-tree.md)。CVE 数据使用独立 `cve` schema、连接变量和端口，保留旧数据。
 
-## 为什么先用结构化检索 + 全文检索
+## 从技术栈到可回查的漏洞知识
 
 CVE-ID 是精确标识；CWE 是弱点分类，一个 CWE 可以对应许多 CVE，不能把分类本身当作某个具体漏洞。厂商/产品、包生态、版本区间、CPE 的 AND/OR 条件、撤回状态、更新时间与来源都需要结构化保存。向量相似度不能证明某版本受影响，也不适合承担这些字段的唯一检索职责。
 
-本版实现 PostgreSQL 参数化结构过滤、`simple` 全文索引和有来源的上下文摘要。英文关键词使用全部词项匹配，没有同义词扩展、中文分词、自然语言规划、语义排序或模型调用。`q=SQL injection` 是词项检索；`cwe=CWE-89` 是分类过滤。产品名称使用大小写不敏感的精确匹配，不猜别名。
+第一版提供无参数能力发现、技术栈/服务家族 → 具体服务或组件 → CWE → CVE 的检索树，再返回命中依据、来源、信息缺口和下一步核查线索。完整调用示例见 [智能体接入指南](../docs/cve-agent-guide.md)。`sql` 是 SQL 数据库分支；SQL 注入是 `CWE-89`，可以跨技术栈检索。树节点只来自本地当前已导入资料，不能用预设产品名称生成虚构 CVE。
+
+本版实现 PostgreSQL 参数化结构过滤、`cve.facets` 导航投影、`simple` 全文索引和有来源的上下文摘要。英文关键词使用全部词项匹配，没有同义词扩展、中文分词、自然语言规划、语义排序或模型调用。`q=SQL injection` 是词项检索；`cwe=CWE-89` 是分类过滤。`product` 使用大小写不敏感的精确匹配；仅树接口的 stack 下产品筛选明确支持 `ngix → nginx` 别名，上下文/搜索接口不做此转换。`mode=natural_language` 明确返回501，尚未实现。
 
 后续若有真实问题集证明关键词漏召回，可为**描述/受影响产品证据**增加 embedding：以 `(observation_id, chunk, model, dimension, content_hash)` 绑定索引，合并结构化与向量候选，再评估排序。撤回处理、版本判断、来源回查继续依靠结构化数据。本轮未安装向量扩展、下载模型或宣称完成 embedding/RAG 效果评测。
 
@@ -53,12 +55,15 @@ node scripts/cve_cli.js serve --port 3100
 
 ```sql
 GRANT USAGE ON SCHEMA cve TO memz_cve_reader, memz_cve_ingester;
-GRANT SELECT ON cve.records, cve.observations TO memz_cve_reader;
+GRANT SELECT ON cve.records, cve.observations, cve.facets TO memz_cve_reader;
 GRANT SELECT, INSERT ON cve.observations TO memz_cve_ingester;
 GRANT SELECT, INSERT, UPDATE, DELETE ON cve.records TO memz_cve_ingester;
+GRANT SELECT, INSERT, DELETE ON cve.facets TO memz_cve_ingester;
 GRANT SELECT, INSERT, UPDATE ON cve.source_state, cve.checkpoints, cve.sync_runs TO memz_cve_ingester;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA cve TO memz_cve_ingester;
 ```
+
+**已有 CVE 库升级也要以 schema owner 重新运行 `node scripts/cve_cli.js migrate`，再补授上述 facets 权限，随后启动新版读取/导入进程。** 迁移新增 `cve.facets`、索引和 records 触发器，并回填尚无 facets 的当前记录；已有无 state 的 facets 表会加列并从 records 回填状态。state 与 records 更新在同一事务维护；不修改已有 observation 原文、records 指针或同步断点。该触发器按调用者权限执行，reader 少了 SELECT 会导致查询/就绪检查失败，ingester 少了 facets INSERT/DELETE 会使导入事务失败。迁移不会自动授予这些角色权限。
 
 导入器只追加 observations，专用导入角色不需要其 UPDATE/DELETE 权限。`status` 需要读取 counts/checkpoints/runs，请在导入连接下执行。不要把管理员或导入连接传入 agent。迁移是事务性的、可重复执行，有锁/语句超时；没有自动 DROP、回滚到旧表结构或重置现有数据的命令。
 
@@ -99,6 +104,7 @@ NVD 数据页与页游标在同一事务中提交，失败页整体回滚，已�
 | --- | --- |
 | `cve.observations` | 原始 JSON、规范化 JSON、source/source_id/CVE-ID、source URL、上游 modified、抓取时间、规范化键序后的 JSON SHA-256；导入器追加写入 |
 | `cve.records` | 每个来源/来源标识/CVE 当前 observation 指针、全文索引、last_seen；同 CVE 不同来源独立存在 |
+| `cve.facets` | 当前来源记录的 state、技术栈、vendor/product/ecosystem 服务身份与 CWE 投影；records 触发器维护，供树和结构查询使用，不是原始来源事实 |
 | `cve.source_state` | GHSA 的更新水位，即使移除最后一个 CVE alias，也阻止旧快照恢复关联 |
 | `cve.checkpoints` | Git commit、NVD 完成窗口/未完成页、KEV 目录版本 |
 | `cve.sync_runs` | 开始/结束时间、running/complete/failed、实际已提交计数和脱敏错误码 |
@@ -113,15 +119,19 @@ NVD configurations 的 AND/OR、环境条件、`vulnerable:false`、含排除边
 
 | 接口 | 行为 |
 | --- | --- |
-| `GET /health/ready` | 只读检查 CVE schema 是否可访问；不是覆盖率/新鲜度证明 |
+| `GET /health/ready` | 只读检查 records/facets 是否可访问；不是覆盖率/新鲜度证明 |
+| `GET /api/cve/capabilities` | 无参数能力发现，返回领域、策略、树入口、示例和限制 |
+| `GET /api/cve/tree?...` | 根 → stack → service → CWE，返回可直接继续调用的 next_query/context_query |
 | `GET /api/cve/:CVE-ID` | 精确查询，包含撤回记录；不存在返回404 |
 | `GET /api/cve/search?...` | 结构化/词项搜索，来源摘要，CVE-ID 升序游标分页 |
 | `GET /api/cve/context?...` | 相同候选，64KiB 输出预算，带 citation 的 agent 上下文 |
 | `GET /api/cve/observations/:id` | 按固定 observation ID 返回完整 raw/normalized 与来源，16MiB 预算 |
 
-搜索参数：`id`、`q`、`vendor`、`product`、`version`、`cwe`、`cpe`、`kev=true/false`、`include_rejected=true/false`、`limit=1..50`（默认10）、`after=CVE-...`。至少一个实际检索条件；重复、未知、错误类型参数返回400。CPE 使用完整 criteria 精确匹配。描述过滤需由同一来源记录同时满足；同一 CVE 的其他来源仅作为证据附上。`kev` 按当前目录 membership 再过滤。分页按字符串 CVE-ID 升序，无相关度排序或总数；每页打开新快照，并发更新期间不保证跨页固定集合。
+树参数仅接受 `stack`、`service`、`product`、`limit`、`after`；不接受 `cwe`。`service` 是树返回的不透明64字符小写十六进制键（SHA-256），必须同时带 stack；`product` 仅用于 stack 下的服务列表精确筛选，不能与 service 同用。弱点节点的 `context_query` 应传给 context，而非 tree。树分页使用绑定 stack/service/product 范围的游标，优先原样跟随响应的 `next_query`。详见 [树契约](../docs/cve-retrieval-tree.md)。
 
-`version` 必须与 `product` 一起提供，只标明待评估的目标版本。响应明确返回 `requires_ecosystem_specific_evaluation`，**不会据此过滤并断言受影响/不受影响**。完整版本范围在 observation 中；不同生态、预发布版、回补修复和组合配置尚无通用判定器。
+搜索/上下文参数：`id`、`q`、`vendor`、`product`、`version`、`cwe`（支持 `unclassified`）、`cpe`、`kev=true/false`、`include_rejected=true/false`、`stack`、`service`、`mode`、`limit=1..50`（默认10）、`after=CVE-...`。至少一个实际检索条件；重复、未知、错误类型参数返回400。CPE 使用完整 criteria 精确匹配。描述过滤需由同一来源记录同时满足；同一 CVE 的其他来源仅作为证据附上。`kev` 按当前目录 membership 再过滤。分页按字符串 CVE-ID 升序，无相关度排序或总数；每页打开新快照，并发更新期间不保证跨页固定集合。
+
+`version` 必须与 `product` 或 `service` 一起提供，只标明待评估的目标版本。响应明确返回 `requires_ecosystem_specific_evaluation`，**不会据此过滤并断言受影响/不受影响**。完整版本范围在 observation 中；不同生态、预发布版、回补修复和组合配置尚无通用判定器。
 
 ```powershell
 Invoke-RestMethod 'http://127.0.0.1:3100/api/cve/CVE-2021-44228'
@@ -131,7 +141,9 @@ Invoke-RestMethod 'http://127.0.0.1:3100/api/cve/context?q=SQL%20injection&limit
 
 只有本地已导入资料会命中；无命中时 `items=[]`、`citations=[]`，不编造 CVE 或触发 web search。上下文标记 `untrusted_data:true`，每个 source 摘要有 `excerpt:true` 和 `observation_path`。描述、产品和引用有显式长度/数量上限；摘要不复制版本区间或 CPE 逻辑树，防止只读到半个区间却当作完整证据。引用包括 CVE-ID、source_id、固定 observation_id、hash、来源 URL、modified 和 fetched_at。超预算整体返回413，不静默丢掉余下候选；缩小 limit 后重试。源异常/数据库故障是503，不伪装为空结果。其他写方法返回405。
 
-Node 客户端可调用 `require('./cve/client').readContext({id:'CVE-2021-44228'})`；它只访问显式 loopback `CVE_BASE_URL`，限制响应大小/超时并拒绝重定向。MCP stdio 入口：
+上下文的 `match` 标记候选性质、实际过滤条件和命中的 observation；`investigation` 的 `generated_by=deterministic_rules_v1` 给出身份/完整范围/公告核对步骤、匹配来源 CWE 的通用核查提示与按来源列出的信息缺口。这些规则提示不是来源确认的 CVE 复现步骤，也不执行检测；当前规则及官方 CWE 链接见 [树契约](../docs/cve-retrieval-tree.md#建议与来源事实的边界)。
+
+Node 客户端提供 `readCapabilities({})`、`readTree({})`、`readContext({id:'CVE-2021-44228'})` 和 `readObservation({id:'实际observation_id'})`，从 `require('./cve/client')` 读取；它只访问显式 loopback `CVE_BASE_URL`，限制响应大小/超时并拒绝重定向。MCP stdio 入口：
 
 ```json
 {
@@ -141,25 +153,26 @@ Node 客户端可调用 `require('./cve/client').readContext({id:'CVE-2021-44228
 }
 ```
 
-仅暴露 `cve_read_context`，输入对应查询参数，其中 `limit` 为整数、两个布尔过滤为 boolean。MCP 不持有 DB 连接或模型 key，不导入、改事实、批准候选或执行检测动作。
+MCP 暴露四个只读工具：`cve_capabilities`、`cve_browse_tree`、`cve_read_context`、`cve_read_observation`。从 capabilities 的空参数调用开始，再原样跟随树节点；完整顺序示例见 [智能体接入指南](../docs/cve-agent-guide.md)。输入对应各自查询参数，`limit` 为整数、两个布尔过滤为 boolean，observation `id` 为字符串。MCP 不持有 DB 连接或模型 key，不导入、改事实、批准候选或执行检测动作。
 
-`D:\projects2\pentest-tools` 的现有 TypeScript 工作台资料检索位于 `workbench/src/knowledge/tools.ts`，agent 工具及只读分类由 `workbench/src/agent/session.ts` 组装。本轮只做了只读核对；该项目尚未注册此工具，也未进行真实模型/渗透任务联调。后续由其控制器调用本机 HTTP 客户端/适配器，把工具显式列为只读并保留来源回执，容器不直接持有数据库凭据。MCP 入口可先供支持 MCP 的客户端独立使用。
+`D:\projects2\pentest-tools` 的现有 TypeScript 工作台资料检索位于 `workbench/src/knowledge/tools.ts`，agent 工具及只读分类由 `workbench/src/agent/session.ts` 组装。2026-11-08曾进行只读核对；该项目尚未注册此工具，也未进行真实模型/渗透任务联调。后续由其控制器调用本机 HTTP 客户端/适配器，把工具显式列为只读并保留来源回执，容器不直接持有数据库凭据。MCP 入口可先供支持 MCP 的客户端独立使用。
 
 ## 验证与证据
 
 ```powershell
 # 无数据库/无联网单元测试
-node --test cve/test/unit.test.js
+node --test cve/test/unit.test.js cve/test/tree.test.js
 
 # 显式测试管理员连接；只创建/删除随机临时库与随机 NOLOGIN 测试角色
 $env:CVE_TEST_DATABASE_URL = '<test-admin-connection>'
 node --test cve/test/*.test.js
 node scripts/cve_evaluate.js
+node scripts/cve_tree_evaluate.js
 
 # 额外、显式联网：固定 Git commit 的真实公开样本与可选 feed
 node scripts/cve_live_smoke.js --allow-network
 ```
 
-未设 `CVE_TEST_DATABASE_URL` 时 PG 集成测试明确 skip；评测/联网 smoke 则失败，不使用默认管理员连接。测试不会迁移或清空连接所指定的已有库。评测用三条原创合成 CVE、六条来源记录、16个固定预期查询；这验证接口与候选集合，不代表真实检索质量。联网 smoke 只导入一个已知 CVE 的少量来源记录到临时库，结束后删除；失败会保留失败状态并非零退出。
+未设 `CVE_TEST_DATABASE_URL` 时 PG 集成测试明确 skip；评测/联网 smoke 则失败，不使用默认管理员连接。测试不会迁移或清空连接所指定的已有库。评测用三条原创合成 CVE、六条来源记录、16个固定预期查询；这验证接口与候选集合，不代表真实检索质量。树规模检查使用2000条原创合成 CVE/来源记录（100 web、1900 other），由真实投影触发器生成 facets；使用专用 SELECT-only 角色和单持有连接，经真实 HTTP 对根、服务、弱点与上下文各进行1次热身和20次测量，并保存执行计划。它不是并发负载、真实全库或冷缓存基准。联网 smoke 只导入一个已知 CVE 的少量来源记录到临时库，结束后删除；失败会保留失败状态并非零退出。
 
-报告输出至 Git 忽略的 `artifacts/cve/`。独立 [CVE CI](../.github/workflows/cve.yml) 在 Node 22/24、PG16 上运行 fixture/DB/MCP 回归与合成评测，不依赖外网漏洞源。具体本次实际结果、未完成项与同步信息见 [STATUS.md](STATUS.md)。
+报告输出至 Git 忽略的 `artifacts/cve/`。独立 [CVE CI](../.github/workflows/cve.yml) 在 Node 22/24、PG16 上运行 fixture/DB/MCP 回归、合成候选评测与树规模检查，不依赖外网漏洞源。2026-11-08 的20项回归与16题评测是树功能之前的历史基线，不能充当本轮新增能力的通过证据。2026-11-09 本轮实际结果、未完成项与同步信息见 [STATUS.md](STATUS.md)。

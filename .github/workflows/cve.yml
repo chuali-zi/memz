@@ -35,9 +35,14 @@ jobs:
       - run: node scripts/cve_evaluate.js
         env:
           CVE_TEST_DATABASE_URL: postgres://postgres:cve_ci_only@127.0.0.1:5432/cve_test_admin
+      - run: node scripts/cve_tree_evaluate.js
+        env:
+          CVE_TEST_DATABASE_URL: postgres://postgres:cve_ci_only@127.0.0.1:5432/cve_test_admin
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cve-synthetic-evaluation-node${{ matrix.node }}
-          path: artifacts/cve/evaluation.json
+          path: |
+            artifacts/cve/evaluation.json
+            artifacts/cve/tree-evaluation.json
           if-no-files-found: ignore

@@ -1,5 +1,7 @@
 # 本机 MCP 兼容适配
 
+> 此文是旧项目记忆 MCP 的历史接口。当前 Memz 面向漏洞知识与 CVE 的 MCP 入口是 `scripts/cve_mcp.js`，包含能力发现、检索树、上下文和完整来源四个只读工具，接入见 [智能体调用指南](cve-agent-guide.md)。
+
 `scripts/context-client.js --stdin` 和 `proposal-client.js --stdin` 原来只接收一次 JSON，不提供 MCP 握手、工具发现或请求编号。`scripts/mcp-server.js` 复用这两个库，为本机智能体进程提供标准 stdio 适配；没有模型调用或 MCP HTTP 监听端口。
 
 ## 协议与依赖选择

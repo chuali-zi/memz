@@ -1,0 +1,240 @@
+TAP version 13
+# Subtest: isolated PostgreSQL CVE migration, lifecycle, sync, retrieval, HTTP and MCP
+    # Subtest: additive repeatable migration preserves preexisting memory data and PUBLIC has no access
+    ok 1 - additive repeatable migration preserves preexisting memory data and PUBLIC has no access
+      ---
+      duration_ms: 94.8995
+      type: 'test'
+      ...
+    # Subtest: idempotency, stale updates, complete independent sources, immutable old evidence
+    ok 2 - idempotency, stale updates, complete independent sources, immutable old evidence
+      ---
+      duration_ms: 106.2266
+      type: 'test'
+      ...
+    # Subtest: rejection hides all source matches; exact lookup and observations retain evidence
+    ok 3 - rejection hides all source matches; exact lookup and observations retain evidence
+      ---
+      duration_ms: 28.7755
+      type: 'test'
+      ...
+    # Subtest: GHSA alias removal detaches current links and stale snapshots cannot restore them
+    ok 4 - GHSA alias removal detaches current links and stale snapshots cannot restore them
+      ---
+      duration_ms: 64.3135
+      type: 'test'
+      ...
+    # Subtest: NVD page failure preserves committed cursor and resumes; invalid page rolls back
+    ok 5 - NVD page failure preserves committed cursor and resumes; invalid page rolls back
+      ---
+      duration_ms: 69.1968
+      type: 'test'
+      ...
+    # Subtest: KEV snapshot removal updates membership, retaining original observations
+    ok 6 - KEV snapshot removal updates membership, retaining original observations
+      ---
+      duration_ms: 33.8969
+      type: 'test'
+      ...
+    # Subtest: read role cannot import; transactions used by reads reject writes; sync lock excludes overlap
+    ok 7 - read role cannot import; transactions used by reads reject writes; sync lock excludes overlap
+      ---
+      duration_ms: 18.7613
+      type: 'test'
+      ...
+    # Subtest: concurrent updates serialize per source/CVE and the latest source version wins
+    ok 8 - concurrent updates serialize per source/CVE and the latest source version wins
+      ---
+      duration_ms: 19.7461
+      type: 'test'
+      ...
+    # Subtest: pinned Git import ignores dirty worktree; rerun and incremental sync; broken JSON does not advance checkpoint
+    ok 9 - pinned Git import ignores dirty worktree; rerun and incremental sync; broken JSON does not advance checkpoint
+      ---
+      duration_ms: 1912.8501
+      type: 'test'
+      ...
+    # Subtest: HTTP exact lookup, unknowns, provenance, strict validation, methods and agent context
+    ok 10 - HTTP exact lookup, unknowns, provenance, strict validation, methods and agent context
+      ---
+      duration_ms: 892.5691
+      type: 'test'
+      ...
+    1..10
+ok 1 - isolated PostgreSQL CVE migration, lifecycle, sync, retrieval, HTTP and MCP
+  ---
+  duration_ms: 3343.8831
+  type: 'test'
+  ...
+# Subtest: isolated PostgreSQL tree discovery, evidence navigation and projection lifecycle
+    # Subtest: empty database discovers capabilities and returns honest empty navigation and context
+    ok 1 - empty database discovers capabilities and returns honest empty navigation and context
+      ---
+      duration_ms: 63.2545
+      type: 'test'
+      ...
+    # Subtest: same product across vendors has distinct opaque services and multiple paths count distinct CVEs
+    ok 2 - same product across vendors has distinct opaque services and multiple paths count distinct CVEs
+      ---
+      duration_ms: 28.1617
+      type: 'test'
+      ...
+    # Subtest: all three node levels page stably and cursors cannot move to a different scope
+    ok 3 - all three node levels page stably and cursors cannot move to a different scope
+      ---
+      duration_ms: 64.1141
+      type: 'test'
+      ...
+    # Subtest: unknown product and missing affected/CWE fields remain browsable with explicit evidence gaps
+    ok 4 - unknown product and missing affected/CWE fields remain browsable with explicit evidence gaps
+      ---
+      duration_ms: 22.1883
+      type: 'test'
+      ...
+    # Subtest: a service and CWE must coexist in one source; conflicting sources remain cited but do not generate matching rules
+    ok 5 - a service and CWE must coexist in one source; conflicting sources remain cited but do not generate matching rules
+      ---
+      duration_ms: 26.5275
+      type: 'test'
+      ...
+    # Subtest: HTTP and MCP complete discovery -> stack -> service -> CWE -> candidates -> full immutable observation
+    ok 6 - HTTP and MCP complete discovery -> stack -> service -> CWE -> candidates -> full immutable observation
+      ---
+      duration_ms: 765.9305
+      type: 'test'
+      ...
+    # Subtest: HTTP validates discovery, scope, duplicates and unsupported strategies with explicit errors
+    ok 7 - HTTP validates discovery, scope, duplicates and unsupported strategies with explicit errors
+      ---
+      duration_ms: 13.8869
+      type: 'test'
+      ...
+    # Subtest: source updates, authoritative rejection and GHSA alias removal refresh paths without deleting history
+    ok 8 - source updates, authoritative rejection and GHSA alias removal refresh paths without deleting history
+      ---
+      duration_ms: 72.2138
+      type: 'test'
+      ...
+    # Subtest: migration backfills a pre-tree current dataset, is repeatable and preserves all evidence and checkpoints
+    ok 9 - migration backfills a pre-tree current dataset, is repeatable and preserves all evidence and checkpoints
+      ---
+      duration_ms: 56.3896
+      type: 'test'
+      ...
+    # Subtest: a dedicated SELECT-only role browses tree and context but cannot change projection or ingest
+    ok 10 - a dedicated SELECT-only role browses tree and context but cannot change projection or ingest
+      ---
+      duration_ms: 69.3896
+      type: 'test'
+      ...
+    # Subtest: documented ingester grants support insert, unchanged, update and GHSA unlink without facets UPDATE
+    ok 11 - documented ingester grants support insert, unchanged, update and GHSA unlink without facets UPDATE
+      ---
+      duration_ms: 104.8426
+      type: 'test'
+      ...
+    1..11
+ok 2 - isolated PostgreSQL tree discovery, evidence navigation and projection lifecycle
+  ---
+  duration_ms: 1611.4072
+  type: 'test'
+  ...
+# Subtest: discovery describes the whole read-only evidence workflow and disabled strategy honestly
+ok 3 - discovery describes the whole read-only evidence workflow and disabled strategy honestly
+  ---
+  duration_ms: 1.2366
+  type: 'test'
+  ...
+# Subtest: tree query requires parent scope, explicit aliases and bounded well-formed input
+ok 4 - tree query requires parent scope, explicit aliases and bounded well-formed input
+  ---
+  duration_ms: 1.0244
+  type: 'test'
+  ...
+# Subtest: tree cursors are validated by level and query scope rather than reusable across branches
+ok 5 - tree cursors are validated by level and query scope rather than reusable across branches
+  ---
+  duration_ms: 0.6359
+  type: 'test'
+  ...
+# Subtest: tree/structured SQL binds input and joins product/CWE to one current source
+ok 6 - tree/structured SQL binds input and joins product/CWE to one current source
+  ---
+  duration_ms: 0.4981
+  type: 'test'
+  ...
+# Subtest: strategy and missing evidence contracts distinguish rules, source facts and target verdicts
+ok 7 - strategy and missing evidence contracts distinguish rules, source facts and target verdicts
+  ---
+  duration_ms: 0.8638
+  type: 'test'
+  ...
+# Subtest: discovery/tree/observation clients reject wrong contracts, invalid input and unsupported service status
+ok 8 - discovery/tree/observation clients reject wrong contracts, invalid input and unsupported service status
+  ---
+  duration_ms: 19.8178
+  type: 'test'
+  ...
+# Subtest: CVE5 CNA + ADP references deduplicate while ranges, scores and languages survive
+ok 9 - CVE5 CNA + ADP references deduplicate while ranges, scores and languages survive
+  ---
+  duration_ms: 3.0548
+  type: 'test'
+  ...
+# Subtest: NVD configurations preserve AND/environment and CVSS discrepancies without verdicts
+ok 10 - NVD configurations preserve AND/environment and CVSS discrepancies without verdicts
+  ---
+  duration_ms: 0.7688
+  type: 'test'
+  ...
+# Subtest: GHSA aliases/ranges and KEV fields retain independent source identity
+ok 11 - GHSA aliases/ranges and KEV fields retain independent source identity
+  ---
+  duration_ms: 0.642
+  type: 'test'
+  ...
+# Subtest: unknown formats, IDs, states and dates fail explicitly; hashes ignore key order
+ok 12 - unknown formats, IDs, states and dates fail explicitly; hashes ignore key order
+  ---
+  duration_ms: 0.9267
+  type: 'test'
+  ...
+# Subtest: query rejects unknown/duplicate-shaped inputs and binds hostile strings as parameters
+ok 13 - query rejects unknown/duplicate-shaped inputs and binds hostile strings as parameters
+  ---
+  duration_ms: 0.7281
+  type: 'test'
+  ...
+# Subtest: NVD uses bounded windows; CLI flags and client destinations are strict
+ok 14 - NVD uses bounded windows; CLI flags and client destinations are strict
+  ---
+  duration_ms: 0.4279
+  type: 'test'
+  ...
+# Subtest: download rate limits NVD; retries transient errors without forwarding credentials to KEV
+ok 15 - download rate limits NVD; retries transient errors without forwarding credentials to KEV
+  ---
+  duration_ms: 21.4421
+  type: 'test'
+  ...
+# Subtest: download bounds retries and fails closed on HTTP errors and malformed JSON
+ok 16 - download bounds retries and fails closed on HTTP errors and malformed JSON
+  ---
+  duration_ms: 1.6739
+  type: 'test'
+  ...
+# Subtest: agent client returns explicit no-match and distinguishes output-budget failures
+ok 17 - agent client returns explicit no-match and distinguishes output-budget failures
+  ---
+  duration_ms: 1.2247
+  type: 'test'
+  ...
+1..17
+# tests 38
+# suites 0
+# pass 38
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3621.9003

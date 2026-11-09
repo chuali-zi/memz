@@ -7,6 +7,8 @@ const {importDocument} = require('./store');
 const {syncNvd, syncGit, syncKev, importPath, createDownloader, withSyncLock} = require('./sync');
 const {search, evidenceContext} = require('./query');
 const {serve} = require('./server');
+const {capabilities} = require('./taxonomy');
+const {browseTree} = require('./tree');
 function options(args) {
   const out = {};
   for (let i = 0; i < args.length; i += 2) {
@@ -17,8 +19,9 @@ function options(args) {
 }
 async function main(args = process.argv.slice(2)) {
   const [command, ...rest] = args, opts = options(rest);
-  const allowed = {migrate: [], import: ['source','path'], sync: ['source','repo','start','end','id'], serve: ['port'], query: ['id','q','vendor','product','version','cwe','cpe','kev','include_rejected','limit','after'], status: []};
+  const allowed = {capabilities: [], tree: ['stack','service','product','limit','after'], migrate: [], import: ['source','path'], sync: ['source','repo','start','end','id'], serve: ['port'], query: ['id','q','vendor','product','version','cwe','cpe','kev','include_rejected','limit','after','stack','service','mode'], status: []};
   if (!allowed[command] || Object.keys(opts).some(k => !allowed[command].includes(k))) throw new Error('INVALID_ARGUMENTS');
+  if (command === 'capabilities') {process.stdout.write(`${JSON.stringify(capabilities(), null, 2)}\n`); return;}
   if (!process.env.CVE_DATABASE_URL) throw new Error('CVE_DATABASE_URL_REQUIRED');
   const pool = new Pool({connectionString: process.env.CVE_DATABASE_URL, max: 4, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000});
   pool.on('error', () => process.stderr.write('CVE_DATABASE_CONNECTION_LOST\n'));
@@ -38,7 +41,8 @@ async function main(args = process.argv.slice(2)) {
       else if (opts.source === 'circl' && CVE_ID.test(opts.id || '') && Object.keys(opts).length === 2) {
         result = await withSyncLock(pool, 'circl', async counts => Object.assign(counts, await importDocument(pool, 'circl', await createDownloader()(`https://vulnerability.circl.lu/api/vulnerability/${opts.id}`))));
       } else throw new Error('INVALID_ARGUMENTS');
-    } else if (command === 'query') result = evidenceContext(await search(pool, opts));
+    } else if (command === 'tree') result = await browseTree(pool, opts);
+    else if (command === 'query') result = evidenceContext(await search(pool, opts));
     else if (command === 'status') result = {
       records: (await pool.query('SELECT source,count(*)::int count FROM cve.records GROUP BY source ORDER BY source')).rows,
       checkpoints: (await pool.query('SELECT * FROM cve.checkpoints ORDER BY name')).rows,

@@ -4,6 +4,8 @@ const http = require('node:http');
 const {search, evidenceContext} = require('./query');
 const {CVE_ID} = require('./normalize');
 const {transaction} = require('./store');
+const {capabilities} = require('./taxonomy');
+const {browseTree} = require('./tree');
 function createApp(pool) {
   const app = express(); app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -19,9 +21,12 @@ function createApp(pool) {
     return res.type('json').send(body);
   }
   app.get('/health/ready', async (req, res) => {
-    await transaction(pool, c => c.query('SELECT 1 FROM cve.records LIMIT 1'), {readOnly: true});
+    await transaction(pool, c => c.query('SELECT 1 FROM cve.records r LEFT JOIN cve.facets f USING(source,source_id,cve_id) LIMIT 1'), {readOnly: true});
     res.json({ready: true});
   });
+  app.get('/api/cve/capabilities', (req, res) => Object.keys(req.query).length
+    ? res.status(400).json({error: 'INVALID_QUERY'}) : send(res, capabilities(), 65536));
+  app.get('/api/cve/tree', async (req, res) => send(res, await browseTree(pool, req.query), 65536));
   app.get('/api/cve/search', async (req, res) => send(res, evidenceContext(await search(pool, req.query))));
   app.get('/api/cve/context', async (req, res) => send(res, evidenceContext(await search(pool, req.query)), 65536));
   app.get('/api/cve/observations/:id', async (req, res) => {
@@ -38,8 +43,8 @@ function createApp(pool) {
   app.use((req, res) => res.status(404).json({error: 'NOT_FOUND'}));
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
-    const status = error.status === 400 ? 400 : 503;
-    res.status(status).json({error: status === 400 ? 'INVALID_QUERY' : 'CVE_DATABASE_UNAVAILABLE'});
+    const status = error.status === 400 ? 400 : error.status === 501 ? 501 : 503;
+    res.status(status).json({error: status === 400 ? 'INVALID_QUERY' : status === 501 ? 'RETRIEVAL_MODE_NOT_IMPLEMENTED' : 'CVE_DATABASE_UNAVAILABLE'});
   });
   return app;
 }
