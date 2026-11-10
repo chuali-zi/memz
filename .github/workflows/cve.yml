@@ -1,9 +1,9 @@
 name: CVE knowledge module
 on:
   push:
-    paths: ['cve/**', 'db/cve_*', 'scripts/cve_*', '.github/workflows/cve.yml', 'package.json', 'package-lock.json']
+    paths: ['cve/**', 'db/cve_*', 'scripts/cve_*', 'compose.cve.yml', '.github/workflows/cve.yml', 'package.json', 'package-lock.json']
   pull_request:
-    paths: ['cve/**', 'db/cve_*', 'scripts/cve_*', '.github/workflows/cve.yml', 'package.json', 'package-lock.json']
+    paths: ['cve/**', 'db/cve_*', 'scripts/cve_*', 'compose.cve.yml', '.github/workflows/cve.yml', 'package.json', 'package-lock.json']
 jobs:
   cve:
     runs-on: ubuntu-latest

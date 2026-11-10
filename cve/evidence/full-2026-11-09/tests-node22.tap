@@ -1,0 +1,501 @@
+TAP version 13
+# Subtest: isolated PostgreSQL bulk preserves observations, stale rules, facets and transactions
+    # Subtest: batch insert retains complete raw evidence, source URL and trigger facets
+    ok 1 - batch insert retains complete raw evidence, source URL and trigger facets
+      ---
+      duration_ms: 88.1583
+      type: 'test'
+      ...
+    # Subtest: same hash only advances last_seen and stale versions do not change current evidence
+    ok 2 - same hash only advances last_seen and stale versions do not change current evidence
+      ---
+      duration_ms: 107.2783
+      type: 'test'
+      ...
+    # Subtest: equal-timestamp corrections replace facets and old hashes reuse immutable observations
+    ok 3 - equal-timestamp corrections replace facets and old hashes reuse immutable observations
+      ---
+      duration_ms: 61.8097
+      type: 'test'
+      ...
+    # Subtest: duplicates and malformed documents leave the caller transaction unchanged
+    ok 4 - duplicates and malformed documents leave the caller transaction unchanged
+      ---
+      duration_ms: 29.9301
+      type: 'test'
+      ...
+    # Subtest: database failure in a later record rolls back all observations, records, facets and checkpoint
+    ok 5 - database failure in a later record rolls back all observations, records, facets and checkpoint
+      ---
+      duration_ms: 64.6092
+      type: 'test'
+      ...
+    # Subtest: bulk and original single-record imports share locks and the latest source timestamp wins
+    ok 6 - bulk and original single-record imports share locks and the latest source timestamp wins
+      ---
+      duration_ms: 205.8032
+      type: 'test'
+      ...
+    # Subtest: documented minimum ingester grants support batch inserts, updates and unchanged records
+    ok 7 - documented minimum ingester grants support batch inserts, updates and unchanged records
+      ---
+      duration_ms: 82.7347
+      type: 'test'
+      ...
+    # Subtest: a real 500-document batch uses four SQL calls and shares commit with its checkpoint
+    ok 8 - a real 500-document batch uses four SQL calls and shares commit with its checkpoint
+      ---
+      duration_ms: 1019.1693
+      type: 'test'
+      ...
+    1..8
+ok 1 - isolated PostgreSQL bulk preserves observations, stale rules, facets and transactions
+  ---
+  duration_ms: 2769.808
+  type: 'test'
+  ...
+# Subtest: bulk input validates the entire batch before issuing SQL
+ok 2 - bulk input validates the entire batch before issuing SQL
+  ---
+  duration_ms: 40.3111
+  type: 'test'
+  ...
+# Subtest: 500 changed documents use four SQL calls and preserve raw hashes and provenance
+ok 3 - 500 changed documents use four SQL calls and preserve raw hashes and provenance
+  ---
+  duration_ms: 182.254
+  type: 'test'
+  ...
+# Subtest: mixed classification uses at most five SQL calls and accepts timestamp-equal corrections
+ok 4 - mixed classification uses at most five SQL calls and accepts timestamp-equal corrections
+  ---
+  duration_ms: 4.3204
+  type: 'test'
+  ...
+# Subtest: pinned inventory and batch reader ignore dirty worktree, preserve large/Unicode JSON and stable hashes
+ok 5 - pinned inventory and batch reader ignore dirty worktree, preserve large/Unicode JSON and stable hashes
+  ---
+  duration_ms: 1204.7913
+  type: 'test'
+  ...
+# Subtest: incremental inventory keeps whole-target count/hash and explicitly reports deletions and ancestry gaps
+ok 6 - incremental inventory keeps whole-target count/hash and explicitly reports deletions and ancestry gaps
+  ---
+  duration_ms: 2317.8688
+  type: 'test'
+  ...
+# Subtest: CVE blobs reject invalid JSON, ID mismatches, missing objects and untrusted entry paths
+ok 7 - CVE blobs reject invalid JSON, ID mismatches, missing objects and untrusted entry paths
+  ---
+  duration_ms: 1187.3365
+  type: 'test'
+  ...
+# Subtest: git symlink mode and inconsistent CVE bucket paths are refused
+ok 8 - git symlink mode and inconsistent CVE bucket paths are refused
+  ---
+  duration_ms: 1251.7037
+  type: 'test'
+  ...
+# Subtest: prepare cache refuses unrelated repositories and offline misses without creating directories
+ok 9 - prepare cache refuses unrelated repositories and offline misses without creating directories
+  ---
+  duration_ms: 134.9782
+  type: 'test'
+  ...
+# Subtest: oversized blobs are rejected before reading their payload
+ok 10 - oversized blobs are rejected before reading their payload
+  ---
+  duration_ms: 1321.8894
+  type: 'test'
+  ...
+# Subtest: owned cache resumes initialization, fetches shallow only once and supports offline continuation
+ok 11 - owned cache resumes initialization, fetches shallow only once and supports offline continuation
+  ---
+  duration_ms: 135.2
+  type: 'test'
+  ...
+# Subtest: unrelated fetched candidate never changes the trusted ref; validated descendants publish atomically
+ok 12 - unrelated fetched candidate never changes the trusted ref; validated descendants publish atomically
+  ---
+  duration_ms: 2622.1574
+  type: 'test'
+  ...
+# Subtest: local config creates strong separated credentials and reruns preserve them
+ok 13 - local config creates strong separated credentials and reruns preserve them
+  ---
+  duration_ms: 3194.6357
+  type: 'test'
+  ...
+# Subtest: runtime refuses preexisting unmanaged data or partial credentials
+ok 14 - runtime refuses preexisting unmanaged data or partial credentials
+  ---
+  duration_ms: 47.1197
+  type: 'test'
+  ...
+# Subtest: path guards reject escapes, linked directories and hardlinked secrets
+ok 15 - path guards reject escapes, linked directories and hardlinked secrets
+  ---
+  duration_ms: 21.2501
+  type: 'test'
+  ...
+# Subtest: runtime errors and invalid command output never expose arbitrary detail
+ok 16 - runtime errors and invalid command output never expose arbitrary detail
+  ---
+  duration_ms: 128.6335
+  type: 'test'
+  ...
+# Subtest: compose keeps PG16 on loopback with project-local durable storage and file secret
+ok 17 - compose keeps PG16 on loopback with project-local durable storage and file secret
+  ---
+  duration_ms: 14.196
+  type: 'test'
+  ...
+# Subtest: managed synchronization uses real isolated PostgreSQL batches, manifest verification and recovery
+    # Subtest: sync-now without a baseline completes a full snapshot, then imports only changed blobs
+    ok 1 - sync-now without a baseline completes a full snapshot, then imports only changed blobs
+      ---
+      duration_ms: 2152.1252
+      type: 'test'
+      ...
+    # Subtest: no-change incremental sync preserves record timestamps and observations
+    ok 2 - no-change incremental sync preserves record timestamps and observations
+      ---
+      duration_ms: 2487.2543
+      type: 'test'
+      ...
+    # Subtest: source interruption commits complete batches only and resumes pinned target without fetching
+    ok 3 - source interruption commits complete batches only and resumes pinned target without fetching
+      ---
+      duration_ms: 755.9353
+      type: 'test'
+      ...
+    # Subtest: a silently truncated source stream retains the last complete batch and can resume
+    ok 4 - a silently truncated source stream retains the last complete batch and can resume
+      ---
+      duration_ms: 419.4675
+      type: 'test'
+      ...
+    # Subtest: manifest failure rolls back the same batch observations, facets and checkpoint position
+    ok 5 - manifest failure rolls back the same batch observations, facets and checkpoint position
+      ---
+      duration_ms: 393.3064
+      type: 'test'
+      ...
+    # Subtest: upstream deletions or timestamp rollback cannot advance the completed snapshot
+    ok 6 - upstream deletions or timestamp rollback cannot advance the completed snapshot
+      ---
+      duration_ms: 434.4551
+      type: 'test'
+      ...
+    # Subtest: snapshot verification rejects hash mismatches, observation drift and extra source records
+    ok 7 - snapshot verification rejects hash mismatches, observation drift and extra source records
+      ---
+      duration_ms: 387.7383
+      type: 'test'
+      ...
+    # Subtest: upstream commit history rollback is refused without changing the completed baseline
+    ok 8 - upstream commit history rollback is refused without changing the completed baseline
+      ---
+      duration_ms: 334.2692
+      type: 'test'
+      ...
+    # Subtest: completion verifies its inventory and record pointers in a repeatable database snapshot
+    ok 9 - completion verifies its inventory and record pointers in a repeatable database snapshot
+      ---
+      duration_ms: 284.6627
+      type: 'test'
+      ...
+    # Subtest: source session lock rejects overlap and releases after source failure
+    ok 10 - source session lock rejects overlap and releases after source failure
+      ---
+      duration_ms: 264.4342
+      type: 'test'
+      ...
+    1..10
+ok 18 - managed synchronization uses real isolated PostgreSQL batches, manifest verification and recovery
+  ---
+  duration_ms: 7922.8991
+  type: 'test'
+  ...
+# Subtest: isolated PostgreSQL CVE migration, lifecycle, sync, retrieval, HTTP and MCP
+    # Subtest: additive repeatable migration preserves preexisting memory data and PUBLIC has no access
+    ok 1 - additive repeatable migration preserves preexisting memory data and PUBLIC has no access
+      ---
+      duration_ms: 199.553
+      type: 'test'
+      ...
+    # Subtest: idempotency, stale updates, complete independent sources, immutable old evidence
+    ok 2 - idempotency, stale updates, complete independent sources, immutable old evidence
+      ---
+      duration_ms: 182.0467
+      type: 'test'
+      ...
+    # Subtest: rejection hides all source matches; exact lookup and observations retain evidence
+    ok 3 - rejection hides all source matches; exact lookup and observations retain evidence
+      ---
+      duration_ms: 50.9777
+      type: 'test'
+      ...
+    # Subtest: GHSA alias removal detaches current links and stale snapshots cannot restore them
+    ok 4 - GHSA alias removal detaches current links and stale snapshots cannot restore them
+      ---
+      duration_ms: 141.3664
+      type: 'test'
+      ...
+    # Subtest: NVD page failure preserves committed cursor and resumes; invalid page rolls back
+    ok 5 - NVD page failure preserves committed cursor and resumes; invalid page rolls back
+      ---
+      duration_ms: 184.4073
+      type: 'test'
+      ...
+    # Subtest: KEV snapshot removal updates membership, retaining original observations
+    ok 6 - KEV snapshot removal updates membership, retaining original observations
+      ---
+      duration_ms: 82.4541
+      type: 'test'
+      ...
+    # Subtest: read role cannot import; transactions used by reads reject writes; sync lock excludes overlap
+    ok 7 - read role cannot import; transactions used by reads reject writes; sync lock excludes overlap
+      ---
+      duration_ms: 49.3472
+      type: 'test'
+      ...
+    # Subtest: concurrent updates serialize per source/CVE and the latest source version wins
+    ok 8 - concurrent updates serialize per source/CVE and the latest source version wins
+      ---
+      duration_ms: 39.5378
+      type: 'test'
+      ...
+    # Subtest: pinned Git import ignores dirty worktree; rerun and incremental sync; broken JSON does not advance checkpoint
+    ok 9 - pinned Git import ignores dirty worktree; rerun and incremental sync; broken JSON does not advance checkpoint
+      ---
+      duration_ms: 2870.6606
+      type: 'test'
+      ...
+    # Subtest: HTTP exact lookup, unknowns, provenance, strict validation, methods and agent context
+    ok 10 - HTTP exact lookup, unknowns, provenance, strict validation, methods and agent context
+      ---
+      duration_ms: 3832.9499
+      type: 'test'
+      ...
+    1..10
+ok 19 - isolated PostgreSQL CVE migration, lifecycle, sync, retrieval, HTTP and MCP
+  ---
+  duration_ms: 7943.2151
+  type: 'test'
+  ...
+# Subtest: sync status SDK accepts no parameters, uses local GET and validates response contract and budget
+ok 20 - sync status SDK accepts no parameters, uses local GET and validates response contract and budget
+  ---
+  duration_ms: 71.9057
+  type: 'test'
+  ...
+# Subtest: sync status HTTP and MCP read unknown, pending and completed fixture states with SELECT-only privileges
+    # Subtest: unknown coverage stays unverified even when status reads succeed
+    ok 1 - unknown coverage stays unverified even when status reads succeed
+      ---
+      duration_ms: 166.3336
+      type: 'test'
+      ...
+    # Subtest: pending partial import reports progress, existing local records and failed run honestly
+    ok 2 - pending partial import reports progress, existing local records and failed run honestly
+      ---
+      duration_ms: 52.2861
+      type: 'test'
+      ...
+    # Subtest: completed checkpoint reports verification at completion time and exposes its fixed commit
+    ok 3 - completed checkpoint reports verification at completion time and exposes its fixed commit
+      ---
+      duration_ms: 53.1397
+      type: 'test'
+      ...
+    # Subtest: new pending update takes precedence over the earlier completed checkpoint
+    ok 4 - new pending update takes precedence over the earlier completed checkpoint
+      ---
+      duration_ms: 50.3499
+      type: 'test'
+      ...
+    # Subtest: HTTP and MCP reject parameters and expose no synchronization write command
+    ok 5 - HTTP and MCP reject parameters and expose no synchronization write command
+      ---
+      duration_ms: 64.8689
+      type: 'test'
+      ...
+    1..5
+ok 21 - sync status HTTP and MCP read unknown, pending and completed fixture states with SELECT-only privileges
+  ---
+  duration_ms: 7862.6242
+  type: 'test'
+  ...
+# Subtest: isolated PostgreSQL tree discovery, evidence navigation and projection lifecycle
+    # Subtest: empty database discovers capabilities and returns honest empty navigation and context
+    ok 1 - empty database discovers capabilities and returns honest empty navigation and context
+      ---
+      duration_ms: 158.582
+      type: 'test'
+      ...
+    # Subtest: same product across vendors has distinct opaque services and multiple paths count distinct CVEs
+    ok 2 - same product across vendors has distinct opaque services and multiple paths count distinct CVEs
+      ---
+      duration_ms: 59.2414
+      type: 'test'
+      ...
+    # Subtest: all three node levels page stably and cursors cannot move to a different scope
+    ok 3 - all three node levels page stably and cursors cannot move to a different scope
+      ---
+      duration_ms: 169.4456
+      type: 'test'
+      ...
+    # Subtest: unknown product and missing affected/CWE fields remain browsable with explicit evidence gaps
+    ok 4 - unknown product and missing affected/CWE fields remain browsable with explicit evidence gaps
+      ---
+      duration_ms: 59.4678
+      type: 'test'
+      ...
+    # Subtest: a service and CWE must coexist in one source; conflicting sources remain cited but do not generate matching rules
+    ok 5 - a service and CWE must coexist in one source; conflicting sources remain cited but do not generate matching rules
+      ---
+      duration_ms: 79.1396
+      type: 'test'
+      ...
+    # Subtest: HTTP and MCP complete discovery -> stack -> service -> CWE -> candidates -> full immutable observation
+    ok 6 - HTTP and MCP complete discovery -> stack -> service -> CWE -> candidates -> full immutable observation
+      ---
+      duration_ms: 6495.3301
+      type: 'test'
+      ...
+    # Subtest: HTTP validates discovery, scope, duplicates and unsupported strategies with explicit errors
+    ok 7 - HTTP validates discovery, scope, duplicates and unsupported strategies with explicit errors
+      ---
+      duration_ms: 38.3802
+      type: 'test'
+      ...
+    # Subtest: source updates, authoritative rejection and GHSA alias removal refresh paths without deleting history
+    ok 8 - source updates, authoritative rejection and GHSA alias removal refresh paths without deleting history
+      ---
+      duration_ms: 132.1622
+      type: 'test'
+      ...
+    # Subtest: migration backfills a pre-tree current dataset, is repeatable and preserves all evidence and checkpoints
+    ok 9 - migration backfills a pre-tree current dataset, is repeatable and preserves all evidence and checkpoints
+      ---
+      duration_ms: 92.9811
+      type: 'test'
+      ...
+    # Subtest: a dedicated SELECT-only role browses tree and context but cannot change projection or ingest
+    ok 10 - a dedicated SELECT-only role browses tree and context but cannot change projection or ingest
+      ---
+      duration_ms: 105.4644
+      type: 'test'
+      ...
+    # Subtest: documented ingester grants support insert, unchanged, update and GHSA unlink without facets UPDATE
+    ok 11 - documented ingester grants support insert, unchanged, update and GHSA unlink without facets UPDATE
+      ---
+      duration_ms: 148.9238
+      type: 'test'
+      ...
+    1..11
+ok 22 - isolated PostgreSQL tree discovery, evidence navigation and projection lifecycle
+  ---
+  duration_ms: 8075.1495
+  type: 'test'
+  ...
+# Subtest: discovery describes the whole read-only evidence workflow and disabled strategy honestly
+ok 23 - discovery describes the whole read-only evidence workflow and disabled strategy honestly
+  ---
+  duration_ms: 6.6762
+  type: 'test'
+  ...
+# Subtest: tree query requires parent scope, explicit aliases and bounded well-formed input
+ok 24 - tree query requires parent scope, explicit aliases and bounded well-formed input
+  ---
+  duration_ms: 3.5065
+  type: 'test'
+  ...
+# Subtest: tree cursors are validated by level and query scope rather than reusable across branches
+ok 25 - tree cursors are validated by level and query scope rather than reusable across branches
+  ---
+  duration_ms: 7.6491
+  type: 'test'
+  ...
+# Subtest: tree/structured SQL binds input and joins product/CWE to one current source
+ok 26 - tree/structured SQL binds input and joins product/CWE to one current source
+  ---
+  duration_ms: 2.1021
+  type: 'test'
+  ...
+# Subtest: strategy and missing evidence contracts distinguish rules, source facts and target verdicts
+ok 27 - strategy and missing evidence contracts distinguish rules, source facts and target verdicts
+  ---
+  duration_ms: 3.0773
+  type: 'test'
+  ...
+# Subtest: discovery/tree/observation clients reject wrong contracts, invalid input and unsupported service status
+ok 28 - discovery/tree/observation clients reject wrong contracts, invalid input and unsupported service status
+  ---
+  duration_ms: 101.3568
+  type: 'test'
+  ...
+# Subtest: CVE5 CNA + ADP references deduplicate while ranges, scores and languages survive
+ok 29 - CVE5 CNA + ADP references deduplicate while ranges, scores and languages survive
+  ---
+  duration_ms: 8.822
+  type: 'test'
+  ...
+# Subtest: NVD configurations preserve AND/environment and CVSS discrepancies without verdicts
+ok 30 - NVD configurations preserve AND/environment and CVSS discrepancies without verdicts
+  ---
+  duration_ms: 3.3163
+  type: 'test'
+  ...
+# Subtest: GHSA aliases/ranges and KEV fields retain independent source identity
+ok 31 - GHSA aliases/ranges and KEV fields retain independent source identity
+  ---
+  duration_ms: 2.1565
+  type: 'test'
+  ...
+# Subtest: unknown formats, IDs, states and dates fail explicitly; hashes ignore key order
+ok 32 - unknown formats, IDs, states and dates fail explicitly; hashes ignore key order
+  ---
+  duration_ms: 5.3239
+  type: 'test'
+  ...
+# Subtest: query rejects unknown/duplicate-shaped inputs and binds hostile strings as parameters
+ok 33 - query rejects unknown/duplicate-shaped inputs and binds hostile strings as parameters
+  ---
+  duration_ms: 2.8236
+  type: 'test'
+  ...
+# Subtest: NVD uses bounded windows; CLI flags and client destinations are strict
+ok 34 - NVD uses bounded windows; CLI flags and client destinations are strict
+  ---
+  duration_ms: 1.7177
+  type: 'test'
+  ...
+# Subtest: download rate limits NVD; retries transient errors without forwarding credentials to KEV
+ok 35 - download rate limits NVD; retries transient errors without forwarding credentials to KEV
+  ---
+  duration_ms: 55.7666
+  type: 'test'
+  ...
+# Subtest: download bounds retries and fails closed on HTTP errors and malformed JSON
+ok 36 - download bounds retries and fails closed on HTTP errors and malformed JSON
+  ---
+  duration_ms: 5.1497
+  type: 'test'
+  ...
+# Subtest: agent client returns explicit no-match and distinguishes output-budget failures
+ok 37 - agent client returns explicit no-match and distinguishes output-budget failures
+  ---
+  duration_ms: 4.7165
+  type: 'test'
+  ...
+1..37
+# tests 81
+# suites 0
+# pass 81
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12063.4798

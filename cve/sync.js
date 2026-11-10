@@ -53,7 +53,12 @@ async function withSyncLock(pool, source, fn) {
   try {
     const acquired = (await lock.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) ok', [`cve-sync:${source}`])).rows[0].ok;
     if (!acquired) throw new Error('SYNC_BUSY');
-    try { return await runTracked(pool, source, fn); }
+    try {
+      // Holding the source lock proves earlier running entries have no active
+      // conforming writer (e.g. a process was interrupted before its catch ran).
+      await pool.query("UPDATE cve.sync_runs SET status='failed',finished_at=now(),error_code='SYNC_INTERRUPTED' WHERE source=$1 AND status='running'", [source]);
+      return await runTracked(pool, source, fn);
+    }
     finally { await lock.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [`cve-sync:${source}`]); }
   } finally { lock.release(); }
 }

@@ -2,3 +2,6 @@ node_modules/
 .env
 artifacts/
 backups/
+data/
+.env.cve
+.env.cve.*

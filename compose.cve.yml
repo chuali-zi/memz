@@ -1,0 +1,27 @@
+name: memz-cve
+services:
+  db:
+    image: postgres:16
+    container_name: memz-cve-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: memz_cve
+      POSTGRES_USER: memz_cve_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/cve_owner_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - type: bind
+        source: ./data/cve/postgres
+        target: /var/lib/postgresql/data
+      - type: bind
+        source: ./data/cve/runtime/owner.password
+        target: /run/secrets/cve_owner_password
+        read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memz_cve_owner -d memz_cve"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 10s

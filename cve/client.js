@@ -46,6 +46,14 @@ async function readCapabilities(input = {}, options) {
   return request('/api/cve/capabilities', {}, options, 65536,
     value => value?.schema === 'memz.cve.capabilities.v1' && value.domain === 'vulnerability_knowledge_and_cve_details' && Array.isArray(value.workflow));
 }
+async function readSyncStatus(input = {}, options) {
+  if (Object.keys(wireInput(input)).length) throw new Error('INVALID_QUERY');
+  const nullableObject = value => value === null || (typeof value === 'object' && value !== null && !Array.isArray(value));
+  return request('/api/cve/sync-status', {}, options, 65536,
+    value => value?.schema === 'memz.cve.sync-status.v1' && typeof value.scope === 'string' &&
+      ['not_verified','partial_update','verified_at_last_completed_sync'].includes(value.coverage) &&
+      nullableObject(value.completed) && nullableObject(value.pending) && Array.isArray(value.records) && Array.isArray(value.runs));
+}
 async function readTree(input = {}, options) {
   const {cursor_key, ...query} = parseTreeQuery(wireInput(input));
   return request('/api/cve/tree', query, options, 65536,
@@ -58,4 +66,4 @@ async function readObservation(input, options) {
     value => value?.untrusted_data === true && String(value.observation?.id) === query.id &&
       value.observation?.raw && typeof value.observation.raw === 'object' && value.observation?.normalized);
 }
-module.exports = {baseURL, readContext, readCapabilities, readTree, readObservation};
+module.exports = {baseURL, readContext, readCapabilities, readTree, readObservation, readSyncStatus};

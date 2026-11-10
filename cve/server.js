@@ -6,6 +6,7 @@ const {CVE_ID} = require('./normalize');
 const {transaction} = require('./store');
 const {capabilities} = require('./taxonomy');
 const {browseTree} = require('./tree');
+const {readSyncStatus} = require('./managed-sync');
 function createApp(pool) {
   const app = express(); app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -27,6 +28,8 @@ function createApp(pool) {
   app.get('/api/cve/capabilities', (req, res) => Object.keys(req.query).length
     ? res.status(400).json({error: 'INVALID_QUERY'}) : send(res, capabilities(), 65536));
   app.get('/api/cve/tree', async (req, res) => send(res, await browseTree(pool, req.query), 65536));
+  app.get('/api/cve/sync-status', async (req, res) => Object.keys(req.query).length
+    ? res.status(400).json({error: 'INVALID_QUERY'}) : send(res, await readSyncStatus(pool), 65536));
   app.get('/api/cve/search', async (req, res) => send(res, evidenceContext(await search(pool, req.query))));
   app.get('/api/cve/context', async (req, res) => send(res, evidenceContext(await search(pool, req.query)), 65536));
   app.get('/api/cve/observations/:id', async (req, res) => {

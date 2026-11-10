@@ -1,0 +1,261 @@
+{
+  "kind": "official_cve_snapshot_verification",
+  "generated_at": "2026-11-10T03:28:44.317Z",
+  "node": "v25.6.1",
+  "postgres": "16.15 (Debian 16.15-1.pgdg13+2)",
+  "snapshot": {
+    "total": 421868,
+    "commit": "1a94c9aa74fbdc2a41e532a2e4dc145c81e89239",
+    "counts": {
+      "files": 1389,
+      "stale": 0,
+      "skipped": 0,
+      "updated": 807,
+      "inserted": 582,
+      "unchanged": 0
+    },
+    "states": [
+      {
+        "count": 402712,
+        "state": "PUBLISHED"
+      },
+      {
+        "count": 19156,
+        "state": "REJECTED"
+      }
+    ],
+    "verified": true,
+    "completed_at": "2026-11-10T03:26:00.200Z",
+    "inventory_hash": "48daa9e3932885c548e6d5ce4534476ca39b261a25895f08c656af56a7792d28"
+  },
+  "records": [
+    {
+      "source": "cvelist",
+      "state": "PUBLISHED",
+      "count": 402712
+    },
+    {
+      "source": "cvelist",
+      "state": "REJECTED",
+      "count": 19156
+    }
+  ],
+  "years": [
+    {
+      "cve_year": "1999",
+      "count": 1579
+    },
+    {
+      "cve_year": "2000",
+      "count": 1243
+    },
+    {
+      "cve_year": "2001",
+      "count": 1556
+    },
+    {
+      "cve_year": "2002",
+      "count": 2393
+    },
+    {
+      "cve_year": "2003",
+      "count": 1555
+    },
+    {
+      "cve_year": "2004",
+      "count": 2707
+    },
+    {
+      "cve_year": "2005",
+      "count": 4770
+    },
+    {
+      "cve_year": "2006",
+      "count": 7145
+    },
+    {
+      "cve_year": "2007",
+      "count": 6580
+    },
+    {
+      "cve_year": "2008",
+      "count": 7179
+    },
+    {
+      "cve_year": "2009",
+      "count": 5054
+    },
+    {
+      "cve_year": "2010",
+      "count": 5250
+    },
+    {
+      "cve_year": "2011",
+      "count": 4899
+    },
+    {
+      "cve_year": "2012",
+      "count": 5944
+    },
+    {
+      "cve_year": "2013",
+      "count": 6836
+    },
+    {
+      "cve_year": "2014",
+      "count": 9011
+    },
+    {
+      "cve_year": "2015",
+      "count": 8786
+    },
+    {
+      "cve_year": "2016",
+      "count": 10656
+    },
+    {
+      "cve_year": "2017",
+      "count": 17113
+    },
+    {
+      "cve_year": "2018",
+      "count": 17819
+    },
+    {
+      "cve_year": "2019",
+      "count": 17684
+    },
+    {
+      "cve_year": "2020",
+      "count": 21141
+    },
+    {
+      "cve_year": "2021",
+      "count": 23494
+    },
+    {
+      "cve_year": "2022",
+      "count": 27632
+    },
+    {
+      "cve_year": "2023",
+      "count": 31509
+    },
+    {
+      "cve_year": "2024",
+      "count": 39369
+    },
+    {
+      "cve_year": "2025",
+      "count": 45483
+    },
+    {
+      "cve_year": "2026",
+      "count": 87481
+    }
+  ],
+  "database_bytes": 4348476439,
+  "checks": [
+    {
+      "route": "/health/ready",
+      "status": 200,
+      "elapsed_ms": 209.158,
+      "bytes": 14
+    },
+    {
+      "route": "/api/cve/sync-status",
+      "status": 200,
+      "elapsed_ms": 3136.306,
+      "bytes": 2201
+    },
+    {
+      "route": "/api/cve/tree",
+      "status": 200,
+      "elapsed_ms": 9511.791,
+      "bytes": 681,
+      "nodes": [
+        {
+          "key": "java",
+          "cve_count": 89
+        },
+        {
+          "key": "other",
+          "cve_count": 402288
+        },
+        {
+          "key": "sql",
+          "cve_count": 209
+        },
+        {
+          "key": "web",
+          "cve_count": 216
+        }
+      ]
+    },
+    {
+      "route": "/api/cve/tree?stack=web&product=ngix",
+      "status": 200,
+      "elapsed_ms": 24.867,
+      "bytes": 1477,
+      "nodes": [
+        {
+          "key": "42f1c23246ed47f1bcc1080bea252adf713de55b111181f9b2373ebcc8b1b6d5",
+          "cve_count": 2,
+          "product": "nginx"
+        },
+        {
+          "key": "bfe3ef532bc359146901504a654f058a40991d507bcba826ba9f63bbcce81722",
+          "cve_count": 3,
+          "product": "nginx"
+        },
+        {
+          "key": "fa1e21c22b1241020348b53095a3239abcbb26ef0d7812690978c553ccc2cc46",
+          "cve_count": 6,
+          "product": "nginx"
+        }
+      ]
+    },
+    {
+      "route": "/api/cve/context?id=CVE-1999-0001&include_rejected=true",
+      "status": 200,
+      "elapsed_ms": 27.132,
+      "bytes": 3314,
+      "cve_ids": [
+        "CVE-1999-0001"
+      ]
+    },
+    {
+      "route": "/api/cve/context?id=CVE-2014-0160&include_rejected=true",
+      "status": 200,
+      "elapsed_ms": 13.876,
+      "bytes": 3917,
+      "cve_ids": [
+        "CVE-2014-0160"
+      ]
+    },
+    {
+      "route": "/api/cve/context?id=CVE-2021-44228&include_rejected=true",
+      "status": 200,
+      "elapsed_ms": 19.254,
+      "bytes": 4802,
+      "cve_ids": [
+        "CVE-2021-44228"
+      ]
+    },
+    {
+      "route": "/api/cve/context?id=CVE-2026-0001&include_rejected=true",
+      "status": 200,
+      "elapsed_ms": 9.832,
+      "bytes": 4057,
+      "cve_ids": [
+        "CVE-2026-0001"
+      ]
+    }
+  ],
+  "observation_check": {
+    "id": "334911",
+    "cve_id": "CVE-2026-0001",
+    "sha256": "88b0006846aaf945ad6a91a6c3655ccb45d6eb2bde62005ceb40981c3a76220e"
+  },
+  "limitations": "Single serial HTTP checks, not a load benchmark or retrieval-quality evaluation. Complete public CVE Program snapshot only; supplemental sources have independent coverage."
+}

@@ -17,11 +17,15 @@
 
 - 核心目录：`cve/`；独立数据库结构：`db/cve_schema.sql`。
 - 安装：Node.js 22+、PostgreSQL 16，仓库根目录运行 `npm ci`。
-- 迁移、导入、启动：`node scripts/cve_cli.js migrate / import / serve`，具体参数和角色权限见 [CVE README](cve/README.md)。必须显式配置 `CVE_DATABASE_URL`；读取服务默认监听 `127.0.0.1:3100`。
+- 本机持久库：`node scripts/cve_local.js setup`，独立 PostgreSQL 16、端口5433、数据持久保存在 `data/cve/postgres`；详见 [持久运行说明](docs/cve-persistent-runtime.md)。
+- 全量获取：`node scripts/cve_cli.js full`；立即同步：`node scripts/cve_cli.js sync-now`。从 CVE Program 官方仓库自动获取、按固定版本批量续传，并核对清单完整性。尚无基线时立即同步会先建立全量库。
+- 读取启动与覆盖状态：`node scripts/cve_cli.js serve --local true` / `node scripts/cve_cli.js status --local true`。读取服务默认监听 `127.0.0.1:3100`；自管数据库使用显式 `CVE_DATABASE_URL`，角色权限见 [CVE README](cve/README.md)。
 - 智能体入口：HTTP 与 `node scripts/cve_mcp.js`。能力发现、检索树、上下文与完整证据契约见 [检索树设计](docs/cve-retrieval-tree.md)。
 - 验证：`node --test cve/test/*.test.js`；真实数据库检查需显式测试连接，结果与限制记录在 [CVE 状态](cve/STATUS.md)。
 
 现有 `npm start`、根 `server.js`、`public/` 和下面的材料属于旧项目记忆原型；当前阶段保留代码与用户数据用于迁移参考，不作为新产品启动路径。旧的模型记忆评测不能证明漏洞检索质量。检索树的验收要区分合成回归、真实语料召回率、延迟及智能体任务效果。
+
+“全量”指固定官方提交中的公开 CVE 记录，包含 REJECTED；不表示 NVD/GHSA 等补充来源全部齐备。智能体可通过 `cve_sync_status` 或 `/api/cve/sync-status` 查看最后核验的版本、数量及未完成进度。同步期间查询可见已经提交的批次；有 pending 时不能声称整个库已切换到新快照。数据库、来源缓存与本地凭据均不提交到 Git。
 
 <details>
 <summary>历史项目记忆原型：运行、升级、比赛材料与证据（不再定义产品方向）</summary>

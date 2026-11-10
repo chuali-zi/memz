@@ -124,7 +124,7 @@ test('isolated PostgreSQL tree discovery, evidence navigation and projection lif
         mcp = new Client({name:'tree-fixture',version:'1.0.0'});
         await mcp.connect(new StdioClientTransport({command:process.execPath,args:[path.join(__dirname,'..','..','scripts','cve_mcp.js')],env:{...process.env,CVE_BASE_URL:base},stderr:'pipe'}));
         const tools = (await mcp.listTools()).tools;
-        assert.deepEqual(tools.map(x => x.name),['cve_capabilities','cve_browse_tree','cve_read_context','cve_read_observation']);
+        assert.deepEqual(tools.map(x => x.name),['cve_capabilities','cve_browse_tree','cve_read_context','cve_read_observation','cve_sync_status']);
         assert.ok(tools.every(x => x.annotations.readOnlyHint && !x.annotations.destructiveHint));
         const call = async (name,args = {}) => {
           const response = await mcp.callTool({name,arguments:args});

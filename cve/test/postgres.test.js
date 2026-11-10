@@ -155,7 +155,7 @@ test('isolated PostgreSQL CVE migration, lifecycle, sync, retrieval, HTTP and MC
       const {StdioClientTransport} = require('@modelcontextprotocol/sdk/client/stdio.js');
       const transport = new StdioClientTransport({command:process.execPath,args:[path.join(__dirname,'..','..','scripts','cve_mcp.js')],env:{...process.env,CVE_BASE_URL:base},stderr:'pipe'});
       mcp = new McpClient({name:'cve-fixture',version:'1.0.0'});await mcp.connect(transport);
-      assert.deepEqual((await mcp.listTools()).tools.map(x=>x.name),['cve_capabilities','cve_browse_tree','cve_read_context','cve_read_observation']);
+      assert.deepEqual((await mcp.listTools()).tools.map(x=>x.name),['cve_capabilities','cve_browse_tree','cve_read_context','cve_read_observation','cve_sync_status']);
       const result = await mcp.callTool({name:'cve_read_context',arguments:{id:'CVE-2099-10001',limit:1}});assert.equal(result.isError,false);
       assert.equal(JSON.parse(result.content[0].text).items[0].cve_id,'CVE-2099-10001');
       const invalid = await mcp.callTool({name:'cve_read_context',arguments:{q:'x',limit:51}});assert.equal(invalid.isError,true);

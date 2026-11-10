@@ -13,15 +13,21 @@ const aliases = Object.freeze({ngix: 'nginx'});
 const servicePattern = /^[a-f0-9]{64}$/;
 const cwePattern = /^(?:CWE-\d{1,10}|unclassified)$/;
 function publishedCondition(alias, state = `${alias}.normalized->>'state'`) {
+  // A normalized CVE Program record is its own highest-priority authority.
+  // The facets trigger copies its state in the same transaction; avoid reading
+  // and decompressing the same normalized JSON again for every tree facet.
   return `${state}='PUBLISHED' AND
-    (SELECT authority.normalized->>'state' FROM cve.records authority WHERE authority.cve_id=${alias}.cve_id
-     ORDER BY CASE authority.source WHEN 'cvelist' THEN 0 WHEN 'nvd' THEN 1 WHEN 'ghsa' THEN 2 WHEN 'circl' THEN 3 ELSE 4 END,authority.source_id LIMIT 1)='PUBLISHED'`;
+    (${alias}.source='cvelist' OR
+     (SELECT authority.normalized->>'state' FROM cve.records authority WHERE authority.cve_id=${alias}.cve_id
+      ORDER BY CASE authority.source WHEN 'cvelist' THEN 0 WHEN 'nvd' THEN 1 WHEN 'ghsa' THEN 2 WHEN 'circl' THEN 3 ELSE 4 END,authority.source_id LIMIT 1)='PUBLISHED')`;
 }
 function capabilities() {
   return {
     schema: 'memz.cve.capabilities.v1', name: 'Memz', domain: 'vulnerability_knowledge_and_cve_details',
     purpose: 'Find source-attributed vulnerability candidates for a technology stack, service or CVE, understand conditions and choose the next verification step.',
     taxonomy_version: 1, stacks, product_aliases: aliases,
+    data_status: {path: '/api/cve/sync-status', tool: 'cve_sync_status',
+      purpose: 'Check the last verified official snapshot, pending progress and independent supplemental-source coverage before relying on an empty result.'},
     modes: {tree: {enabled: true}, structured: {enabled: true}, lexical: {enabled: true, semantics: 'simple_all_terms'},
       natural_language: {enabled: false, status: 'reserved', error: 'RETRIEVAL_MODE_NOT_IMPLEMENTED'}},
     workflow: [

@@ -1,8 +1,70 @@
 # CVE 模块状态
 
-核对日期：2026-11-09（Asia/Shanghai）。当前产品方向是向 AI 智能体提供漏洞知识与 CVE 详情；[模块接入](README.md)、[检索树契约](../docs/cve-retrieval-tree.md)、[从零调用指南](../docs/cve-agent-guide.md) 是当前入口。旧项目记忆、审批、比赛材料和 memory benchmarks 仅保留为历史资料。
+核对日期：2026-11-10（Asia/Shanghai）。当前产品方向是向 AI 智能体提供漏洞知识与 CVE 详情；[模块接入](README.md)、[持久运行说明](../docs/cve-persistent-runtime.md)、[检索树契约](../docs/cve-retrieval-tree.md)、[从零调用指南](../docs/cve-agent-guide.md) 是当前入口。旧项目记忆、审批、比赛材料和 memory benchmarks 仅保留为历史资料。
 
-## 2026-11-09 本轮实现
+## 2026-11-09～10 持久全量主库实现
+
+- 增加独立 `memz-cve` Compose 项目、PG16 `memz_cve` 库及 `127.0.0.1:5433` 入口。PGDATA 绑定 `D:\race\shujuku\data\cve\postgres`，来源缓存与私有随机凭据保存在被忽略的 `data/cve/`；不把数据、缓存或凭据纳入代码提交。reader / ingester / owner 分离，读取智能体使用 reader；reader 可读同步元数据，ingester 可追加 observations、维护 records/facets/source_files，但不能 UPDATE/DELETE 历史 observations。
+- 增加托管 `full` / `sync-now`：自动获取官方 CVE Program bare 仓库，首次浅 fetch、后续增量 fetch，持续 `git cat-file` 读取固定 commit 的对象。默认500文件一个事务，原子写 observations、records、facets、source_files 与批次断点。pending 优先离线恢复原固定目标，完成后再执行一次 `sync-now` 追新。
+- 增加完整 manifest 和当前证据一致性核验，核对数量、CVE/路径/blob 清单 hash、台账与 observation hash、records 与 observation normalized 一致性；成功后才前移 completed。删除、非祖先历史/历史回退和来源日期回退明确停止，`full` 不清库。
+- 增加 HTTP `/api/cve/sync-status`、Node `readSyncStatus` 与第五个只读 MCP 工具 `cve_sync_status`。覆盖状态区分 `not_verified`、`partial_update`、`verified_at_last_completed_sync`；pending 时读取可能跨 commit，完成标记仅说明上次完成时的固定快照。树与同步状态计数复用 facets 的当前投影，避免为计数扫描宽来源 JSON；性能结论限于实际报告。
+- 实际导入出现过 Docker/数据库中断，批次恢复保留已提交数据并继续固定目标；也出现过管理员批次命中15秒 SQL 限时。托管批次与完整校验改用事务内120秒预算，读取路径仍保留15秒预算；后续管理批次回归单独记录，未将先前失败报告当作通过。
+
+## 持久全量主库的实际结果
+
+首次官方公共全量基线已于 **2026-11-09 14:18:57.391 +08:00** 完成并核验。依据[归档全量结果](evidence/full-2026-11-09/full-result.json)（本机原始文件为 `artifacts/cve-full-work/full-complete-result.json`），`status=complete`、`mode=full`、`resumed=true`、`snapshot.verified=true`：
+
+| 固定快照项目 | 实际结果 |
+| --- | --- |
+| 上游 | CVE Program 官方 cvelistV5；公开 CVE JSON，包含 REJECTED |
+| Git commit | `4acc5defac150feb879b4f6200a66121deb4c76d` |
+| 完整清单/当前记录总数 | **421,286** |
+| PUBLISHED | **402,145** |
+| REJECTED | **19,141** |
+| inventory hash | `92bfb747e03317353390bda5637e5cfb8604470155c4b53292566740d723679f` |
+| 完成时间 UTC | `2026-11-09T06:18:57.391Z` |
+| 累计导入 | inserted/files 各421,286；updated/unchanged/stale/skipped 各0 |
+
+最终 run_id=4 的单次运行计数为25,786项，表示最后恢复段；不能把这一段当作全库数量。首次进度日志最后输出218,500项后中断，数据库已提交批次恢复点为220,000，恢复日志随后从220,500继续；后续还有超时失败与固定目标续跑，最终以上述 completed 校验结果为准。此证据确认固定公开快照的本地覆盖，不包括未公开 RESERVED 详情，也不证明 NVD/GHSA/KEV/CIRCL 全量、实时上游最新或真实召回质量。
+
+**2026-11-10 11:26:00.200 +08:00，真实 `sync-now` 已完成增量更新并重新核验全库。** [实际增量结果](evidence/full-2026-11-09/sync-now-result.json) 为 run_id=5、`status=complete`、`mode=incremental`、`resumed=false`、`snapshot.verified=true`；今天最新的已完成快照如下，首次全量基线继续保留在上表：
+
+| 增量后的固定快照项目 | 实际结果 |
+| --- | --- |
+| Git commit | `1a94c9aa74fbdc2a41e532a2e4dc145c81e89239` |
+| 完整清单/当前记录总数 | **421,868** |
+| PUBLISHED | **402,712** |
+| REJECTED | **19,156** |
+| inventory hash | `48daa9e3932885c548e6d5ce4534476ca39b261a25895f08c656af56a7792d28` |
+| 完成时间 UTC | `2026-11-10T03:26:00.200Z` |
+| 本次变更 | **新增582、更新807，共处理1,389个文件**；unchanged/stale/skipped均0 |
+
+增量数量描述本次修改范围，421,868描述重新核验的完整快照；它比首次基线净增582个CVE。完成标记固定到上述commit与时间，不构成对其后上游提交的实时保证。
+
+| 检查 | 当前结果 | 证据 |
+| --- | --- | --- |
+| 单元/PG/HTTP/MCP/托管源回归 | Node22.23.4、24.22.2、25.6.1各 **81/81通过，0失败/跳过/取消** | [Node22 TAP](evidence/full-2026-11-09/tests-node22.tap)、[Node24 TAP](evidence/full-2026-11-09/tests-node24.tap)、[Node25 TAP](evidence/full-2026-11-09/tests-node25.tap) |
+| 管理批次预算调整后的定向回归 | **11/11通过，0失败/跳过/取消**；在上述81项报告后调整管理员超时并单独重跑，不把三版本报告说成调整后的全套重跑 | [实际TAP](evidence/full-2026-11-09/tests-admin-budget.tap) |
+| 合成候选契约评测 | **16/16通过**；3条原创合成CVE、6条来源记录 | [候选评测](evidence/full-2026-11-09/evaluation.json) |
+| 合成树/HTTP规模检查 | **4/4通过**；2000条原创合成CVE，单持有只读连接，每组1次热身+20次串行测量 | [树报告](evidence/full-2026-11-09/tree-evaluation.json)；不是421,286条真实全库性能测量 |
+| 真实固定快照全量导入与校验 | **421,286/421,286，verified=true** | 上述实际完成结果；[本轮证据范围](evidence/full-2026-11-09/README.md) |
+| 真实 `sync-now` 立即同步 | **complete，新增582/更新807，完整421,868项重新verified** | [实际增量结果](evidence/full-2026-11-09/sync-now-result.json)；commit与时间见上表 |
+| Docker profile恢复、启停与持久读取 | **2026-11-10恢复原profile，CVE PG与原shujuku容器healthy，独立CVE容器stop/start成功；重启后421,868项、1999～2026共28年，8项HTTP及1项完整observation检查通过** | [实际重启后验证](evidence/full-2026-11-09/live-verification.json)；HTTP3100已运行，单次功能检查不是负载测试 |
+| 本轮提交/推送与CI | **本机检查已完成；实际提交、推送及CI结果见Git日志和最终交付** | 不沿用历史提交和CI成功作为本轮结果 |
+
+本轮 evidence 的归档范围和已知限制见 [full-2026-11-09](evidence/full-2026-11-09/README.md)。本轮跨版本回归、合成评测与真实全量完成是不同证据：前两者验证所列工程契约，后者验证固定上游快照的数量与当前证据一致性。
+
+重启后实际验证生成于 `2026-11-10T03:28:44.317Z`，记录库大小 **4,348,476,439 bytes**；年份分组共28年（1999～2026），合计421,868项，与最新completed快照一致。8个HTTP请求均返回200，覆盖ready、同步状态、树根、ngix产品别名及1999/2014/2021/2026跨年份精确上下文；另读取并校验固定observation `334911`（CVE-2026-0001）的完整证据与hash。报告保留单次耗时；其中树根约9.51秒，不能把这些单次结果当作p50/p95、并发吞吐或生产SLA。
+
+## 当前边界与未完成项
+
+已建立上述固定提交的持久全量 CVE Program 主库，真实立即同步已完成并更新到421,868项；原Docker profile及基础服务已恢复，独立CVE容器stop/start后的跨年份、HTTP与完整observation持久读取已通过单次功能检查。没有完成生产部署、所有补充来源全量、备份恢复演练、长期自动调度或真实语料检索质量评测。合成正确性、固定规模延迟及本次真实全库单次功能检查不代表真实 Recall/Precision、全库并发性能或智能体任务效果；真实资料和问题集应冻结版本，测量召回/精确率、证据完整性、零结果、调用次数、响应字节与p50/p95。
+
+未在 pentest-tools 注册或联调真实智能体任务；没有自动执行漏洞测试。目标产品/版本/配置仍由调用方读完整 observation 核实。自然语言模糊检索、embedding 与生态版本比较器尚未实现。旧实现和既有用户数据保留；恢复profile后原shujuku容器已正常启动。本次重启读取证明所列快照和功能当时可用，不能替代长期监控、故障恢复与备份恢复验收。
+
+## 2026-11-09 检索树历史实现
+
+以下为持久全量任务之前的检索树第一版记录；其中“本轮”仅指当时的树功能，不代表本次全量任务的实现或成绩。
 
 - 增加无参数 capabilities，说明领域、可用/保留模式、调用顺序、例子与限制；CLI capabilities 不需要数据库连接。
 - 增加按本地当前资料浏览的 stack → service → CWE 检索树，再用节点 context_query 取 CVE 候选。service 是 vendor/product/ecosystem 组合的不透明64字符十六进制键（SHA-256），区分同名服务；树支持绑定范围的游标、默认10/最多50和明确空结果指引。
@@ -12,7 +74,7 @@
 - MCP 提供 cve_capabilities、cve_browse_tree、cve_read_context、cve_read_observation 四个只读工具；Node 客户端与 HTTP/CLI 覆盖对应流程。
 - natural_language 仅保留接口，返回501 RETRIEVAL_MODE_NOT_IMPLEMENTED；没有 embedding、自然语言规划或通用版本受影响判定。CWE 提示是通用核查线索，不是 CVE 复现步骤。
 
-## 2026-11-09 本轮验证记录
+## 2026-11-09 检索树历史验证记录
 
 本轮跨 Node 完整回归、合成候选评测和树规模检查已取得下列实际结果。专用ingester角色已按README列出的权限实际验证导入成功。下方2026-11-08结果只属于树实现之前的历史基线，不能直接视作新增能力通过。文档调用示例也不构成真实目标智能体联调。
 
@@ -38,9 +100,9 @@
 
 本轮结束后的只读清理检查：0个临时测试数据库、0个临时测试角色；原有 memz 数据库中没有创建 cve schema。
 
-## 当前边界与未完成项
+## 检索树第一版结束时的历史边界
 
-没有持久全量 CVE 库、生产部署、全量覆盖率结论或真实语料检索质量评测。合成正确性与固定规模延迟只验证对应工程行为，不能代表全球 CVE 规模、真实 Recall/Precision 或智能体任务效果。真实资料和问题集应冻结版本，测量召回/精确率、证据完整性、零结果、调用次数、响应字节与p50/p95。
+当时尚无持久全量 CVE 库、生产部署、全量覆盖率结论或真实语料检索质量评测。其中持久主库状态已由本文上方的真实固定快照完成结果更新；本节仅保留历史背景。合成正确性与固定规模延迟只验证对应工程行为，不能代表全球 CVE 规模、真实 Recall/Precision 或智能体任务效果。
 
 未在 pentest-tools 注册或联调真实智能体任务；没有自动执行漏洞测试。目标产品/版本/配置仍由调用方读完整 observation 核实。自然语言模糊检索、生态版本比较器、长期同步覆盖与恢复演练仍待独立任务。旧实现和既有用户数据保留，不能以方向转变为理由删除或混入其他任务变更。
 

@@ -120,6 +120,17 @@ CREATE TABLE IF NOT EXISTS cve.checkpoints (
   cursor jsonb NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- Managed official snapshots: membership/blob identity plus the canonical raw JSON digest.
+-- Updated atomically with each imported batch and its resume checkpoint.
+CREATE TABLE IF NOT EXISTS cve.source_files (
+  source text NOT NULL CHECK (source='cvelist'),
+  cve_id text NOT NULL CHECK (cve_id ~ '^CVE-[0-9]{4}-[0-9]{4,}$'),
+  path text NOT NULL,
+  blob_oid text NOT NULL CHECK (blob_oid ~ '^([a-f0-9]{40}|[a-f0-9]{64})$'),
+  sha256 text NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$'),
+  PRIMARY KEY(source,cve_id),
+  UNIQUE(source,path)
+);
 CREATE TABLE IF NOT EXISTS cve.sync_runs (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   source text NOT NULL,

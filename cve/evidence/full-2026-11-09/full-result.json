@@ -1,0 +1,39 @@
+{
+  "run_id": "4",
+  "status": "complete",
+  "counts": {
+    "inserted": 25786,
+    "updated": 0,
+    "unchanged": 0,
+    "stale": 0,
+    "skipped": 0,
+    "files": 25786
+  },
+  "mode": "full",
+  "resumed": true,
+  "snapshot": {
+    "total": 421286,
+    "inventory_hash": "92bfb747e03317353390bda5637e5cfb8604470155c4b53292566740d723679f",
+    "states": [
+      {
+        "state": "PUBLISHED",
+        "count": 402145
+      },
+      {
+        "state": "REJECTED",
+        "count": 19141
+      }
+    ],
+    "verified": true,
+    "commit": "4acc5defac150feb879b4f6200a66121deb4c76d",
+    "completed_at": "2026-11-09T06:18:57.391Z",
+    "counts": {
+      "files": 421286,
+      "stale": 0,
+      "skipped": 0,
+      "updated": 0,
+      "inserted": 421286,
+      "unchanged": 0
+    }
+  }
+}
